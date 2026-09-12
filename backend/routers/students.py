@@ -11,7 +11,7 @@ async def list_students():
     cursor = await db.execute("SELECT * FROM students ORDER BY name")
     rows = await cursor.fetchall()
     await db.close()
-    return rows
+    return [dict(row) for row in rows]
 
 
 @router.post("/", response_model=StudentResponse)
@@ -29,7 +29,7 @@ async def create_student(data: StudentCreate):
         await db.close()
         raise HTTPException(status_code=400, detail="Student with this NIM already exists")
     await db.close()
-    return student
+    return dict(student)
 
 
 @router.get("/{student_id}", response_model=StudentResponse)
@@ -40,7 +40,7 @@ async def get_student(student_id: int):
     await db.close()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    return student
+    return dict(student)
 
 
 @router.delete("/{student_id}")

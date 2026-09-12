@@ -11,7 +11,7 @@ async def list_schedules():
     cursor = await db.execute("SELECT * FROM schedules ORDER BY day_of_week, start_time")
     rows = await cursor.fetchall()
     await db.close()
-    return rows
+    return [dict(row) for row in rows]
 
 
 @router.post("/", response_model=ScheduleResponse)
@@ -25,7 +25,7 @@ async def create_schedule(data: ScheduleCreate):
     cursor = await db.execute("SELECT * FROM schedules ORDER BY id DESC LIMIT 1")
     schedule = await cursor.fetchone()
     await db.close()
-    return schedule
+    return dict(schedule)
 
 
 @router.delete("/{schedule_id}")

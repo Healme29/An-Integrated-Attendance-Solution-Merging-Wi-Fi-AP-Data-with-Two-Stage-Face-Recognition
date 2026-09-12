@@ -44,7 +44,7 @@ async def get_today_attendance():
     )
     rows = await cursor.fetchall()
     await db.close()
-    return rows
+    return [dict(row) for row in rows]
 
 
 @router.get("/student/{student_id}")

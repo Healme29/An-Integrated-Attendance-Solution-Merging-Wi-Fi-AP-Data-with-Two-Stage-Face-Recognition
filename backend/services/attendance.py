@@ -87,6 +87,8 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
     att_id = (await cursor.fetchone())[0]
     await db.close()
 
+    from datetime import datetime
+
     return {
         "id": att_id,
         "student_id": student_id,
@@ -94,5 +96,6 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
         "check_type": check_type,
         "confidence": confidence,
         "wifi_verified": wifi_verified,
-        "status": status
+        "status": status,
+        "timestamp": datetime.now()
     }
