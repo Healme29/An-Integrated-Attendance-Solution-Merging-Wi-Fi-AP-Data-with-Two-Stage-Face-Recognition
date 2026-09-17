@@ -1,0 +1,37 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+
+# Model weights (large files)
+*.pt
+
+# Embeddings
+backend/data/embeddings/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flutter
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins*
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/ios/.symlinks/
+mobile/ios/Pods/
+mobile/.idea/
