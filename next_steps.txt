@@ -1,0 +1,136 @@
+Next Steps - Action Plan
+=========================
+Date: September 15, 2026
+Project: Integrated Attendance System (Wi-Fi + Two-Stage Face Recognition)
+
+Goal: Get the system to a testable state, then ready for school deployment.
+
+---
+
+WEEK 1-2: PRIORITY 1 - BLOCKERS
+--------------------------------
+
+Step 1 - Fix Face Enrollment Data Saving
+  - Create backend/data/faces/ directory
+  - Write uploaded image bytes to disk (not just store path)
+  - Store real face embedding bytes in database (not "b"blob"" literal)
+  - Test: Enroll a face via Swagger UI and verify data in database
+
+Step 2 - Link Start and End Selfies (Two-Stage Logic)
+  - Create a function to find existing "start" record for same student+schedule
+  - When "end" check arrives, pair it with the "start" record
+  - Add new status values: "partial" (only start done), "verified" (both done)
+  - Do NOT mark attendance as fully "present" until both checks exist
+  - Prevent duplicate check-ins for the same schedule session
+  - Test: Enroll face, do start check, do end check, verify both are linked
+
+Step 3 - Enforce Schedule Time Validation
+  - Call get_schedules_for_now() in the attendance check router
+  - Reject attendance if current time is outside the schedule window
+  - Use ATTENDANCE_CHECK_WINDOW_MINUTES for grace period before/after class
+  - Test: Try checking in outside class hours - should be rejected
+
+Step 4 - Fix Mobile-Backend Data Contract
+  - Update Flutter AttendanceResult model to match backend's response fields
+    (id, student_id, schedule_id, check_type, confidence, wifi_verified,
+     status, timestamp)
+  - OR change backend response to match what Flutter expects
+  - Test: Capture photo on phone, upload, see correct result on screen
+
+At the end of Week 2: The system should be testable end-to-end for the
+first time using Swagger UI (backend) and a real Android phone (mobile).
+
+---
+
+WEEK 3-4: PRIORITY 2 - IMPORTANT
+-----------------------------------
+
+Step 5 - Student Enrollment Screen in Mobile App
+  - Add a screen where students can take a selfie and enroll their face
+  - Connect to POST /faces/enroll endpoint
+  - Show success/failure feedback
+
+Step 6 - Student Login
+  - Add simple login by NIM (student ID number)
+  - Store logged-in student ID in SharedPreferences
+  - Use this ID for attendance check-ins
+
+Step 7 - Teacher Web Dashboard
+  - Build a simple web page (or new Flutter screen) for teachers
+  - Show today's attendance list: who is present, who is absent
+  - Filter by class/schedule
+  - Use GET /attendance/today and GET /attendance/student/{id} endpoints
+
+Step 8 - Configurable Server URL
+  - Add a settings screen in Flutter app
+  - Allow changing the backend URL (for different school networks)
+  - Store URL in SharedPreferences
+
+Step 9 - Network Error Handling
+  - Add try-catch around all API calls in Flutter
+  - Show user-friendly error messages (not crashes)
+  - Add retry button on failure
+
+Step 10 - Test on Real School Infrastructure
+  - Deploy backend on a school computer
+  - Connect mobile app to school Wi-Fi
+  - Test Wi-Fi scanning detects real student devices
+  - Test the full flow: login -> start selfie -> attend class -> end selfie
+
+---
+
+WEEK 5-6: POLISH AND DEPLOYMENT
+---------------------------------
+
+Step 11 - Docker Setup
+  - Create Dockerfile for backend
+  - Create docker-compose.yml (backend + database)
+  - Write deployment instructions
+
+Step 12 - Attendance History View
+  - Add screen in mobile app for students to see their own history
+
+Step 13 - CSV/PDF Export
+  - Add endpoint to export attendance as CSV
+  - Add endpoint for PDF summary per class
+
+Step 14 - Teacher Notifications
+  - Alert teachers when a student's attendance is incomplete
+  - Simple in-app notification or email
+
+Step 15 - Offline Mode
+  - Cache attendance records locally on phone
+  - Sync when connection is available
+
+---
+
+MILESTONE SUMMARY
+-----------------
+  Milestone 1 (End of Week 2): Backend testable via Swagger UI
+    - Face enrollment works correctly
+    - Two-stage logic pairs start + end checks
+    - Schedule time is enforced
+    - Mobile app displays correct attendance data
+
+  Milestone 2 (End of Week 4): First real school trial
+    - Students can enroll and check in from their phones
+    - Teachers can view attendance via dashboard
+    - Wi-Fi scanning works on school network
+    - Error handling prevents crashes
+
+  Milestone 3 (End of Week 6): Production ready
+    - Docker deployment
+    - Attendance history and export
+    - Offline fallback
+    - Push notifications
+
+---
+
+FIRST ACTION TO TAKE RIGHT NOW
+-------------------------------
+1. Open backend/services/attendance.py
+2. Open backend/routers/attendance.py
+3. Open backend/data/ directory
+4. Start Step 1: Create the faces/ directory and fix the enrollment function
+
+Need help? Ask me to start implementing any specific step.

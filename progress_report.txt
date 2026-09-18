@@ -1,0 +1,140 @@
+Progress Report: An Integrated Attendance Solution Merging Wi-Fi AP Data with Two-Stage Face Recognition
+========================================================================================================
+
+Project Overview
+----------------
+An automated attendance system that requires three conditions to be met:
+1. Student's device connected to the correct classroom Wi-Fi AP
+2. Attendance attempt within valid class schedule time
+3. Face match at BOTH start-of-class AND end-of-class selfies
+
+Tech Stack: Python/FastAPI backend with SQLite | Flutter mobile app (Android/iOS)
+
+Target Users: Students and teachers at school for daily attendance tracking.
+
+
+Overall Project Readiness for School Use: ~5%
+==============================================
+
+This number reflects whether the system can be installed and used by real
+students and teachers today. The answer is: not yet. The project has a good
+foundation of source code, but the critical parts that make it actually work
+in a school are still missing.
+
+Breakdown by Requirement
+-------------------------
+Below is each requirement needed for the system to be usable in school,
+along with its current readiness percentage.
+
+  REQUIREMENT                          READINESS   NOTES
+  -------------------------------------------------------------------------
+  Face enrollment saves & works          0%       Image bytes never saved to
+                                                 disk. Embedding data stored
+                                                 incorrectly. Cannot enroll
+                                                 a real student properly.
+
+  Two-stage attendance logic             0%       The core concept requires
+  (start + end selfie linked)                     linking start and end check-
+                                                 ins. Currently each selfie is
+                                                 recorded independently with
+                                                 no connection between them.
+
+  Schedule time enforcement              0%       Students can check in at any
+                                                 time, even outside class hours.
+                                                 The code to check time exists
+                                                 but is never used.
+
+  Mobile app displays correct data       0%       The Flutter app expects data
+                                                 in a different format than
+                                                 what the backend sends. It
+                                                 will crash or show wrong info.
+
+  Student self-enrollment via app        0%       No screen to register face
+                                                 from the phone. Must use
+                                                 technical API calls manually.
+
+  Teacher/admin dashboard                0%       No web interface. Teachers
+                                                 cannot view who is present or
+                                                 absent.
+
+  Login / authentication                 0%       No login system. Anyone can
+                                                 access or modify data.
+
+  Works on real Android/iOS devices      0%       Only tested with mocked data.
+                                                 Hardcoded to Android emulator.
+
+  Reliable Wi-Fi scanning on campus     10%       Code exists but never tested
+                                                 on a real school network.
+
+  Database schema                        100%     All 5 tables are properly
+                                                 created with constraints.
+
+What Is Actually Working Today
+-------------------------------
+- Database structure (tables, foreign keys)
+- API endpoint definitions (15 endpoints can receive requests)
+- Face detection & recognition code (YOLOv8 + InsightFace integrated)
+- Wi-Fi scanner logic (ARP scanning written)
+- Flutter app screens (Home, Camera, Result - basic UI exists)
+- Unit tests (33+ tests with mocked data)
+
+However, none of the above has been tested end-to-end with real data,
+real cameras, or real Wi-Fi networks.
+
+What Must Be Done (Priority Order)
+------------------------------------
+
+PRIORITY 1 - BLOCKERS (Must fix before any student can use it)
+  1. Fix face enrollment data saving
+     - Create backend/data/faces/ directory
+     - Save uploaded images to disk
+     - Store real face embeddings in the database
+
+  2. Link start and end selfies
+     - Create logic to pair "start" and "end" check-ins for the same
+       student and class
+     - Only mark attendance as fully verified when BOTH are done
+
+  3. Enforce class schedule time
+     - Connect schedule validation to the attendance check endpoint
+     - Students can only check in during their class time window
+
+  4. Fix mobile app data format
+     - Make Flutter model match what the backend returns
+     - Test camera capture -> upload -> result flow
+
+PRIORITY 2 - IMPORTANT (Needed for real deployment)
+  5. Build student enrollment screen in the mobile app
+  6. Add student login (by NIM / student ID)
+  7. Build a simple web dashboard for teachers
+  8. Make the server URL changeable in the app
+  9. Add error handling for network failures
+  10. Test Wi-Fi scanning on actual school infrastructure
+
+PRIORITY 3 - POLISH (For production readiness)
+  11. Docker setup for easy deployment
+  12. Attendance history view in mobile app
+  13. CSV/PDF export of attendance data
+  14. Push notifications for attendance status
+  15. Offline mode with local data caching
+
+Estimated Timeline to School Readiness
+----------------------------------------
+  Priority 1 (blockers):     2-3 weeks
+  Priority 2 (important):    2-3 weeks
+  Priority 3 (polish):       2-4 weeks
+
+  Total estimated effort:    6-10 weeks with focused development
+
+  Note: This assumes one developer working full-time. Timeline may vary
+  based on testing with real hardware (cameras, school Wi-Fi network).
+
+Summary
+--------
+  The project has a SOLID CODE FOUNDATION (~85% of planned code files exist),
+  but is ONLY ~5% ready for actual school use. The core features that make
+  attendance work (two-stage verification, schedule enforcement, working data
+  saving, functional mobile app) still need to be completed.
+
+  The first milestone is Priority 1 items 1-4. Once those are done, the
+  system will be testable end-to-end for the first time.

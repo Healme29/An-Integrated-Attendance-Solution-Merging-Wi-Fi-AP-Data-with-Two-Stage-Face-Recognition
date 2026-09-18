@@ -2,21 +2,21 @@
 
 ## 1. PROJECT OVERVIEW
 
-**Proyek:** An Integrated Attendance Solution Merging Wi-Fi AP Data with Two-Stage Face Recognition
+**Project:** An Integrated Attendance Solution Merging Wi-Fi AP Data with Two-Stage Face Recognition
 
-**Tujuan:** Membangun sistem absensi otomatis untuk sekolah. Mahasiswa cukup datang ke kelas, foto selfie di awal dan akhir pelajaran, dan sistem otomatis mencatat kehadiran — dengan verifikasi bahwa mereka benar-benar ada di ruangan (Wi-Fi) dan wajahnya cocok (face recognition).
+**Objective:** Build an automated attendance system for schools. Students simply come to class, take a selfie at the beginning and end of the lesson, and the system automatically records attendance — with verification that they are actually in the room (Wi-Fi) and their face matches (face recognition).
 
-**Tiga Syarat Absensi:** Attendance hanya diberikan jika SEMUA kondisi ini terpenuhi:
-1. **Wi-Fi AP:** MAC address perangkat mahasiswa terdeteksi di jaringan kelas (Access Point yang benar)
-2. **Waktu:** Check-in dilakukan dalam jadwal kelas yang valid (±15 menit grace period)
-3. **Dua Selfie:** Wajah cocok di selfie AWAL DAN AKHIR kelas (two-stage verification)
+**Three Attendance Requirements:** Attendance is only granted if ALL of these conditions are met:
+1. **Wi-Fi AP:** The student's device MAC address is detected on the class network (correct Access Point)
+2. **Time:** Check-in is within valid class schedule hours (±15 minute grace period)
+3. **Two Selfies:** Face matches in BOTH the START AND END selfie of class (two-stage verification)
 
 ---
 
 ## 2. TECH STACK
 
-| Layer | Teknologi | Versi |
-|-------|-----------|-------|
+| Layer | Technology | Version |
+|-------|------------|---------|
 | **Backend** | Python + FastAPI | 0.115.0 |
 | **Server** | Uvicorn | 0.30.6 |
 | **Database** | SQLite (async via aiosqlite) | 0.20.0 |
@@ -28,30 +28,30 @@
 | **Mobile Frontend** | Flutter (Android + iOS) | >=3.0.0 |
 | **HTTP Client** | `http` package | ^1.2.2 |
 | **Camera** | `camera` package | ^0.11.0+2 |
-| **Testing** | pytest + pytest-asyncio + httpx | terbaru |
+| **Testing** | pytest + pytest-asyncio + httpx | latest |
 
 ---
 
-## 3. DIRECTORY STRUCTURE (LENGKAP)
+## 3. DIRECTORY STRUCTURE (COMPLETE)
 
 ```
 project-root/
-├── AGENTS.md                           # Panduan AI coding assistant
-├── README.md                           # Dokumentasi proyek
+├── AGENTS.md                           # AI coding assistant guide
+├── README.md                           # Project documentation
 ├── LICENSE                             # MIT License
 ├── next_steps.txt                      # 6-week action plan
 ├── progress_report.txt                 # Readiness assessment (~5%)
 │
-├── docs/                               # Dokumentasi tugas
-│   ├── TUGAS_A_KETUA.md                # Tugas A — Face Recognition Pipeline
-│   ├── TUGAS_B.md                      # Tugas B — Attendance Orchestrator
-│   ├── TUGAS_C.md                      # Tugas C — Flutter Mobile App
-│   ├── TUGAS_D.md                      # Tugas D — Wi-Fi + Testing
-│   └── PROMPT_AI_TEAM.md              # File ini — context lengkap
+├── docs/                               # Task documentation
+│   ├── TASK_A_LEAD.md                  # Task A — Face Recognition Pipeline
+│   ├── TASK_B.md                       # Task B — Attendance Orchestrator
+│   ├── TASK_C.md                       # Task C — Flutter Mobile App
+│   ├── TASK_D.md                       # Task D — Wi-Fi + Testing
+│   └── PROMPT_AI_TEAM.md              # This file — complete context
 │
 ├── backend/                            # FastAPI Backend
 │   ├── main.py                         # Entry point, CORS, router registration
-│   ├── config.py                       # Semua konfigurasi (paths, thresholds, timeouts)
+│   ├── config.py                       # All configuration (paths, thresholds, timeouts)
 │   ├── requirements.txt                # Python dependencies
 │   ├── attendance.db                   # SQLite database (auto-created)
 │   │
@@ -113,40 +113,40 @@ project-root/
 
 ```sql
 -- Table: students
--- Menyimpan data mahasiswa
+-- Stores student data
 CREATE TABLE students (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    name            TEXT NOT NULL,              -- Nama lengkap
-    nim             TEXT UNIQUE NOT NULL,        -- Nomor Induk Mahasiswa
-    mac_address     TEXT,                       -- MAC address device (untuk Wi-Fi check)
+    name            TEXT NOT NULL,              -- Full name
+    nim             TEXT UNIQUE NOT NULL,        -- Student ID Number
+    mac_address     TEXT,                       -- Device MAC address (for Wi-Fi check)
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Table: faces
--- Menyimpan data wajah (embedding vector + path gambar)
+-- Stores face data (embedding vector + image path)
 CREATE TABLE faces (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id      INTEGER NOT NULL,           -- FK → students.id
-    embedding       BLOB NOT NULL,              -- Pickle dari list numpy arrays (512-D)
-    image_path      TEXT,                       -- Path ke file gambar di disk
+    embedding       BLOB NOT NULL,              -- Pickled list of numpy arrays (512-D)
+    image_path      TEXT,                       -- Path to image file on disk
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 );
 
 -- Table: schedules
--- Jadwal kelas
+-- Class schedules
 CREATE TABLE schedules (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    class_name      TEXT NOT NULL,              -- Nama kelas (e.g., "Math 101")
+    class_name      TEXT NOT NULL,              -- Class name (e.g., "Math 101")
     day_of_week     INTEGER NOT NULL,           -- 0=Monday, 6=Sunday
     start_time      TEXT NOT NULL,              -- "HH:MM" format
     end_time        TEXT NOT NULL,              -- "HH:MM" format
-    ap_bssid        TEXT,                       -- BSSID Access Point kelas
-    room            TEXT                        -- Nama ruangan
+    ap_bssid        TEXT,                       -- Class Access Point BSSID
+    room            TEXT                        -- Room name
 );
 
 -- Table: attendance
--- Records absensi
+-- Attendance records
 CREATE TABLE attendance (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id      INTEGER NOT NULL,           -- FK → students.id
@@ -161,7 +161,7 @@ CREATE TABLE attendance (
 );
 
 -- Table: ap_logs
--- Log scan Wi-Fi
+-- Wi-Fi scan logs
 CREATE TABLE ap_logs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     mac_address     TEXT NOT NULL,
@@ -173,22 +173,22 @@ CREATE TABLE ap_logs (
 ```
 
 ### Status Values
-| Status | Arti |
-|--------|------|
-| `pending` | Default — belum diproses |
+| Status | Meaning |
+|--------|---------|
+| `pending` | Default — not yet processed |
 | `present` | Face match + Wi-Fi verified (single check, legacy) |
-| `face_only` | Face match OK, tapi Wi-Fi tidak terverifikasi |
-| `partial` | Hanya "start" check-in (menunggu "end") |
-| `verified` | "start" DAN "end" sudah lengkap → attendance SAH |
+| `face_only` | Face match OK, but Wi-Fi not verified |
+| `partial` | Only "start" check-in (waiting for "end") |
+| `verified` | "start" AND "end" complete → attendance VALID |
 
 ---
 
-## 5. API ENDPOINTS (LENGKAP — 15 Endpoints)
+## 5. API ENDPOINTS (COMPLETE — 15 Endpoints)
 
 ### Students
 | Method | Path | Description | Request | Response |
 |--------|------|-------------|---------|----------|
-| GET | `/students/` | List all (opsional filter `?nim=`) | - | `[StudentResponse]` |
+| GET | `/students/` | List all (optional filter `?nim=`) | - | `[StudentResponse]` |
 | POST | `/students/` | Create student | `{name, nim, mac_address?}` | `StudentResponse` |
 | GET | `/students/{id}` | Get by ID | - | `StudentResponse` |
 | DELETE | `/students/{id}` | Delete student | - | `{message}` |
@@ -291,23 +291,23 @@ class WifiScanResponse(BaseModel):
 
 ### Blocker #1 — Face Enrollment Data Saving (0% readiness)
 - **Location:** `backend/routers/faces.py:42`
-- **Bug:** `(student_id, b"blob", ...)` menyimpan literal string `b"blob"` bukan binary embedding sebenarnya
-- **Fix:** Simpan pickle bytes dari list embeddings, simpan file gambar asli ke disk
+- **Bug:** `(student_id, b"blob", ...)` stores the literal string `b"blob"` instead of the actual binary embedding
+- **Fix:** Store pickle bytes from the embeddings list, save the original image file to disk
 
 ### Blocker #2 — Two-Stage Attendance Logic (0% readiness)
 - **Location:** `backend/services/attendance.py`
-- **Bug:** Setiap selfie dicatat independen, tidak ada hubungan antara check-in "start" dan "end"
-- **Fix:** Implementasi pairing: start → status "partial"; end + ditemukan start → kedua record jadi "verified"
+- **Bug:** Each selfie is recorded independently, no relationship between "start" and "end" check-ins
+- **Fix:** Implement pairing: start → status "partial"; end + found start → both records become "verified"
 
 ### Blocker #3 — Schedule Time Enforcement (0% readiness)
 - **Location:** `backend/routers/attendance.py`
-- **Bug:** Tidak ada validasi waktu. Mahasiswa bisa check-in kapan saja
-- **Fix:** Panggil `get_schedules_for_now()` di router dan tolak jika jadwal tidak aktif
+- **Bug:** No time validation. Students can check in at any time
+- **Fix:** Call `get_schedules_for_now()` in the router and reject if the schedule is not active
 
 ### Blocker #4 — Mobile-Backend Data Contract Mismatch (0% readiness)
 - **Location:** `mobile/lib/models/student.dart` + `mobile/lib/screens/camera_screen.dart`
-- **Bug:** Flutter pakai `AttendanceResult` (cocok untuk `/faces/recognize`) tapi panggil `/attendance/check` yang return format beda
-- **Fix:** Buat model `AttendanceCheckResponse` yang cocok dengan response backend
+- **Bug:** Flutter uses `AttendanceResult` (compatible with `/faces/recognize`) but calls `/attendance/check` which returns a different format
+- **Fix:** Create `AttendanceCheckResponse` model that matches the backend response
 
 ---
 
@@ -339,38 +339,38 @@ class WifiScanResponse(BaseModel):
 ### YOLOv8-face (`yolov8m-face.pt`)
 - **Model source:** YapaLab/yolo-face (GitHub releases)
 - **File size:** ~50 MB
-- **Conf threshold:** 0.25 (configurable di `config.py`)
+- **Conf threshold:** 0.25 (configurable in `config.py`)
 - **Image size:** 1280 px (configurable)
 - **Output:** bounding boxes (xyxy), confidence, optional landmarks
 - **Format:** Ultralytics YOLO model, standard API
 
 ### InsightFace ArcFace (`buffalo_l`)
-- **Model source:** Auto-downloaded oleh InsightFace on first use
+- **Model source:** Auto-downloaded by InsightFace on first use
 - **Provider:** CPUExecutionProvider (ONNX Runtime)
 - **Detection size:** 640×640 px
 - **Embedding dimension:** 512-D float32 vector
 - **Similarity metric:** Cosine similarity (sklearn)
-- **Threshold:** 0.5 (harus di-tuning dengan data real)
-- **Note:** `FaceAnalysis.get()` membutuhkan full image (bukan crop) — lihat bug di Blocker #2
+- **Threshold:** 0.5 (must be tuned with real data)
+- **Note:** `FaceAnalysis.get()` requires the full image (not a crop) — see bug in Blocker #2
 
 ---
 
 ## 10. WI-FI SCANNER DETAILS
 
 ### Windows (`arp -a`)
-- Jalankan `arp -a` via subprocess
-- Parse output dengan regex: `(\d+\.\d+\.\d+\.\d+)\s+([\w-]{17})`
-- Masalah: ARP cache mungkin stale → perlu ping sweep dulu
-- Npcap tidak diperlukan untuk `arp -a` (hanya untuk Scapy di Windows)
+- Run `arp -a` via subprocess
+- Parse output with regex: `(\d+\.\d+\.\d+\.\d+)\s+([\w-]{17})`
+- Issue: ARP cache may be stale → need ping sweep first
+- Npcap not required for `arp -a` (only for Scapy on Windows)
 
 ### Linux (Scapy)
 - `ARP(pdst=subnet)` + `Ether(dst="ff:ff:ff:ff:ff:ff")` + `srp()`
-- Membutuhkan Scapy terinstall: `pip install scapy`
-- Membutuhkan akses root / `sudo` untuk raw socket
+- Requires Scapy installed: `pip install scapy`
+- Requires root access / `sudo` for raw socket
 
 ### MAC Address Format
-Semua MAC harus dinormalisasi: lowercase, `-` diganti `:`.
-- Input: `AA-BB-CC-DD-EE-FF` atau `aa:bb:cc:dd:ee:ff`
+All MACs must be normalized: lowercase, `-` replaced with `:`.
+- Input: `AA-BB-CC-DD-EE-FF` or `aa:bb:cc:dd:ee:ff`
 - Normalized: `aa:bb:cc:dd:ee:ff`
 
 ---
@@ -404,7 +404,7 @@ ATTENDANCE_CHECK_WINDOW_MINUTES = 15
 
 ---
 
-## 12. DEPENDENCIES LENGKAP
+## 12. COMPLETE DEPENDENCIES
 
 ### Python (`requirements.txt`)
 ```
@@ -443,31 +443,31 @@ dependencies:
 
 ## 13. TESTING INFRASTRUCTURE
 
-### Mock Strategy (di `conftest.py`)
-- `mock_face_detection`: Return fake face list `{bbox, confidence, crop}` — semua fungsi `detect_faces_from_bytes()` di-patch
-- `mock_face_recognition`: Return fake embedding (random 512-D) + fake comparison (index 0, score 0.85) — patch `get_embedding`, `compare_faces`, `load_embeddings`
-- `mock_wifi_scanner`: Return `True` untuk `check_mac_on_network()`
-- `mock_is_match`: Return `True` untuk `is_match()`
-- Test DB: Redirect ke file sementara `test_attendance.db`, auto-cleanup setiap test
+### Mock Strategy (in `conftest.py`)
+- `mock_face_detection`: Return fake face list `{bbox, confidence, crop}` — patches all `detect_faces_from_bytes()` functions
+- `mock_face_recognition`: Return fake embedding (random 512-D) + fake comparison (index 0, score 0.85) — patches `get_embedding`, `compare_faces`, `load_embeddings`
+- `mock_wifi_scanner`: Return `True` for `check_mac_on_network()`
+- `mock_is_match`: Return `True` for `is_match()`
+- Test DB: Redirect to temporary file `test_attendance.db`, auto-cleanup per test
 
 ### Test Files
-| File | Tests | Fokus |
+| File | Tests | Focus |
 |------|-------|-------|
 | `test_services.py` | 12 tests | Unit: face detection, face recognition, Wi-Fi, attendance |
-| `test_routers.py` | 18 tests | Integration: semua endpoint API |
+| `test_routers.py` | 18 tests | Integration: all API endpoints |
 | `test_attendance_scenarios.py` | 5 tests | Scenario: perfect, mismatch, missing second, wrong room, late |
 
 ### Run Tests
 ```bash
 cd backend
 pytest -v
-# Dengan coverage:
+# With coverage:
 pytest --cov=. --cov-report=term
 ```
 
 ---
 
-## 14. CURRENT DATA FLOW (Yang Berjalan)
+## 14. CURRENT DATA FLOW (As Is)
 
 ```
 User uploads image (selfie)
@@ -478,7 +478,7 @@ recognize_face(image_bytes)
     ↓
 detect_faces_from_bytes() → [{bbox, confidence, crop}]
     ↓
-get_embedding(best_face_crop)  ← BUG: butuh full image, bukan crop
+get_embedding(best_face_crop)  ← BUG: needs full image, not crop
     ↓
 compare_faces(embedding, all_students_embeddings) → (best_idx, score)
     ↓
@@ -493,18 +493,18 @@ INSERT INTO attendance (...) → status = "present" or "face_only"
 
 ---
 
-## 15. TARGET DATA FLOW (Yang Ingin Dicapai)
+## 15. TARGET DATA FLOW (Desired State)
 
 ```
-Mahasiswa buka app → login dengan NIM
+Student opens app → login with NIM
     ↓
-Pilih schedule → pilih check_type (START)
+Select schedule → select check_type (START)
     ↓
-Foto selfie
+Take selfie
     ↓
 POST /attendance/check?schedule_id=X&check_type=start
     ↓
-Validasi waktu: Apakah sekarang dalam jadwal? (grace ±15 menit)
+Time validation: Is the current time within schedule? (grace ±15 min)
     ↓
 detect_faces(full_image) → best face
     ↓
@@ -512,9 +512,9 @@ get_embedding(full_image, bbox) → 512-D vector
     ↓
 compare_faces(embedding, all_embeddings) → match
     ↓
-Cek existing: Apakah sudah ada "start" untuk student+schedule ini?
-    → Jika YA → tolak (duplicate)
-    → Jika TIDAK → lanjut
+Check existing: Is there already a "start" for this student+schedule?
+    → If YES → reject (duplicate)
+    → If NO → proceed
     ↓
 check_mac_on_network(student.mac_address)
     ↓
@@ -522,17 +522,17 @@ INSERT attendance (check_type="start", status="partial")
     ↓
 Response: {status: "partial", wifi_verified: bool, ...}
     ↓
-[Mahasiswa mengikuti kelas...]
+[Student attends class...]
     ↓
-Foto selfie KEDUA (END)
+Take SECOND selfie (END)
     ↓
 POST /attendance/check?schedule_id=X&check_type=end
     ↓
-[Sama: validasi waktu → deteksi → recognition → cek duplicate]
+[Same: time validation → detection → recognition → duplicate check]
     ↓
-Cari existing "start" record untuk student+schedule yang SAMA
-    → Jika ADA → update "start" dan "end" menjadi status="verified"
-    → Jika TIDAK ADA → tolak "Must check in at start of class first"
+Find existing "start" record for the SAME student+schedule
+    → If FOUND → update "start" and "end" to status="verified"
+    → If NOT FOUND → reject "Must check in at start of class first"
     ↓
 Response: {status: "verified", wifi_verified: bool, ...}
 ```
@@ -543,31 +543,31 @@ Response: {status: "verified", wifi_verified: bool, ...}
 
 | Week | Target | Owner |
 |------|--------|-------|
-| **Week 1** | Fix semua Priority 1 Blockers (#1-#4) | A+B+C+D |
+| **Week 1** | Fix all Priority 1 Blockers (#1-#4) | A+B+C+D |
 | **Week 1** | Threshold tuning face recognition | A |
 | **Week 1** | Two-stage logic + schedule enforcement | B |
 | **Week 1** | Fix data contract + error handling | C |
 | **Week 1** | Wi-Fi scanner improvements + update tests | D |
 | **Week 2** | Login + enroll screens (Flutter) | C |
 | **Week 2** | Comprehensive testing scenarios | D |
-| **Week 2** | Integration testing end-to-end | A (ketua) |
+| **Week 2** | Integration testing end-to-end | A (lead) |
 | **Target:** | **End-to-end testable via Swagger UI + Android phone** | **All** |
 
 ---
 
-## 17. PENTING: COMMON PITFALLS
+## 17. IMPORTANT: COMMON PITFALLS
 
-1. **Jangan edit file orang lain tanpa koordinasi** — selalu koordinasi dengan pemilik file.
-2. **Jangan commit langsung ke `main`** — buat branch masing-masing: `tugas-a`, `tugas-b`, `tugas-c`, `tugas-d`.
-3. **Pull request harus di-review oleh A (ketua)** sebelum di-merge.
-4. **Semua perubahan harus passing tests** — jalankan `pytest -v` sebelum commit.
-5. **Jangan push file besar** — `yolov8m-face.pt` (50 MB) tidak boleh masuk git. Sudah di `.gitignore`.
-6. **Backup database** — `attendance.db` mungkin berisi data testing. Jangan commit.
-7. **Jika stuck >30 menit** — tanya di grup. Jangan diam saja.
+1. **Don't edit other people's files without coordination** — always coordinate with the file owner.
+2. **Don't commit directly to `main`** — create your own branches: `task-a`, `task-b`, `task-c`, `task-d`.
+3. **Pull requests must be reviewed by A (lead)** before merging.
+4. **All changes must pass tests** — run `pytest -v` before committing.
+5. **Don't push large files** — `yolov8m-face.pt` (50 MB) must not be in git. Already in `.gitignore`.
+6. **Backup database** — `attendance.db` may contain test data. Don't commit.
+7. **If stuck for >30 minutes** — ask in the group. Don't stay silent.
 
 ---
 
-## 18. PERINTAK DASAR
+## 18. BASIC COMMANDS
 
 ```bash
 # Setup backend
@@ -582,10 +582,10 @@ cd mobile
 flutter pub get                                    # Install dependencies
 flutter run                                        # Run on connected device
 
-# Download model (jika perlu)
+# Download model (if needed)
 curl -L -o backend/data/models/yolov8m-face.pt https://github.com/YapaLab/yolo-face/releases/download/1.0.0/yolov8m-face.pt
 
-# API docs (setelah server jalan)
+# API docs (after server is running)
 open http://localhost:8000/docs                    # Swagger UI
 open http://localhost:8000/redoc                   # ReDoc
 ```
