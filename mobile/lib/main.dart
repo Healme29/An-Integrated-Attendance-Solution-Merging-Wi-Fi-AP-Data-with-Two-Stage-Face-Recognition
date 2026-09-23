@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'models/student.dart';
+import 'services/api_service.dart';
+import 'services/session_service.dart';
 
-void main() {
-  runApp(const FaceAttendanceApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.init();
+  final Student? student = await SessionService.getStudent();
+  runApp(FaceAttendanceApp(initialStudent: student));
 }
 
 class FaceAttendanceApp extends StatelessWidget {
-  const FaceAttendanceApp({super.key});
+  final Student? initialStudent;
+
+  const FaceAttendanceApp({super.key, this.initialStudent});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +25,9 @@ class FaceAttendanceApp extends StatelessWidget {
         colorSchemeSeed: Colors.blue,
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: initialStudent != null
+          ? HomeScreen(student: initialStudent!)
+          : const LoginScreen(),
     );
   }
 }

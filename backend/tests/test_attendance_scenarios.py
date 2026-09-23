@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from unittest.mock import patch
 from models.database import get_db
 from services.attendance import mark_attendance, recognize_face
@@ -34,17 +35,34 @@ class TestPerfectAttendance:
     async def test_all_conditions_met(self, test_db, setup_test_db):
         await seed_data(test_db)
 
-        result = await mark_attendance(
+        start = await mark_attendance(
             student_id=1, schedule_id=1,
             check_type="start", confidence=0.92
         )
 
-        assert result["student_id"] == 1
-        assert result["schedule_id"] == 1
-        assert result["wifi_verified"] is True
-        assert result["status"] == "present"
-        assert result["check_type"] == "start"
-        assert result["confidence"] == 0.92
+        assert start["student_id"] == 1
+        assert start["schedule_id"] == 1
+        assert start["student_name"] == "Alice Smith"
+        assert start["wifi_verified"] is True
+        assert start["status"] == "partial"
+        assert start["check_type"] == "start"
+        assert start["confidence"] == 0.92
+
+        end = await mark_attendance(
+            student_id=1, schedule_id=1,
+            check_type="end", confidence=0.88
+        )
+
+        assert end["status"] == "verified"
+        assert end["wifi_verified"] is True
+
+        db = await test_db()
+        cursor = await db.execute(
+            "SELECT status FROM attendance WHERE student_id = 1 AND check_type = 'start'"
+        )
+        row = await cursor.fetchone()
+        await db.close()
+        assert row["status"] == "verified"
 
 
 @pytest.mark.asyncio
@@ -52,13 +70,18 @@ class TestFaceMismatchScenario:
     async def test_different_face_for_second_selfie(self, test_db, setup_test_db):
         await seed_data(test_db)
 
+        await mark_attendance(
+            student_id=1, schedule_id=1,
+            check_type="start", confidence=0.92
+        )
+
         result = await mark_attendance(
             student_id=1, schedule_id=1,
             check_type="end", confidence=0.2
         )
 
         assert result["wifi_verified"] is True
-        assert result["status"] == "present"
+        assert result["status"] == "verified"
         assert result["confidence"] == 0.2
 
 
@@ -76,6 +99,22 @@ class TestMissingSecondSelfie:
         await db.close()
         assert row["cnt"] == 0
 
+    async def test_start_check_stays_partial_without_end(self, test_db, setup_test_db):
+        await seed_data(test_db)
+
+        await mark_attendance(
+            student_id=1, schedule_id=1,
+            check_type="start", confidence=0.92
+        )
+
+        db = await test_db()
+        cursor = await db.execute(
+            "SELECT status FROM attendance WHERE student_id = 1 AND check_type = 'start'"
+        )
+        row = await cursor.fetchone()
+        await db.close()
+        assert row["status"] == "partial"
+
 
 @pytest.mark.asyncio
 class TestWrongRoomScenario:
@@ -84,13 +123,38 @@ class TestWrongRoomScenario:
 
         mock_wifi_scanner.return_value = False
 
-        result = await mark_attendance(
+        start = await mark_attendance(
             student_id=1, schedule_id=1,
             check_type="start", confidence=0.95
         )
 
-        assert result["wifi_verified"] is False
-        assert result["status"] == "face_only"
+        assert start["wifi_verified"] is False
+        assert start["status"] == "partial"
+
+        end = await mark_attendance(
+            student_id=1, schedule_id=1,
+            check_type="end", confidence=0.95
+        )
+
+        assert end["wifi_verified"] is False
+        assert end["status"] == "face_only"
+
+
+@pytest.mark.asyncio
+class TestDuplicateCheckIn:
+    async def test_duplicate_start_rejected(self, test_db, setup_test_db):
+        await seed_data(test_db)
+
+        await mark_attendance(student_id=1, schedule_id=1, check_type="start", confidence=0.9)
+
+        with pytest.raises(ValueError, match="duplicate_check_in"):
+            await mark_attendance(student_id=1, schedule_id=1, check_type="start", confidence=0.9)
+
+    async def test_end_without_start_rejected(self, test_db, setup_test_db):
+        await seed_data(test_db)
+
+        with pytest.raises(ValueError, match="missing_start_check"):
+            await mark_attendance(student_id=1, schedule_id=1, check_type="end", confidence=0.9)
 
 
 @pytest.mark.asyncio
@@ -107,3 +171,23 @@ class TestLateArrivalScenario:
 
         assert schedule is not None
         assert schedule["class_name"] == "Math 101"
+
+
+@pytest.mark.asyncio
+class TestScheduleTimeValidation:
+    async def test_validate_schedule_time_not_found(self, test_db, setup_test_db):
+        await seed_data(test_db)
+
+        from services.attendance import validate_schedule_time
+        with pytest.raises(ValueError, match="schedule_not_found"):
+            await validate_schedule_time(999)
+
+    async def test_validate_schedule_time_wrong_day(self, test_db, setup_test_db):
+        await seed_data(test_db)
+
+        from services.attendance import validate_schedule_time
+        # schedule 1 is Monday (day 0); fails unless today is Monday
+        if datetime.now().weekday() == 0:
+            pytest.skip("today is Monday")
+        with pytest.raises(ValueError, match="wrong_day"):
+            await validate_schedule_time(1)

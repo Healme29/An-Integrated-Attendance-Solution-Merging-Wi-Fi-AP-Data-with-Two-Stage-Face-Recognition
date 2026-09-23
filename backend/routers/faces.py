@@ -3,8 +3,13 @@ from models.schemas import FaceEnrollResponse, RecognizeResponse
 from models.database import get_db
 from services.face_detection import detect_faces_from_bytes
 from services.face_recognition import get_embedding, save_embeddings, load_embeddings
-from pathlib import Path
+from utils.helpers import image_bytes_to_array
+from datetime import datetime
+import cv2
+import pickle
 from config import DATA_DIR
+
+FACES_DIR = DATA_DIR / "faces"
 
 router = APIRouter(prefix="/faces", tags=["faces"])
 
@@ -12,6 +17,10 @@ router = APIRouter(prefix="/faces", tags=["faces"])
 @router.post("/enroll", response_model=FaceEnrollResponse)
 async def enroll_face(student_id: int, file: UploadFile = File(...)):
     contents = await file.read()
+    image = image_bytes_to_array(contents)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Invalid image data")
+
     faces = detect_faces_from_bytes(contents)
     if not faces:
         raise HTTPException(status_code=400, detail="No face detected in image")
@@ -24,11 +33,23 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
 
     existing = load_embeddings(student_id)
     new_embeddings = []
+    saved_paths = []
 
-    for face in faces:
-        emb = get_embedding(face["crop"])
-        if emb is not None:
-            new_embeddings.append(emb)
+    FACES_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    for i, face in enumerate(faces):
+        emb = get_embedding(image, face["bbox"])
+        if emb is None:
+            continue
+        new_embeddings.append(emb)
+
+        image_path = FACES_DIR / f"student_{student_id}_{timestamp}_{i}.jpg"
+        x1, y1, x2, y2 = [int(v) for v in face["bbox"]]
+        h, w = image.shape[:2]
+        crop = image[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+        cv2.imwrite(str(image_path), crop)
+        saved_paths.append(str(image_path))
 
     if not new_embeddings:
         await db.close()
@@ -37,10 +58,11 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
     all_embeddings = existing + new_embeddings
     save_embeddings(student_id, all_embeddings)
 
-    await db.execute(
-        "INSERT INTO faces (student_id, embedding, image_path) VALUES (?, ?, ?)",
-        (student_id, b"blob", str(DATA_DIR / "faces" / f"{student_id}_{len(all_embeddings)}.jpg"))
-    )
+    for emb, path in zip(new_embeddings, saved_paths):
+        await db.execute(
+            "INSERT INTO faces (student_id, embedding, image_path) VALUES (?, ?, ?)",
+            (student_id, pickle.dumps(emb), path)
+        )
     await db.commit()
     await db.close()
 

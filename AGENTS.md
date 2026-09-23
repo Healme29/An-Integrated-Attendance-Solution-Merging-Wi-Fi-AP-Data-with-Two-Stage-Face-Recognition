@@ -29,39 +29,60 @@ pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
 ```
 
+Backend tests (services mocked, no ML models needed):
+```bash
+python -m pytest backend/tests -q
+```
+
+End-to-end smoke test against a running server:
+```bash
+python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000
+```
+
 Flutter setup:
 ```bash
 cd mobile && flutter pub get && flutter run
 ```
 
+This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\Android\Sdk` (platform 36, build-tools 36.0.0), JDK 17 at `C:\Program Files\Eclipse Adoptium\jdk-17.0.16.8-hotspot`.
+
 ## Key Facts
 
 - YOLOv8-face model: `yolov8m-face.pt` (50 MB) — download from `github.com/YapaLab/yolo-face/releases`
-- InsightFace model: `buffalo_l` (auto-downloaded on first use)
-- Attendance requires ALL 3 conditions: correct AP + valid class time + face match
-- Two-stage check: selfie at start AND end of class
+- InsightFace model: `buffalo_l` (auto-downloaded on first use; set `INSIGHTFACE_HOME` to relocate)
+- Attendance requires ALL 3 conditions: correct AP + valid class time + both selfies matched
+- Two-stage status flow: `start` → `partial`, `end` → `verified` (Wi-Fi ok) or `face_only` (no Wi-Fi); start row finalized on end check-in
+- Duplicate check-ins rejected (409); `end` without prior `start` rejected (409)
+- Attendance outside class window ± grace → 403; wrong day → 403; unknown schedule → 404
+- `get_embedding(image, bbox)` expects the FULL image + YOLO bbox (crops with margin internally)
 - Wi-Fi detection requires Npcap on Windows (WinPcap API-compatible mode)
-- Cosine similarity threshold: 0.5 (adjust based on testing)
+- Cosine similarity threshold: 0.5 (env `FACE_SIMILARITY_THRESHOLD`)
+- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`
+- `WI_FI_SUBNET` unset → subnet auto-detected from the machine's primary interface at scan time
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/students/` | List all students |
+| GET | `/students/?nim=` | List students, or look up one by NIM (login) |
 | POST | `/students/` | Create student (name, nim, mac_address) |
 | GET | `/students/{id}` | Get student by ID |
 | DELETE | `/students/{id}` | Delete student |
 | PUT | `/students/{id}/mac` | Update MAC address |
 | POST | `/faces/enroll?student_id=` | Enroll face (upload image) |
 | POST | `/faces/recognize` | Recognize face (upload image) |
-| POST | `/attendance/check?schedule_id=&check_type=` | Check attendance with face scan |
-| GET | `/attendance/today` | Get today's attendance |
+| POST | `/attendance/check?schedule_id=&check_type=` | Check attendance with face scan (time-enforced) |
+| GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
 | GET | `/attendance/student/{id}` | Get student attendance history |
+| GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |
 | GET | `/schedules/` | List schedules |
-| POST | `/schedules/` | Create schedule |
+| POST | `/schedules/` | Create schedule (validated) |
+| GET | `/schedules/{id}` | Get schedule by ID |
+| PUT | `/schedules/{id}` | Update schedule (validated) |
 | DELETE | `/schedules/{id}` | Delete schedule |
 | GET | `/wifi/scan` | Scan network devices |
 | GET | `/wifi/check/{mac}` | Check if MAC is on network |
+| GET | `/dashboard` | Teacher web dashboard (HTML) |
 
 ## Database Schema
 
@@ -85,7 +106,7 @@ cd mobile && flutter pub get && flutter run
 
 3. Start backend server:
    ```bash
-   cd backend && uvicorn main:app --reload
+   uvicorn backend.main:app --reload
    ```
 
 4. API docs available at: `http://localhost:8000/docs`

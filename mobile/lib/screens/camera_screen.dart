@@ -32,7 +32,12 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
-    _controller = CameraController(cameras.first, ResolutionPreset.high);
+    // Prefer the front camera for selfies.
+    final camera = cameras.firstWhere(
+      (c) => c.lensDirection == CameraLensDirection.front,
+      orElse: () => cameras.first,
+    );
+    _controller = CameraController(camera, ResolutionPreset.high);
     await _controller.initialize();
   }
 
@@ -56,14 +61,20 @@ class _CameraScreenState extends State<CameraScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => AttendanceScreen(result: result, checkType: widget.checkType),
+            builder: (_) => AttendanceScreen(result: result),
           ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
         );
       }
     } finally {

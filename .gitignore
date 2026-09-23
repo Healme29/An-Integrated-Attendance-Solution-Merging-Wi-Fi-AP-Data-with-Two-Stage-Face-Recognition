@@ -8,12 +8,27 @@ build/
 
 # Database
 *.db
+*.db-journal
 
 # Model weights (large files)
 *.pt
 
 # Embeddings
 backend/data/embeddings/
+backend/data/faces/
+
+# Uvicorn runtime artifacts
+backend/uvicorn_*.log
+backend/uvicorn.pid
+
+# Python venv
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+
+# pytest
+.pytest_cache/
 
 # IDE
 .vscode/
@@ -31,7 +46,9 @@ mobile/.packages
 mobile/build/
 mobile/.flutter-plugins*
 mobile/android/.gradle/
+mobile/android/local.properties
 mobile/android/app/build/
+mobile/android/.idea/
 mobile/ios/.symlinks/
 mobile/ios/Pods/
 mobile/.idea/

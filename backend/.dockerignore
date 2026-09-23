@@ -1,0 +1,11 @@
+tests/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+attendance.db
+test_attendance.db
+*.md
+data/embeddings/
+data/faces/
+data/insightface/

@@ -39,12 +39,14 @@ class AttendanceRequest(BaseModel):
 class AttendanceResponse(BaseModel):
     id: int
     student_id: int
+    student_name: Optional[str] = None
     schedule_id: int
     check_type: str
     confidence: Optional[float]
     wifi_verified: bool
     status: str
     timestamp: datetime
+    class_name: Optional[str] = None
 
     class Config:
         from_attributes = True

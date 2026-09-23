@@ -1,8 +1,20 @@
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+# Allow both `uvicorn backend.main:app` (repo root) and
+# `cd backend && uvicorn main:app` to resolve the top-level imports below.
+_BACKEND_DIR = str(Path(__file__).resolve().parent)
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
 from models.database import init_db
 from routers import students, faces, attendance, schedules, wifi
+
+DASHBOARD_FILE = Path(__file__).resolve().parent / "static" / "dashboard.html"
 
 
 @asynccontextmanager
@@ -35,4 +47,9 @@ app.include_router(wifi.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Face Attendance API is running", "docs": "/docs"}
+    return {"message": "Face Attendance API is running", "docs": "/docs", "dashboard": "/dashboard"}
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    return FileResponse(DASHBOARD_FILE, media_type="text/html")

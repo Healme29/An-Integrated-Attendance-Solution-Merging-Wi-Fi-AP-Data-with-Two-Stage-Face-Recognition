@@ -20,12 +20,36 @@ def get_face_analyzer() -> FaceAnalysis:
     return _app
 
 
-def get_embedding(face_image: np.ndarray) -> np.ndarray | None:
-    """Extract 512-D embedding from a face crop using InsightFace ArcFace."""
+def _crop_with_margin(image: np.ndarray, bbox: tuple, margin: float = 0.25) -> np.ndarray:
+    """Crop a bbox region from the image, expanded by a relative margin."""
+    h, w = image.shape[:2]
+    x1, y1, x2, y2 = bbox
+    mx = int((x2 - x1) * margin)
+    my = int((y2 - y1) * margin)
+    x1 = max(0, int(x1) - mx)
+    y1 = max(0, int(y1) - my)
+    x2 = min(w, int(x2) + mx)
+    y2 = min(h, int(y2) + my)
+    return image[y1:y2, x1:x2]
+
+
+def get_embedding(image: np.ndarray, bbox: tuple | None = None) -> np.ndarray | None:
+    """Extract 512-D embedding using InsightFace ArcFace.
+
+    InsightFace expects a full image (it runs its own detector internally).
+    When a YOLO bbox is provided, that region is cropped with a margin so
+    ArcFace's detector reliably finds the face without unrelated faces.
+    """
     analyzer = get_face_analyzer()
-    faces = analyzer.get(face_image)
+    target = _crop_with_margin(image, bbox) if bbox is not None else image
+    faces = analyzer.get(target)
     if not faces:
         return None
+    faces = sorted(
+        faces,
+        key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+        reverse=True,
+    )
     return faces[0].embedding
 
 

@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: ./backend
+    container_name: face-attendance-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_PATH: /app/data/attendance.db
+      WI_FI_SUBNET: ${WI_FI_SUBNET:-192.168.1.0/24}
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.5}
+      ATTENDANCE_CHECK_WINDOW_MINUTES: ${ATTENDANCE_CHECK_WINDOW_MINUTES:-15}
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  backend-data:

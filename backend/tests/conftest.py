@@ -98,6 +98,15 @@ def make_fake_embedding():
     return np.random.randn(512).astype(np.float32)
 
 
+@pytest.fixture
+def fake_jpeg():
+    """Minimal valid JPEG, so enrollment's image-decoding step works."""
+    import cv2
+    ok, buf = cv2.imencode(".jpg", np.zeros((32, 32, 3), dtype=np.uint8))
+    assert ok
+    return buf.tobytes()
+
+
 @pytest.fixture(autouse=True)
 def mock_face_detection():
     fake_faces = [

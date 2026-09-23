@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from typing import Optional
 from models.schemas import StudentCreate, StudentResponse
 from models.database import get_db
 
@@ -6,9 +7,13 @@ router = APIRouter(prefix="/students", tags=["students"])
 
 
 @router.get("/", response_model=list[StudentResponse])
-async def list_students():
+async def list_students(nim: Optional[str] = None):
+    """List students, or look up a single student by NIM (?nim=12345)."""
     db = await get_db()
-    cursor = await db.execute("SELECT * FROM students ORDER BY name")
+    if nim:
+        cursor = await db.execute("SELECT * FROM students WHERE nim = ?", (nim,))
+    else:
+        cursor = await db.execute("SELECT * FROM students ORDER BY name")
     rows = await cursor.fetchall()
     await db.close()
     return [dict(row) for row in rows]

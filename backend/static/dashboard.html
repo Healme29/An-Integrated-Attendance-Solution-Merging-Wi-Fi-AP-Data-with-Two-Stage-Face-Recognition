@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teacher Dashboard - Face Attendance</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #222; }
+  header { background: #1a73e8; color: #fff; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header .actions { display: flex; gap: 8px; }
+  header a, header button { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4);
+    padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
+  header a:hover, header button:hover { background: rgba(255,255,255,0.3); }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .controls select { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; min-width: 260px; }
+  .controls span { color: #666; font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .stat-card .num { font-size: 28px; font-weight: 700; }
+  .stat-card .label { color: #666; font-size: 13px; margin-top: 4px; }
+  .num.verified { color: #188038; } .num.partial { color: #e37400; }
+  .num.face_only { color: #d93025; } .num.total { color: #1a73e8; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 20px; overflow: hidden; }
+  .card h2 { font-size: 16px; padding: 14px 20px; border-bottom: 1px solid #eee; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 20px; border-bottom: 1px solid #f0f0f0; }
+  th { background: #fafafa; color: #555; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+  tr:last-child td { border-bottom: none; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 12px; color: #fff; font-size: 12px; font-weight: 600; }
+  .chip.verified, .chip.present { background: #188038; }
+  .chip.partial { background: #e37400; }
+  .chip.face_only { background: #d93025; }
+  .chip.other { background: #777; }
+  .empty { padding: 32px; text-align: center; color: #999; }
+  .error { padding: 32px; text-align: center; color: #d93025; }
+  .muted { color: #999; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Teacher Dashboard &mdash; <span id="today-date"></span></h1>
+  <div class="actions">
+    <button onclick="loadAll()">Refresh</button>
+    <a id="csv-link" href="/attendance/export/csv" download>Export CSV</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="controls">
+    <select id="schedule-select" onchange="loadAttendance()">
+      <option value="">All classes (today)</option>
+    </select>
+    <span>Auto-refreshes every 30s</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="num total" id="stat-total">0</div><div class="label">Total check-ins</div></div>
+    <div class="stat-card"><div class="num verified" id="stat-verified">0</div><div class="label">Verified</div></div>
+    <div class="stat-card"><div class="num partial" id="stat-partial">0</div><div class="label">Partial (no end selfie)</div></div>
+    <div class="stat-card"><div class="num face_only" id="stat-faceonly">0</div><div class="label">No Wi-Fi</div></div>
+    <div class="stat-card"><div class="num face_only" id="stat-absent">0</div><div class="label">Absent (selected class)</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Attendance Records</h2>
+    <div id="records-body"><div class="empty">Loading&hellip;</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Absent Students <span class="muted">(no start check-in for selected class)</span></h2>
+    <div id="absent-body"><div class="empty">Loading&hellip;</div></div>
+  </div>
+</div>
+
+<script>
+let schedules = [];
+
+function statusChip(status) {
+  const cls = ["verified", "present", "partial", "face_only"].includes(status) ? status : "other";
+  return `<span class="chip ${cls}">${status}</span>`;
+}
+
+function fmtTime(ts) {
+  if (!ts) return "-";
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function loadSchedules() {
+  const select = document.getElementById("schedule-select");
+  try {
+    const res = await fetch("/schedules/");
+    schedules = await res.json();
+    schedules.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = `${s.class_name} (${s.start_time}-${s.end_time})`;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    console.error("Failed to load schedules", e);
+  }
+}
+
+async function loadAttendance() {
+  const scheduleId = document.getElementById("schedule-select").value;
+  const recordsBody = document.getElementById("records-body");
+  const absentBody = document.getElementById("absent-body");
+  const csvLink = document.getElementById("csv-link");
+
+  const query = scheduleId ? `?schedule_id=${scheduleId}` : "";
+  csvLink.href = `/attendance/export/csv${query}`;
+
+  try {
+    const res = await fetch(`/attendance/today${query}`);
+    const records = await res.json();
+
+    document.getElementById("stat-total").textContent = records.length;
+    document.getElementById("stat-verified").textContent = records.filter(r => r.status === "verified" || r.status === "present").length;
+    document.getElementById("stat-partial").textContent = records.filter(r => r.status === "partial").length;
+    document.getElementById("stat-faceonly").textContent = records.filter(r => r.status === "face_only").length;
+
+    if (records.length === 0) {
+      recordsBody.innerHTML = `<div class="empty">No check-ins yet today.</div>`;
+    } else {
+      recordsBody.innerHTML = `<table>
+        <thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Check</th><th>Wi-Fi</th><th>Confidence</th><th>Status</th></tr></thead>
+        <tbody>${records.map(r => `<tr>
+          <td>${fmtTime(r.timestamp)}</td>
+          <td>${esc(r.student_name ?? `#${r.student_id}`)}</td>
+          <td>${esc(r.class_name ?? "-")}</td>
+          <td>${String(r.check_type).toUpperCase()}</td>
+          <td>${r.wifi_verified ? "Yes" : "No"}</td>
+          <td>${r.confidence != null ? (r.confidence * 100).toFixed(1) + "%" : "-"}</td>
+          <td>${statusChip(r.status)}</td>
+        </tr>`).join("")}</tbody></table>`;
+    }
+
+    // Absent students: only meaningful when a specific class is selected
+    if (!scheduleId) {
+      absentBody.innerHTML = `<div class="empty">Select a class to see absent students.</div>`;
+      document.getElementById("stat-absent").textContent = "-";
+      return;
+    }
+
+    const studentsRes = await fetch("/students/");
+    const students = await studentsRes.json();
+    const presentIds = new Set(records.map(r => r.student_id));
+    const absent = students.filter(s => !presentIds.has(s.id));
+    document.getElementById("stat-absent").textContent = absent.length;
+
+    if (absent.length === 0) {
+      absentBody.innerHTML = `<div class="empty">Everyone is accounted for.</div>`;
+    } else {
+      absentBody.innerHTML = `<table>
+        <thead><tr><th>NIM</th><th>Name</th></tr></thead>
+        <tbody>${absent.map(s => `<tr><td>${esc(s.nim)}</td><td>${esc(s.name)}</td></tr>`).join("")}</tbody></table>`;
+    }
+  } catch (e) {
+    recordsBody.innerHTML = `<div class="error">Failed to load attendance: ${esc(e.message)}</div>`;
+    absentBody.innerHTML = "";
+  }
+}
+
+function loadAll() {
+  loadAttendance();
+}
+
+document.getElementById("today-date").textContent = new Date().toLocaleDateString(undefined, {
+  weekday: "long", year: "numeric", month: "long", day: "numeric"
+});
+
+loadSchedules().then(loadAttendance);
+setInterval(loadAttendance, 30000);
+</script>
+</body>
+</html>
