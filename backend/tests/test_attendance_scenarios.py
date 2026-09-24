@@ -24,7 +24,7 @@ async def seed_data(test_db):
     )
     await db.execute(
         "INSERT INTO schedules (id, class_name, day_of_week, start_time, end_time, ap_bssid, room) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (1, "Math 101", 0, "08:00", "09:30", "AP_MATH_01", "Room 201")
+        (1, "Math 101", 0, "08:00", "09:30", None, "Room 201")
     )
     await db.commit()
     await db.close()

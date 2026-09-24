@@ -57,8 +57,12 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 - `get_embedding(image, bbox)` expects the FULL image + YOLO bbox (crops with margin internally)
 - Wi-Fi detection requires Npcap on Windows (WinPcap API-compatible mode)
 - Cosine similarity threshold: 0.5 (env `FACE_SIMILARITY_THRESHOLD`)
-- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`
+- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`, `TIMEZONE`, `MAX_UPLOAD_BYTES`, `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`
 - `WI_FI_SUBNET` unset → subnet auto-detected from the machine's primary interface at scan time
+- `TIMEZONE` (IANA name, e.g. `Asia/Jakarta`) — set on the server so schedule windows stay consistent across machines; unset → system local time
+- Enrollment hardening: JPEG/PNG magic-byte check, `MAX_UPLOAD_BYTES` cap (413), `MIN_FACE_BBOX_PX` filter, max `MAX_EMBEDDINGS_PER_STUDENT` samples per student
+- Schedule creation/update rejects overlapping time slots in the same room (409)
+- `ap_logs` is populated by `/wifi/scan` and `/wifi/check/{mac}` (60 s dedupe window)
 
 ## API Endpoints
 
@@ -73,7 +77,7 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | POST | `/faces/recognize` | Recognize face (upload image) |
 | POST | `/attendance/check?schedule_id=&check_type=` | Check attendance with face scan (time-enforced) |
 | GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
-| GET | `/attendance/student/{id}` | Get student attendance history |
+| GET | `/attendance/student/{id}` | Get student history (supports `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count`) |
 | GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |
 | GET | `/schedules/` | List schedules |
 | POST | `/schedules/` | Create schedule (validated) |
@@ -83,6 +87,7 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | GET | `/wifi/scan` | Scan network devices |
 | GET | `/wifi/check/{mac}` | Check if MAC is on network |
 | GET | `/dashboard` | Teacher web dashboard (HTML) |
+| GET | `/health` | Health check with database ping (503 on DB failure) |
 
 ## Database Schema
 

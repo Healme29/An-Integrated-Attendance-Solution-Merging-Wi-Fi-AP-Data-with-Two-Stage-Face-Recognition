@@ -7,14 +7,18 @@ from models.schemas import StudentCreate, ScheduleCreate
 
 
 def active_schedule_payload(**overrides):
-    """Schedule window spanning 'now' so time enforcement passes."""
+    """Schedule window spanning 'now' so time enforcement passes.
+
+    No ap_bssid by default: BSSID pinning is opt-in and its gating logic
+    is covered separately (see test_hardening.py::TestBssidVerification).
+    """
     now = datetime.now()
     payload = {
         "class_name": "Math 101",
         "day_of_week": now.weekday(),
         "start_time": (now - timedelta(minutes=5)).strftime("%H:%M"),
         "end_time": (now + timedelta(minutes=5)).strftime("%H:%M"),
-        "ap_bssid": "AP_MATH_01",
+        "ap_bssid": None,
         "room": "Room 201"
     }
     payload.update(overrides)
@@ -321,7 +325,7 @@ class TestAttendanceAPI:
     def test_get_today_attendance_schedule_filter(self, client, setup_test_db, fake_jpeg):
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
-        client.post("/schedules/", json=active_schedule_payload(class_name="Physics"))
+        client.post("/schedules/", json=active_schedule_payload(class_name="Physics", room="Room 202"))
         client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.get("/attendance/today?schedule_id=2")

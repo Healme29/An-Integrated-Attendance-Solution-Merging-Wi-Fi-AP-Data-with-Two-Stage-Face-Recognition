@@ -2,13 +2,13 @@ from datetime import datetime, time, timedelta
 from models.database import get_db
 from services.face_recognition import get_embedding, compare_faces, is_match, load_embeddings
 from services.face_detection import detect_faces_from_bytes
-from services.wifi_scanner import check_mac_on_network
-from config import ATTENDANCE_CHECK_WINDOW_MINUTES
+from services.wifi_scanner import check_mac_on_network, get_current_bssid, is_same_bssid
+from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
 
 
 async def get_schedules_for_now() -> list[dict]:
     """Get active schedules based on current time and day."""
-    now = datetime.now()
+    now = now_local()
     current_day = now.weekday()
     current_time = now.strftime("%H:%M")
 
@@ -37,7 +37,7 @@ async def validate_schedule_time(schedule_id: int) -> dict:
         raise ValueError("schedule_not_found")
     schedule = dict(schedule)
 
-    now = datetime.now()
+    now = now_local()
     if schedule["day_of_week"] != now.weekday():
         raise ValueError("wrong_day")
 
@@ -142,9 +142,18 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
     )
     student = await cursor.fetchone()
 
+    cursor = await db.execute(
+        "SELECT ap_bssid FROM schedules WHERE id = ?", (schedule_id,)
+    )
+    schedule_row = await cursor.fetchone()
+
     wifi_verified = False
     if student and student["mac_address"]:
         wifi_verified = check_mac_on_network(student["mac_address"])
+        # When the schedule pins a classroom AP (BSSID), the device only
+        # counts as verified if the server itself is associated with it.
+        if wifi_verified and schedule_row and schedule_row["ap_bssid"]:
+            wifi_verified = is_same_bssid(get_current_bssid(), schedule_row["ap_bssid"])
 
     if check_type == "start":
         status = "partial"
@@ -152,10 +161,13 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
         start_wifi = bool(start_check["wifi_verified"])
         status = "verified" if (wifi_verified and start_wifi) else "face_only"
 
+    # Store an explicit local timestamp (SQLite's CURRENT_TIMESTAMP is UTC,
+    # which would break DATE() comparisons against local class days).
+    timestamp = now_local().strftime("%Y-%m-%d %H:%M:%S")
     await db.execute(
-        """INSERT INTO attendance (student_id, schedule_id, check_type, confidence, wifi_verified, status)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (student_id, schedule_id, check_type, confidence, int(wifi_verified), status)
+        """INSERT INTO attendance (student_id, schedule_id, check_type, confidence, wifi_verified, status, timestamp)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (student_id, schedule_id, check_type, confidence, int(wifi_verified), status, timestamp)
     )
 
     if check_type == "end":
@@ -183,5 +195,5 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
         "confidence": confidence,
         "wifi_verified": wifi_verified,
         "status": status,
-        "timestamp": datetime.now()
+        "timestamp": timestamp
     }

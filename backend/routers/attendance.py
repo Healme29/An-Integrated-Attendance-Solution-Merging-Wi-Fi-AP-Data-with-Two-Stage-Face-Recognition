@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from models.schemas import AttendanceRequest, AttendanceResponse
 from models.database import get_db
 from services.attendance import recognize_face, mark_attendance, validate_schedule_time
-from config import ATTENDANCE_CHECK_WINDOW_MINUTES
+from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
@@ -59,9 +60,8 @@ async def check_attendance(
 
 @router.get("/today", response_model=list[AttendanceResponse])
 async def get_today_attendance(schedule_id: int | None = None):
-    from datetime import datetime
     db = await get_db()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_local().strftime("%Y-%m-%d")
 
     query = """
         SELECT a.*, st.name AS student_name, s.class_name
@@ -87,12 +87,9 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
     """Export attendance records as CSV. Filters: ?date=YYYY-MM-DD&schedule_id=N"""
     import csv
     import io
-    from datetime import datetime
-
-    from fastapi import Response
 
     if date is None:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = now_local().strftime("%Y-%m-%d")
     else:
         try:
             datetime.strptime(date, "%Y-%m-%d")
@@ -142,16 +139,51 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
 
 
 @router.get("/student/{student_id}")
-async def get_student_attendance(student_id: int):
+async def get_student_attendance(
+    student_id: int,
+    response: Response,
+    limit: int = 100,
+    offset: int = 0,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    """Student attendance history.
+
+    Optional filters: ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    Pagination: ?limit=1..500&offset=N (total count returned in X-Total-Count).
+    """
+    if not 1 <= limit <= 500:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 500")
+    if offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be >= 0")
+    for name, value in (("date_from", date_from), ("date_to", date_to)):
+        if value is not None:
+            try:
+                datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"{name} must be in YYYY-MM-DD format")
+
+    where = "a.student_id = ?"
+    params: list = [student_id]
+    if date_from is not None:
+        where += " AND DATE(a.timestamp) >= ?"
+        params.append(date_from)
+    if date_to is not None:
+        where += " AND DATE(a.timestamp) <= ?"
+        params.append(date_to)
+
     db = await get_db()
+    base = f"FROM attendance a JOIN schedules s ON a.schedule_id = s.id WHERE {where}"
+
+    count_cursor = await db.execute(f"SELECT COUNT(*) {base}", params)
+    total = (await count_cursor.fetchone())[0]
+
     cursor = await db.execute(
-        """SELECT a.*, s.class_name, s.room
-           FROM attendance a
-           JOIN schedules s ON a.schedule_id = s.id
-           WHERE a.student_id = ?
-           ORDER BY a.timestamp DESC""",
-        (student_id,)
+        f"SELECT a.*, s.class_name, s.room {base} ORDER BY a.timestamp DESC LIMIT ? OFFSET ?",
+        params + [limit, offset]
     )
     rows = await cursor.fetchall()
     await db.close()
+
+    response.headers["X-Total-Count"] = str(total)
     return [dict(row) for row in rows]

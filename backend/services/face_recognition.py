@@ -1,4 +1,6 @@
+import os
 import pickle
+import threading
 import numpy as np
 from pathlib import Path
 from insightface.app import FaceAnalysis
@@ -7,6 +9,14 @@ from config import INSIGHTFACE_MODEL, FACE_SIMILARITY_THRESHOLD, EMBEDDINGS_DIR
 
 
 _app: FaceAnalysis = None
+_save_lock = threading.Lock()
+
+
+def _l2_normalize(v: np.ndarray) -> np.ndarray:
+    """L2-normalize a vector; zero vectors are returned unchanged."""
+    v = np.asarray(v, dtype=np.float32)
+    norm = float(np.linalg.norm(v))
+    return v / norm if norm > 0 else v
 
 
 def get_face_analyzer() -> FaceAnalysis:
@@ -50,18 +60,31 @@ def get_embedding(image: np.ndarray, bbox: tuple | None = None) -> np.ndarray | 
         key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
         reverse=True,
     )
-    return faces[0].embedding
+    return _l2_normalize(faces[0].embedding)
 
 
 def compare_faces(embedding: np.ndarray, known_embeddings: list[np.ndarray]) -> tuple[int, float]:
-    """Compare embedding against known embeddings. Returns (best_index, best_score)."""
+    """Compare embedding against known embeddings. Returns (best_index, best_score).
+
+    All vectors are L2-normalized first; zero-norm entries are skipped.
+    """
     if not known_embeddings:
         return -1, 0.0
 
-    known_matrix = np.array(known_embeddings)
-    scores = cosine_similarity(embedding.reshape(1, -1), known_matrix)[0]
-    best_idx = int(np.argmax(scores))
-    return best_idx, float(scores[best_idx])
+    emb = _l2_normalize(embedding)
+    valid = [
+        (i, _l2_normalize(known))
+        for i, known in enumerate(known_embeddings)
+        if np.linalg.norm(known) > 0
+    ]
+    if not valid:
+        return -1, 0.0
+
+    known_matrix = np.array([k for _, k in valid])
+    scores = cosine_similarity(emb.reshape(1, -1), known_matrix)[0]
+    scores = np.nan_to_num(scores, nan=0.0, posinf=0.0, neginf=0.0)
+    best_pos = int(np.argmax(scores))
+    return valid[best_pos][0], float(scores[best_pos])
 
 
 def is_match(score: float) -> bool:
@@ -69,27 +92,38 @@ def is_match(score: float) -> bool:
 
 
 def load_embeddings(student_id: int) -> list[np.ndarray]:
-    """Load stored embeddings for a student."""
+    """Load stored embeddings for a student. Returns [] on missing/corrupt file."""
     emb_file = EMBEDDINGS_DIR / f"student_{student_id}.pkl"
     if not emb_file.exists():
         return []
-    with open(emb_file, "rb") as f:
-        return pickle.load(f)
+    try:
+        with open(emb_file, "rb") as f:
+            return pickle.load(f)
+    except (pickle.UnpicklingError, EOFError, OSError, ValueError, AttributeError):
+        return []
 
 
 def save_embeddings(student_id: int, embeddings: list[np.ndarray]):
-    """Save embeddings for a student."""
+    """Save embeddings for a student (atomic write, thread-safe)."""
     EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
     emb_file = EMBEDDINGS_DIR / f"student_{student_id}.pkl"
-    with open(emb_file, "wb") as f:
-        pickle.dump(embeddings, f)
+    tmp_file = emb_file.with_suffix(".tmp")
+    with _save_lock:
+        with open(tmp_file, "wb") as f:
+            pickle.dump(embeddings, f)
+        os.replace(str(tmp_file), str(emb_file))
 
 
 def load_all_embeddings() -> dict[int, list[np.ndarray]]:
-    """Load all stored embeddings. Returns {student_id: [embeddings]}."""
+    """Load all stored embeddings. Returns {student_id: [embeddings]}.
+
+    Corrupt files are skipped rather than crashing the scan.
+    """
     all_embs = {}
     for emb_file in EMBEDDINGS_DIR.glob("student_*.pkl"):
-        student_id = int(emb_file.stem.split("_")[1])
-        with open(emb_file, "rb") as f:
-            all_embs[student_id] = pickle.load(f)
+        try:
+            with open(emb_file, "rb") as f:
+                all_embs[int(emb_file.stem.split("_")[1])] = pickle.load(f)
+        except (pickle.UnpicklingError, EOFError, OSError, ValueError, AttributeError):
+            continue
     return all_embs

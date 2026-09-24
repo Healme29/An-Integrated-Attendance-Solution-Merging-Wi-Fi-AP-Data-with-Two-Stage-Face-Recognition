@@ -13,6 +13,7 @@ if _BACKEND_DIR not in sys.path:
 
 from models.database import init_db
 from routers import students, faces, attendance, schedules, wifi
+from config import CORS_ORIGINS
 
 DASHBOARD_FILE = Path(__file__).resolve().parent / "static" / "dashboard.html"
 
@@ -32,8 +33,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -48,6 +49,26 @@ app.include_router(wifi.router)
 @app.get("/")
 async def root():
     return {"message": "Face Attendance API is running", "docs": "/docs", "dashboard": "/dashboard"}
+
+
+@app.get("/health")
+async def health():
+    from fastapi.responses import JSONResponse
+    from models.database import get_db
+
+    try:
+        db = await get_db()
+        try:
+            cursor = await db.execute("SELECT 1")
+            await cursor.fetchone()
+        finally:
+            await db.close()
+        return {"status": "ok", "database": "ok"}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": f"{type(exc).__name__}: {exc}"}
+        )
 
 
 @app.get("/dashboard", include_in_schema=False)

@@ -1,0 +1,27 @@
+==============================================
+  TESTING PROCEDURE - Attendance System
+==============================================
+
+--- 1. Run backend unit tests (no ML models needed) ---
+python -m pytest backend/tests -q
+
+--- 2. Start the backend server ---
+uvicorn backend.main:app --reload
+
+--- 3. Open API docs in browser (while server is running) ---
+http://localhost:8000/docs
+http://localhost:8000/dashboard
+
+--- 4. Run E2E smoke test (open a SECOND terminal, server must be running) ---
+python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000
+
+--- 5. Stop the server ---
+Press CTRL+C in the server terminal
+
+--- OPTIONAL: threshold evaluation (needs YOLOv8 + InsightFace models) ---
+python backend/scripts/evaluate_threshold.py
+
+--- OPTIONAL: run Flutter mobile app ---
+cd mobile
+flutter pub get
+flutter run

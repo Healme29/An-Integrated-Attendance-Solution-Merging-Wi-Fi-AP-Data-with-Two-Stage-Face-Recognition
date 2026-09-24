@@ -7,22 +7,61 @@ from utils.helpers import image_bytes_to_array
 from datetime import datetime
 import cv2
 import pickle
-from config import DATA_DIR
+from config import DATA_DIR, MAX_UPLOAD_BYTES, MAX_EMBEDDINGS_PER_STUDENT, MIN_FACE_BBOX_PX
 
 FACES_DIR = DATA_DIR / "faces"
 
+# Accepted upload formats, checked via magic bytes (MIME headers lie).
+IMAGE_MAGIC_BYTES = (
+    (b"\xff\xd8\xff", "jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "png"),
+)
+
 router = APIRouter(prefix="/faces", tags=["faces"])
+
+
+def validate_image_upload(contents: bytes) -> str | None:
+    """Return the detected image format if magic bytes match, else None."""
+    for magic, fmt in IMAGE_MAGIC_BYTES:
+        if contents.startswith(magic):
+            return fmt
+    return None
+
+
+def filter_tiny_faces(faces: list[dict]) -> tuple[list[dict], bool]:
+    """Drop faces below the minimum bbox size (likely false positives).
+
+    Returns (kept_faces, had_faces_before_filter).
+    """
+    kept = [
+        f for f in faces
+        if (f["bbox"][2] - f["bbox"][0]) >= MIN_FACE_BBOX_PX
+        and (f["bbox"][3] - f["bbox"][1]) >= MIN_FACE_BBOX_PX
+    ]
+    return kept, len(faces) > 0
 
 
 @router.post("/enroll", response_model=FaceEnrollResponse)
 async def enroll_face(student_id: int, file: UploadFile = File(...)):
     contents = await file.read()
+
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)"
+        )
+    if validate_image_upload(contents) is None:
+        raise HTTPException(status_code=400, detail="Unsupported image format (expected JPEG or PNG)")
+
     image = image_bytes_to_array(contents)
     if image is None:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
     faces = detect_faces_from_bytes(contents)
+    faces, had_faces = filter_tiny_faces(faces)
     if not faces:
+        if had_faces:
+            raise HTTPException(status_code=400, detail="Detected face is too small in the image")
         raise HTTPException(status_code=400, detail="No face detected in image")
 
     db = await get_db()
@@ -55,6 +94,13 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
         await db.close()
         raise HTTPException(status_code=400, detail="Could not extract face embeddings")
 
+    if existing and len(existing) + len(new_embeddings) > MAX_EMBEDDINGS_PER_STUDENT:
+        await db.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Face enrollment limit reached (max {MAX_EMBEDDINGS_PER_STUDENT} samples per student)"
+        )
+
     all_embeddings = existing + new_embeddings
     save_embeddings(student_id, all_embeddings)
 
@@ -69,7 +115,9 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
     return FaceEnrollResponse(
         message="Face enrolled successfully",
         student_id=student_id,
-        face_count=len(all_embeddings)
+        face_count=len(new_embeddings),
+        faces_detected=len(faces),
+        total_embeddings=len(all_embeddings)
     )
 
 

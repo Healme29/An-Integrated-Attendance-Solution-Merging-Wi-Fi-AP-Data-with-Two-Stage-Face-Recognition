@@ -158,18 +158,119 @@ def check_mac_on_network(mac_address: str, devices: list[dict] | None = None) ->
     return any(normalize_mac(d["mac"]) == target for d in devices)
 
 
-def log_ap_access(mac_address: str, ip_address: str, bssid: str = None, ssid: str = None):
+_BSSID_CACHE = {"value": None, "ok": False, "timestamp": 0.0}
+_BSSID_CACHE_TTL = 10
+
+_MAC_PATTERN = re.compile(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")
+
+
+def parse_netsh_bssid(output: str) -> str | None:
+    """Parse the associated BSSID from 'netsh wlan show interfaces' output."""
+    for line in output.splitlines():
+        if "bssid" in line.lower():
+            match = _MAC_PATTERN.search(line)
+            if match:
+                return normalize_mac(match.group(0))
+    return None
+
+
+def parse_iwconfig_bssid(output: str) -> str | None:
+    """Parse the associated BSSID from 'iwconfig' output."""
+    for line in output.splitlines():
+        lowered = line.lower()
+        if "access point" in lowered and "not-associated" not in lowered:
+            match = _MAC_PATTERN.search(line)
+            if match:
+                return normalize_mac(match.group(0))
+    return None
+
+
+def get_current_bssid(use_cache: bool = True) -> str | None:
+    """BSSID of the AP this machine is currently associated with.
+
+    Used to enforce schedules.ap_bssid: devices found on the network can
+    only be attributed to the scheduled AP when the server itself is
+    connected to it. Returns None when not on Wi-Fi or unsupported.
+    """
+    now = time.time()
+    if use_cache and _BSSID_CACHE["ok"]:
+        if now - _BSSID_CACHE["timestamp"] < _BSSID_CACHE_TTL:
+            return _BSSID_CACHE["value"]
+
+    system = platform.system()
+    bssid = None
+    try:
+        if system == "Windows":
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "interfaces"],
+                capture_output=True, text=True, timeout=5
+            )
+            bssid = parse_netsh_bssid(result.stdout or "")
+        elif system == "Linux":
+            result = subprocess.run(
+                ["iwconfig"], capture_output=True, text=True, timeout=5
+            )
+            bssid = parse_iwconfig_bssid(result.stdout or "")
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        bssid = None
+
+    _BSSID_CACHE["value"] = bssid
+    _BSSID_CACHE["ok"] = True
+    _BSSID_CACHE["timestamp"] = now
+    return bssid
+
+
+def is_same_bssid(bssid_a: str | None, bssid_b: str | None) -> bool:
+    """Compare two BSSID strings format-agnostically."""
+    if not bssid_a or not bssid_b:
+        return False
+    return normalize_mac(bssid_a) == normalize_mac(bssid_b)
+
+
+async def log_ap_access(mac_address: str, ip_address: str, bssid: str = None, ssid: str = None):
     """Log AP access to database."""
     from models.database import get_db
-    import asyncio
+    from config import now_local
 
-    async def _log():
-        db = await get_db()
-        await db.execute(
-            "INSERT INTO ap_logs (mac_address, ip_address, bssid, ssid) VALUES (?, ?, ?, ?)",
-            (mac_address, ip_address, bssid, ssid)
-        )
+    db = await get_db()
+    await db.execute(
+        "INSERT INTO ap_logs (mac_address, ip_address, bssid, ssid, scan_time) VALUES (?, ?, ?, ?, ?)",
+        (mac_address, ip_address, bssid, ssid, now_local().strftime("%Y-%m-%d %H:%M:%S"))
+    )
+    await db.commit()
+    await db.close()
+
+
+async def log_seen_devices(devices: list[dict], bssid: str = None, ssid: str = None, dedupe_seconds: int = 60):
+    """Persist discovered devices into the ap_logs table.
+
+    bssid/ssid record which AP the server was associated with during the
+    scan. Skips entries already logged for the same MAC+IP within the
+    dedupe window, so repeated scans (10 s cache, page refreshes) don't
+    flood the table.
+    """
+    from datetime import timedelta
+    from models.database import get_db
+    from config import now_local
+
+    if not devices:
+        return
+
+    cutoff = (now_local() - timedelta(seconds=dedupe_seconds)).strftime("%Y-%m-%d %H:%M:%S")
+    db = await get_db()
+    try:
+        for device in devices:
+            cursor = await db.execute(
+                """SELECT 1 FROM ap_logs
+                   WHERE mac_address = ? AND ip_address = ? AND scan_time >= ?""",
+                (device["mac"], device["ip"], cutoff)
+            )
+            if await cursor.fetchone():
+                continue
+            await db.execute(
+                "INSERT INTO ap_logs (mac_address, ip_address, bssid, ssid, scan_time) VALUES (?, ?, ?, ?, ?)",
+                (device["mac"], device["ip"], bssid, ssid, now_local().strftime("%Y-%m-%d %H:%M:%S"))
+            )
         await db.commit()
+    finally:
         await db.close()
-
-    asyncio.create_task(_log())

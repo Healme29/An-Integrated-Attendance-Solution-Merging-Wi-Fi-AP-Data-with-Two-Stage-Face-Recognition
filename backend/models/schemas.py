@@ -28,6 +28,8 @@ class FaceEnrollResponse(BaseModel):
     message: str
     student_id: int
     face_count: int
+    faces_detected: int = 0
+    total_embeddings: int = 0
 
 
 class AttendanceRequest(BaseModel):

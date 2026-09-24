@@ -1,4 +1,6 @@
 import sys
+import shutil
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -7,6 +9,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config
 TEST_DB = Path(__file__).resolve().parent / "test_attendance.db"
 config.DATABASE_PATH = TEST_DB
+
+# Keep test artifacts (face crops, embedding pickles) out of backend/data/
+TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="attendance_test_data_"))
+config.DATA_DIR = TEST_DATA_DIR
+config.EMBEDDINGS_DIR = TEST_DATA_DIR / "embeddings"
 
 import pytest
 import pytest_asyncio
@@ -70,14 +77,30 @@ async def create_test_db():
     await db.close()
 
 
+def _remove_test_db():
+    """Delete the test DB, retrying briefly (Windows can lag on file handles)."""
+    import gc
+    import time
+    for _ in range(10):
+        try:
+            if TEST_DB.exists():
+                TEST_DB.unlink()
+            return
+        except PermissionError:
+            gc.collect()
+            time.sleep(0.1)
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_db():
-    if TEST_DB.exists():
-        TEST_DB.unlink()
+    _remove_test_db()
+    if TEST_DATA_DIR.exists():
+        shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
     await create_test_db()
     yield
-    if TEST_DB.exists():
-        TEST_DB.unlink()
+    _remove_test_db()
+    if TEST_DATA_DIR.exists():
+        shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
 
 
 @pytest_asyncio.fixture
@@ -151,6 +174,27 @@ def mock_face_recognition():
 def mock_wifi_scanner():
     with patch("services.attendance.check_mac_on_network") as mock:
         mock.return_value = True
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_current_bssid():
+    with patch("services.attendance.get_current_bssid") as mock:
+        mock.return_value = "aa:bb:cc:dd:ee:ff"
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_wifi_scan_api():
+    """Avoid real network scans / BSSID queries from the /wifi API in tests."""
+    devices = [
+        {"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"},
+        {"ip": "192.168.1.20", "mac": "11:22:33:44:55:66"},
+    ]
+    with patch("routers.wifi.scan_network_arp") as mock, \
+         patch("routers.wifi.get_current_bssid") as mock_bssid:
+        mock.return_value = devices
+        mock_bssid.return_value = "aa:bb:cc:dd:ee:ff"
         yield mock
 
 
