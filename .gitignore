@@ -20,6 +20,7 @@ backend/data/faces/
 # Uvicorn runtime artifacts
 backend/uvicorn_*.log
 backend/uvicorn.pid
+backend/server_*.log
 
 # Python venv
 backend/venv/

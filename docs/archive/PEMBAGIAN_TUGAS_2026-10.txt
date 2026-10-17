@@ -1,0 +1,176 @@
+============================================================
+  PEMBAGIAN TUGAS - AN-INTEGRATED-ATTENDANCE-SOLUTION
+============================================================
+
+Tim: 4 anggota (A, B, C, D)
+Status codebase: ~90% selesai
+Fokus: remaining work, polish, testing, deployment
+
+
+============================================================
+  A (LEAD) - FACE PIPELINE & THRESHOLD TUNING
+  Paling Berat ~13-19 jam
+============================================================
+
+[ ] Threshold tuning real data
+    - running evaluate_threshold.py dengan 20+ foto asli
+    - hitung FAR (False Acceptance Rate)
+    - hitung FRR (False Rejection Rate)
+    - hitung EER (Equal Error Rate)
+    - tentukan FACE_SIMILARITY_THRESHOLD optimal di config.py
+
+[ ] Uji coba YOLO confidence threshold
+    - bandingkan YOLO_CONF_THRESHOLD: 0.25 vs 0.3 vs 0.35
+    - ukur recall drop masing-masing
+    - update config.py dengan nilai terbaik
+
+[ ] Optimasi YOLO_IMG_SIZE
+    - coba 640 vs 1280
+    - ukur tradeoff: kecepatan vs akurasi deteksi
+
+[ ] Real-world face testing
+    - minimal 5 orang dengan kondisi berbeda:
+      * pencahayaan terang
+      * pencahayaan redup
+      * wajah miring
+      * aksesoris (masker/kacamata)
+    - dokumentasikan hasilnya
+
+[ ] Generate docs/threshold_report.md
+    - isi placeholder dengan hasil aktual FAR/FRR
+    - format: markdown dengan tabel
+
+[ ] Anti-spoofing documentation
+    - tambah catatan di face_recognition.py
+    - InsightFace buffalo_l TIDAK punya anti-spoofing
+
+[ ] Integrasi & code review
+    - review semua pull request dari B, C, D
+    - integration testing end-to-end
+    - update AGENTS.md jika ada perubahan arsitektur
+
+
+============================================================
+  B - ATTENDANCE LOGIC & SCHEDULE
+  Lebih Ringan dari A ~6-8 jam
+============================================================
+
+[ ] Verifikasi two-stage attendance flow
+    - start check-in -> status "partial"
+    - end check-in -> status "verified" (jika start ada)
+    - end check-in tanpa start -> error 409
+    - duplicate start -> error 409
+    - duplicate end -> error 409
+
+[ ] Test grace period
+    - ATTENDANCE_CHECK_WINDOW_MINUTES = 15
+    - coba check-in 10 menit SEBELUM jadwal -> harus diterima
+    - coba check-in 10 menit SETELAH jadwal -> harus diterima
+    - coba check-in 20 menit SEBELUM -> harus ditolak (403)
+
+[ ] Test midnight-crossing window
+    - buat jadwal 23:00 - 00:30
+    - coba check-in jam 23:30 -> harus diterima
+    - coba check-in jam 00:15 -> harus diterima
+
+[ ] Test schedule overlap detection
+    - buat 2 jadwal overlap di ruang & hari sama -> 409
+    - buat 2 jadwal non-overlap -> sukses
+    - buat 2 jadwal ruang beda -> sukses
+
+[ ] Review response models
+    - AttendanceResponse: pastikan field cocok dgn return
+    - AttendanceHistoryResponse: tambah class_name, room
+    - Pastikan wifi_verified: bool, status: str sesuai API docs
+
+[ ] Update TASK_B.md
+    - centang semua item yang sudah selesai dikerjakan
+
+
+============================================================
+  C - FLUTTER APP POLISH
+  Ringan ~5-7 jam
+============================================================
+
+[ ] Loading states
+    - tambah skeleton loader di semua screen
+    - tampilkan indikator loading saat panggil API
+
+[ ] Empty states
+    - tampilkan ilustrasi + teks jika:
+      * tidak ada jadwal
+      * tidak ada history
+      * tidak ada data siswa
+
+[ ] Error handling improvement
+    - semua screen: tangani timeout koneksi
+    - semua screen: tangani server down
+    - tampilkan pesan user-friendly (bukan error mentah)
+
+[ ] Update mobile/README.md
+    - saat ini masih default Flutter boilerplate
+    - ganti dengan deskripsi app + screen + setup
+
+[ ] Update TASK_C.md
+    - centang semua item yang sudah selesai dikerjakan
+
+
+============================================================
+  D - TESTING, DEPLOYMENT & DOKUMENTASI
+  Ringan ~5-8 jam
+============================================================
+
+[ ] Docker Compose verification
+    - build ulang container
+    - verifikasi volume mapping
+    - verifikasi environment variables
+    - pastikan database persist
+
+[ ] CORS hardening
+    - backend/main.py: ganti allow_origins=["*"]
+    - ganti dengan whitelist IP/domain spesifik
+
+[ ] Update dokumen usang
+    - progress_report.txt -> update status ke ~90%
+    - next_steps.txt -> sesuaikan dengan realitas
+    - docs/PROMPT_AI_TEAM.md -> update blocker status
+
+[ ] Smoke test
+    - jalankan: python backend/scripts/smoke_test.py
+    - pastikan semua endpoint OK
+
+[ ] Database indexes (jika belum ada)
+    - idx_attendance_student ON attendance(student_id)
+    - idx_attendance_schedule ON attendance(schedule_id)
+    - idx_attendance_timestamp ON attendance(timestamp)
+    - idx_students_nim ON students(nim)
+    - idx_schedules_day_time ON schedules(day_of_week, start_time)
+
+[ ] Update TASK_D.md
+    - centang semua item yang sudah selesai dikerjakan
+
+
+============================================================
+  PRIORITAS PENGERJAAN
+============================================================
+
+Stage 1 (Hari 1-2):
+  1. A -> Threshold tuning & real testing (kritis)
+  2. B -> Verifikasi two-stage flow (core logic)
+
+Stage 2 (Hari 2-3):
+  3. C -> Flutter polish (UX)
+  4. D -> Testing, deployment & dokumen (paralel)
+
+============================================================
+  ALUR KERJA
+============================================================
+
+1. Masing-masing clone repo: git clone <url>
+2. Buat branch: git checkout -b tugas-[a/b/c/d]
+3. Kerja sesuai tugas masing-masing
+4. Commit & push: git push origin tugas-[a/b/c/d]
+5. Buat Pull Request ke main
+6. A review & merge PR setelah semua selesai
+
+============================================================
