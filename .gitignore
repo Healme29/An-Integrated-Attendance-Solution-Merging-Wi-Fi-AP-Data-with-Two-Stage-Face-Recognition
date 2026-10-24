@@ -17,6 +17,9 @@ build/
 backend/data/embeddings/
 backend/data/faces/
 
+# Experiment photos (do not commit face photos)
+gambar_percobaan/
+
 # Uvicorn runtime artifacts
 backend/uvicorn_*.log
 backend/uvicorn.pid
