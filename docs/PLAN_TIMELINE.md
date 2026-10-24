@@ -63,6 +63,28 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-24 — A: Flutter auto-prompt integration drafted + TWO local simulators running
+- Flutter side implemented (draft for **C** to review/own — user requested A
+  to prototype it now): `mobile/lib/services/prompt_service.dart` (polling
+  service, 20 s heartbeat, dedupe per stage `scheduleId:checkType`), API
+  method `getCheckInPrompt`, banner card + "Check in now / Later" in
+  `home_screen.dart` (lifecycle-aware: pauses when app backgrounded),
+  `auto_check_in_on` toggle in `session_service.dart` + Settings switch.
+  `flutter analyze`: **No issues found**. NOT committed to mobile branch —
+  sits on task-a for C's review.
+- Headless e2e test PASSED (`backend/scripts/simulate_phone.py`): creates a
+  fresh demo schedule (unique room, midnight-safe window), then
+  banner→tap→START (79.9%, partial) → banner flips END →tap (85.4%,
+  verified) → `check_in_complete` banner stops. Full loop 90 s.
+- Visual phone simulator: `docs/A/demo/auto_prompt_simulator.html`
+  (browser window mimicking the app: banner, Log, photo upload stand-in for
+  the camera, auto-tap option, demo-class creator with Shanghai-time
+  windows). Served at http://127.0.0.1:8765/auto_prompt_simulator.html
+  (`python -m http.server 8765` in `docs/A/demo`).
+- Blocked for REAL desktop app run: Windows build needs Developer Mode
+  (symlink) — admin denied in this shell. Everything else works on
+  emulator/real phone; `10.0.2.2:8000` already the app default.
+
 ### 2026-10-24 — A: auto check-in prompt feature BUILT & VERIFIED live (tier 1)
 - New endpoint `GET /me/prompt?student_id=N` (`backend/routers/prompt.py`,
   registered in `main.py`): polls-friendly contract for the mobile app —
