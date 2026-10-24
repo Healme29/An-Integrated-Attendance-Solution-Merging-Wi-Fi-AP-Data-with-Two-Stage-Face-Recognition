@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,11 +13,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _urlController;
   bool _isTesting = false;
   bool? _lastPingOk;
+  bool _autoPromptOn = true;
 
   @override
   void initState() {
     super.initState();
     _urlController = TextEditingController(text: ApiService.baseUrl);
+    SessionService.getAutoPromptOn().then((v) {
+      if (mounted) setState(() => _autoPromptOn = v);
+    });
   }
 
   @override
@@ -108,6 +113,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text("Auto check-in prompt"),
+            subtitle: const Text(
+              "Show a banner automatically when a class is detected "
+              "and your device is seen on the classroom Wi-Fi.",
+            ),
+            value: _autoPromptOn,
+            onChanged: (v) async {
+              await SessionService.setAutoPromptOn(v);
+              setState(() => _autoPromptOn = v);
+            },
           ),
         ],
       ),

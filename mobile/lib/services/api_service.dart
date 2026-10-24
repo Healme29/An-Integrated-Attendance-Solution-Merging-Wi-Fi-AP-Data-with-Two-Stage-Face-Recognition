@@ -106,6 +106,13 @@ class ApiService {
     return data.map((json) => Student.fromJson(json)).toList();
   }
 
+  /// Auto check-in prompt: which stage (if any) is actionable right now.
+  /// Contract: docs/A/auto_prompt_spec.md (backend GET /me/prompt).
+  static Future<Map<String, dynamic>> getCheckInPrompt(int studentId) async {
+    final data = await _get("/me/prompt?student_id=$studentId");
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// Login lookup: returns the student with this NIM, or null if not found.
   static Future<Student?> findStudentByNim(String nim) async {
     final data = await _get("/students/?nim=$nim") as List<dynamic>;
