@@ -63,6 +63,56 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-24 — A: auto check-in prompt feature BUILT & VERIFIED live (tier 1)
+- New endpoint `GET /me/prompt?student_id=N` (`backend/routers/prompt.py`,
+  registered in `main.py`): polls-friendly contract for the mobile app —
+  returns `prompt` (strict: schedule active + stage open + device MAC seen on
+  the classroom network), `check_available`, `check_type` (auto start→end),
+  `wifi_seen`, `bssid`, `reason`. READS existing services only; no attendance
+  rule changed — check-ins still go through the fully-enforced
+  `POST /attendance/check`.
+- 7 new tests (`backend/tests/test_prompt.py`): whole suite now **131/131**
+  (includes 124 baseline).
+- Live verification (schedule "Uji Auto Prompt" id 9, Buchari MAC = gateway):
+  prompt start ✅ → start check (confidence 0.972) → prompt flips to `end`
+  ✅ → end check (0.955) → `reason: check_in_complete`, banner stops ✅.
+  Willian (no valid MAC): `check_available=true` but `prompt=false`,
+  `device_not_seen_on_network` ✅. Room-overlap guard also observed working.
+- Spec for C (Flutter heartbeat + banner + auto-navigate):
+  `docs/A/auto_prompt_spec.md`. Mobile files untouched (C's area).
+- (Earlier same day: threshold evaluation with 2 students → report + live
+  Wi-Fi/two-stage verification; see previous entries.)
+
+### 2026-10-24 — A: end-to-end Wi-Fi + two-stage check-in VERIFIED live
+- Server run with `TIMEZONE=Asia/Shanghai` (CST); Wi-Fi scan auto-detected
+  subnet 10.163.207.0/24 and BSSID 54:2b:de:fd:90:21 correctly in local time.
+- **Discovery: `/wifi/scan` on Windows does NOT need Npcap** — it uses ping
+  sweep + `arp -a` (see `wifi_scanner.py::_scan_windows`). The "Npcap required
+  on Windows" note in AGENTS.md/PROJECT_CONTEXT is outdated for this path;
+  Npcap only matters for raw Scapy (Linux path) capture. Candidate doc fix.
+- Set Buchari MAC (simulated as gateway device) via `PUT /students/8/mac`.
+- `POST /attendance/check?schedule_id=8&check_type=start` with a HELD-OUT
+  photo (never enrolled) → matched, confidence **0.943**, `wifi_verified=true`,
+  status `partial` ✅ (recognition works on unseen photos, not just enrolled ones)
+- `end` check with another held-out photo → confidence **0.688**,
+  `wifi_verified=true`, **status `verified`** — both rows finalized ✅
+- Full two-stage flow + Wi-Fi check automation confirmed working live.
+- Observed issue for review: `students/faces.created_at` + `ap_logs.scan_time`
+  use SQLite `CURRENT_TIMESTAMP` (UTC) while `attendance.timestamp` is local —
+  inconsistent; fix candidate in `models/database.py`.
+
+### 2026-10-24 — A: first enrollment + threshold evaluation done (2 students)
+- Fixed environment: `onnxruntime` failed to import because NumPy 2.2.6 was
+  installed; restored the pinned `numpy==1.26.4` from `backend/requirements.txt`.
+- Created students: Buchari `F25040126` (id 8) and Willian `F25040128` (id 9).
+- Enrolled faces: Buchari 5 selfies (varied location/lighting/expression),
+  Willian 3 selfies. Stored under `gambar_percobaan/orang_1|orang_2/` (gitignored).
+- Ran `evaluate_threshold.py` → wrote real FAR/FRR/EER to `docs/threshold_report.md`:
+  genuine min **0.708** vs impostor max **0.224** → distributions fully separated.
+  **Threshold kept at 0.5** (midpoint of safe gap [0.224, 0.708]).
+- ⚠️ Pending: still 2/3 students — recruit `orang_3` and re-run the evaluation
+  before the M1 progress report (~Nov 1). See caveats in `docs/threshold_report.md`.
+
 ### 2026-10-18 — Planning session + repository audit + docs restructure (all)
 - Audited the repository against reality: 124 tests, **123 passing**, 1 failing
   (`test_dashboard_served` — stale `"Teacher Dashboard"` assertion vs. redesigned
