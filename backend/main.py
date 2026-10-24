@@ -12,7 +12,7 @@ if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
 from models.database import init_db
-from routers import students, faces, attendance, schedules, wifi
+from routers import students, faces, attendance, schedules, wifi, prompt
 from config import CORS_ORIGINS
 
 DASHBOARD_FILE = Path(__file__).resolve().parent / "static" / "dashboard.html"
@@ -44,6 +44,7 @@ app.include_router(faces.router)
 app.include_router(attendance.router)
 app.include_router(schedules.router)
 app.include_router(wifi.router)
+app.include_router(prompt.router)
 
 
 @app.get("/")

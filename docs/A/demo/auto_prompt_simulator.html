@@ -1,0 +1,316 @@
+<!doctype html>
+<!--
+  LOCAL PHONE SIMULATOR — Auto check-in prompt (tier 1, polling)
+  Visual stand-in for the Flutter app while the mobile build is not on a
+  device/emulator yet. Mirrors docs/A/auto_prompt_spec.md and the Dart code
+  in mobile/lib/services/prompt_service.dart:
+
+    poll GET /me/prompt every N s
+      -> prompt=true  -> show BANNER (once per stage "scheduleId:checkType")
+      -> student taps "Check in now" -> POST /attendance/check with a photo
+      -> next poll offers the next stage (start -> end) -> ... ->
+         reason check_in_complete stops the banner.
+
+  All attendance rules stay on the server; this page never bypasses them.
+  Serve it with any static file server and open it in a browser
+  (backend CORS allows any origin):
+      cd docs/A/demo && python -m http.server 8765
+      http://127.0.0.1:8765/auto_prompt_simulator.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auto Check-in Simulator</title>
+<style>
+  :root { --green:#2e7d32; --red:#c62828; --amber:#ff8f00; }
+  body { background:#1a1c22; color:#e8eaed; font-family:Segoe UI, Arial, sans-serif; display:flex; gap:24px; justify-content:center; padding:24px; }
+  .phone { width:360px; background:#101216; border:10px solid #26282f; border-radius:36px; padding:14px 14px 20px; height:740px; display:flex; flex-direction:column; box-shadow:0 12px 48px #000c; }
+  .notch { width:120px; height:18px; background:#26282f; border-radius:9px; margin:0 auto 10px; }
+  .statusbar { display:flex; justify-content:space-between; font-size:12px; color:#9aa0a6; padding:0 6px 8px; }
+  .appbar { background:var(--green); color:#fff; padding:12px 14px; border-radius:12px; font-weight:600; }
+  .screen { flex:1; overflow-y:auto; margin-top:10px; padding-right:2px; }
+  .card { background:#1e2129; border-radius:14px; padding:14px; margin-bottom:12px; }
+  .banner { background:#0b3d1e; border:1px solid var(--green); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .banner h3 { margin:0 0 6px; font-size:15px; }
+  .row { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+  button { cursor:pointer; border:0; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600; }
+  .btn-fill { background:var(--green); color:#fff; }
+  .btn-fill:disabled { background:#405c44; color:#b7c2b8; cursor:not-allowed; }
+  .btn-text { background:transparent; color:#8ab4f8; }
+  .btn-out { background:transparent; color:#9aa0a6; border:1px solid #3c4043; }
+  .muted { color:#9aa0a6; font-size:13px; }
+  .logline { font-size:12px; color:#9aa0a6; border-bottom:1px dashed #2a2d33; padding:6px 2px; }
+  .ok { color:#81c995; } .warn { color:#fdd663; } .err { color:#f28b82; }
+  .panel { width:430px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  label { font-size:13px; color:#9aa0a6; }
+  input, select { background:#20222a; color:#e8eaed; border:1px solid #3c4043; border-radius:8px; padding:8px; width:100%; box-sizing:border-box; margin:4px 0 12px; }
+  .switch { display:flex; align-items:center; gap:10px; margin:10px 0; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+  .pill-ok { background:#0b3d1e; color:#81c995; }
+  .pill-mid { background:#3d2e0b; color:#fdd663; }
+</style>
+</head>
+<body>
+
+<!-- ============ PHONE ============ -->
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar"><span id="clock"></span><span>&#128241; LTE &#128225; Wi-Fi</span></div>
+  <div class="appbar">&#128100; Face Attendance</div>
+  <div class="screen">
+    <div class="card">
+      <div id="studentName" class="muted">Not logged in</div>
+      <div style="font-weight:700; margin-top:4px;" id="studentTitle">&#8212;</div>
+    </div>
+
+    <div class="banner" id="banner" style="display:none">
+      <h3 id="bannerTitle"></h3>
+      <div id="bannerBody" class="muted"></div>
+      <div class="row">
+        <button class="btn-text" onclick="dismiss()">Later</button>
+        <button class="btn-fill" onclick="accept()" id="checkBtn">Check in now</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span id="idleState" class="muted">Idle &#8212; waiting for a class...&#8230;</span>
+    </div>
+
+    <div class="card">
+      <div class="muted" style="margin-bottom:8px; font-weight:600;">SIM LOG</div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONTROL PANEL ============ -->
+<div class="panel">
+  <h2>&#127918; Simulator controls (student side)</h2>
+
+  <label>Student ID</label>
+  <input id="studentId" value="8" title="Buchari = 8, Willian = 9">
+  <button class="btn-out" onclick="loadStudent()">Load student</button>
+
+  <button class="btn-out" style="margin:4px 0 12px;" onclick="createDemoClass()">&#10133; Create demo class (Shanghai now &plusmn; 20 min)</button>
+
+  <div class="switch">
+    <input type="checkbox" id="polling" onchange="togglePolling()">
+    <label for="polling" style="color:#e8eaed;">Poll <code>/me/prompt</code> (heartbeat, like the app's PromptService)</label>
+  </div>
+  <label>Poll interval (s)</label>
+  <input id="interval" type="number" value="6" min="2" max="60">
+
+  <div class="switch">
+    <input type="checkbox" id="autoAccept" checked onchange="">
+    <label for="autoAccept" style="color:#e8eaed;">Auto-tap <b>&#8220;Check in now&#8221;</b> after 3 s (simulates the student confirming the banner)</label>
+  </div>
+
+  <label>&#128247; Photo for START check (camera stand-in)</label>
+  <input type="file" id="photoStart" accept="image/*" onchange="photoPicked('start', this)">
+  <label>&#128247; Photo for END check</label>
+  <input type="file" id="photoEnd" accept="image/*" onchange="photoPicked('end', this)">
+  <div class="muted">Pick selfie photos from <code>gambar_percobaan/orang_1/</code> (held-out, never enrolled) so recognition is a real test.</div>
+
+  <h2 style="margin-top:20px;">&#128073; Result of last check-in</h2>
+  <div class="card" id="lastResult" class="muted"><span class="muted">&#8212;</span></div>
+</div>
+
+<script>
+const BASE = "http://127.0.0.1:8000";
+const CN_OFFSET_MIN = 8 * 60; // server runs TIMEZONE=Asia/Shanghai (UTC+8)
+
+/** Wall-clock time in Shanghai regardless of the browser's timezone,
+ *  so schedule windows line up with the backend. */
+function shNow() {
+  return new Date(Date.now() + (CN_OFFSET_MIN + new Date().getTimezoneOffset()) * 60000);
+}
+function shWeekday() { // 0 = Monday ... 6 = Sunday (backend convention)
+  return (shNow().getUTCDay() + 6) % 7;
+}
+function hm(d) {
+  return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
+}
+
+const state = {
+  studentId: null, student: null,
+  lastOffered: null, currentPrompt: null, files: { start: null, end: null },
+  timer: null, busy: false
+};
+
+function log(msg, cls) {
+  const el = document.getElementById("log");
+  const line = document.createElement("div");
+  line.className = "logline " + (cls || "");
+  line.textContent = new Date().toLocaleTimeString([], { hour12: false }) + "  " + msg;
+  el.prepend(line);
+}
+function setStatus(html, cls) {
+  const el = document.getElementById("idleState");
+  el.innerHTML = html;
+  el.className = cls || "muted";
+}
+setInterval(() => {
+  document.getElementById("clock").textContent =
+      new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}, 1000);
+
+async function api(path, opts) {
+  const res = await fetch(BASE + path, opts);
+  if (!res.ok) {
+    let detail = String(res.status);
+    try { const j = await res.json(); if (j.detail) detail = j.detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function loadStudent() {
+  const id = parseInt(document.getElementById("studentId").value, 10);
+  if (!id) return log("Student ID must be a number", "err");
+  try {
+    const s = await api("/students/" + id);
+    state.studentId = id; state.student = s; state.lastOffered = null;
+    document.getElementById("studentTitle").textContent = s.name + " (" + (s.nim || "no NIM") + ")";
+    document.getElementById("studentName").textContent = "Student #" + s.id;
+    log("Logged in: " + s.name, "ok");
+  } catch (e) { log("Load student failed: " + e.message, "err"); }
+}
+
+async function createDemoClass() {
+  const n = shNow();
+  const start = hm(new Date(n.getTime() - 2 * 60000)); // started 2 min ago
+  let endMin = n.getTime() + 20 * 60000;              // ends in 20 min
+  const end = n.getUTCDate() === new Date(endMin).getUTCDate()
+      ? hm(new Date(endMin)) : "23:59";               // never cross midnight
+  const body = {
+    class_name: "Demo Interactive",
+    day_of_week: shWeekday(),
+    start_time: start, end_time: end,
+    room: "Ruang Demo " + String(n.getUTCMilliseconds()).padStart(3, "0"),
+  };
+  try {
+    const s = await api("/schedules/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    log("Demo class created: id " + s.id + " [" + body.class_name + "] " +
+        start + "-" + end + " (" + body.room + ")", "ok");
+  } catch (e) { log("Create demo class failed: " + e.message, "err"); }
+}
+
+function stageKey(p) { return p.schedule_id + ":" + p.check_type; }
+
+function showBanner(p) {
+  state.currentPrompt = p;
+  document.getElementById("bannerTitle").textContent =
+      p.class_name + " (" + (p.room || "-") + ") detected!";
+  document.getElementById("bannerBody").textContent =
+      (p.check_type === "end" ? "End check-in" : "Start check-in") +
+      " is available now — device seen on the classroom Wi-Fi (BSSID " + (p.bssid || "-") + ").";
+  document.getElementById("banner").style.display = "block";
+}
+
+function dismiss() {
+  document.getElementById("banner").style.display = "none";
+  state.currentPrompt = null;
+  log("Banner dismissed (Later)");
+}
+
+function photoPicked(type, input) {
+  state.files[type] = input.files[0] || null;
+  log("Photo for " + type + " check: " + (state.files[type] ? state.files[type].name : "none"));
+}
+
+async function accept(auto) {
+  const p = state.currentPrompt;
+  if (!p || state.busy) return;
+  const type = p.check_type;
+  const file = state.files[type];
+  if (!file) {
+    log("No photo selected for the " + type + " check — tap 'Check in now' again after picking one.", "warn");
+    return;
+  }
+  state.busy = true;
+  document.getElementById("checkBtn").disabled = true;
+  dismiss();
+  try {
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    const res = await fetch(BASE + "/attendance/check?schedule_id=" + p.schedule_id + "&check_type=" + type,
+                            { method: "POST", body: fd });
+    const j = await res.json();
+    const box = document.getElementById("lastResult");
+    if (!res.ok) {
+      box.innerHTML = "<span class='err'>" + j.detail + "</span>";
+      log(type + " check rejected: " + (j.detail || res.status), "err");
+    } else {
+      box.innerHTML =
+        "<b>" + j.student_name + "</b> &mdash; " + (j.check_type || "").toUpperCase() +
+        " check &mdash; " + new Date(j.timestamp).toLocaleTimeString([], { hour12: false }) + "<br>" +
+        "confidence <span class='ok'>" + (j.confidence * 100).toFixed(1) + "%</span>" +
+        " &nbsp; " + (j.wifi_verified ? "<span class='pill pill-ok'>Wi-Fi verified</span>"
+                                     : "<span class='pill pill-mid'>face only</span>") +
+        " &nbsp; status <b>" + j.status + "</b>";
+      log("Check-in sent: " + j.check_type + " -> status " + j.status +
+          " (confidence " + (j.confidence * 100).toFixed(1) + "%)", "ok");
+    }
+  } catch (e) {
+    log("Check-in failed: " + e.message, "err");
+  } finally {
+    state.busy = false;
+    document.getElementById("checkBtn").disabled = false;
+  }
+}
+
+async function poll() {
+  if (!state.studentId) return;
+  try {
+    const p = await api("/me/prompt?student_id=" + state.studentId);
+    if (p.prompt) {
+      const key = stageKey(p);
+      if (key !== state.lastOffered) {
+        state.lastOffered = key;
+        showBanner(p);
+        log("PROMPT: " + p.check_type + " check for [" + p.class_name + "] (server says: offer the banner)", "ok");
+        if (document.getElementById("autoAccept").checked) {
+          setTimeout(() => {
+            if (state.currentPrompt && state.currentPrompt.schedule_id === p.schedule_id
+                && state.currentPrompt.check_type === p.check_type) accept(true);
+          }, 3000);
+        }
+      }
+    } else if (p.reason === "check_in_complete") {
+      setStatus("&#9989; Check-in complete for today &#8212; banner stops (like the app).", "ok");
+    } else if (p.reason === "no_active_schedule") {
+      setStatus("&#128197; No active class right now.", "warn");
+    } else if (p.reason === "device_not_seen_on_network") {
+      setStatus("&#128225; Class is active, but this device's MAC is NOT seen on the classroom network &#8212; banner must NOT appear (server rule).", "err");
+    } else {
+      setStatus("&#128164; " + (p.reason || "idle"));
+    }
+  } catch (e) {
+    setStatus("&#9888;&#65039; Server unreachable &#8212; will retry.", "err");
+  }
+}
+
+function togglePolling() {
+  const on = document.getElementById("polling").checked;
+  if (on) {
+    if (!state.studentId) { log("Load a student before polling", "warn"); document.getElementById("polling").checked = false; return; }
+    const secs = Math.max(2, parseInt(document.getElementById("interval").value, 10) || 8);
+    state.timer = setInterval(poll, secs * 1000);
+    poll();
+    log("Polling started (every " + secs + " s)");
+  } else {
+    clearInterval(state.timer); state.timer = null;
+    log("Polling stopped");
+  }
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && document.getElementById("banner").style.display !== "none") accept(false);
+});
+</script>
+</body>
+</html>

@@ -4,6 +4,18 @@ import '../models/student.dart';
 
 class SessionService {
   static const String _studentKey = "logged_in_student";
+  static const String _autoPromptKey = "auto_check_in_on";
+
+  /// Auto check-in prompt toggle (Settings). ON by default.
+  static Future<bool> getAutoPromptOn() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_autoPromptKey) ?? true;
+  }
+
+  static Future<void> setAutoPromptOn(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoPromptKey, value);
+  }
 
   static Future<void> saveStudent(Student student) async {
     final prefs = await SharedPreferences.getInstance();

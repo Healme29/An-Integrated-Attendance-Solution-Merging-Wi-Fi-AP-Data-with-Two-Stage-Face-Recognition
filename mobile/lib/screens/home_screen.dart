@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:face_attendance/models/student.dart';
+import 'package:face_attendance/services/prompt_service.dart';
+import 'package:face_attendance/services/session_service.dart';
 import 'camera_screen.dart';
 import 'enroll_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
-import 'package:face_attendance/models/student.dart';
 import 'package:face_attendance/services/api_service.dart';
-import 'package:face_attendance/services/session_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final Student student;
@@ -17,17 +20,81 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _schedules = [];
   int? _selectedScheduleId;
   String _selectedCheckType = "start";
   bool _isLoadingSchedules = true;
   String? _schedulesError;
 
+  // Auto check-in prompt (tier 1, polling GET /me/prompt every ~20 s).
+  final PromptService _promptService = PromptService();
+  StreamSubscription<CheckInPrompt>? _promptSub;
+  CheckInPrompt? _prompt; // banner currently shown, null = none
+  bool _autoPromptOn = true;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSchedules();
+    _initPrompt();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Save battery and stop pointless polls while backgrounded.
+    if (state == AppLifecycleState.paused) {
+      _promptService.stop();
+    } else if (state == AppLifecycleState.resumed && _autoPromptOn) {
+      _promptService.start(widget.student.id);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _promptSub?.cancel();
+    _promptService.stop();
+    super.dispose();
+  }
+
+  Future<void> _initPrompt() async {
+    final on = await SessionService.getAutoPromptOn();
+    if (!mounted) return;
+    setState(() => _autoPromptOn = on);
+    if (!on) return;
+    _startPromptService();
+  }
+
+  void _startPromptService() {
+    _promptSub ??= _promptService.stream.listen(_onPrompt);
+    _promptService.start(widget.student.id);
+  }
+
+  void _stopPromptService() {
+    _promptSub?.cancel();
+    _promptSub = null;
+    _promptService.stop();
+    if (mounted) setState(() => _prompt = null);
+  }
+
+  void _onPrompt(CheckInPrompt p) {
+    if (!mounted) return;
+    setState(() => _prompt = p);
+  }
+
+  void _dismissPrompt() => setState(() => _prompt = null);
+
+  void _acceptPrompt() {
+    final p = _prompt;
+    if (p == null || p.scheduleId == null || p.checkType == null) return;
+    setState(() {
+      _selectedScheduleId = p.scheduleId;
+      _selectedCheckType = p.checkType!;
+      _prompt = null;
+    });
+    _openCamera();
   }
 
   Future<void> _loadSchedules() async {
@@ -120,11 +187,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     // Schedules may change with a new server URL.
     _loadSchedules();
+    // Auto check-in toggle may have changed too.
+    final on = await SessionService.getAutoPromptOn();
+    if (!mounted) return;
+    setState(() => _autoPromptOn = on);
+    if (on) {
+      _promptService.resetOffered();
+      _startPromptService();
+    } else {
+      _stopPromptService();
+    }
+  }
+
+  Widget _buildPromptBanner() {
+    final p = _prompt!;
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.wifi, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "${p.label} detected!",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              p.checkType == "end"
+                  ? "End check-in is available now."
+                  : "Start check-in is available now.",
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _dismissPrompt,
+                  child: const Text("Later"),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _acceptPrompt,
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text("Check in now"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) {    return Scaffold(
       appBar: AppBar(
         title: const Text("Face Attendance"),
         actions: [
@@ -169,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_autoPromptOn && _prompt != null) _buildPromptBanner(),
+            if (_autoPromptOn && _prompt != null) const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
