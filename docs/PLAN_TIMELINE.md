@@ -63,6 +63,28 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A: app renamed "Student Attendance", default backend URL fixed, phone login path cleared
+- **Rename (English UI)**: Android launcher label, login title, home AppBar, MaterialApp
+  title, dashboard sidebar + page title → **"Student Attendance"** ("Student Attendance
+  System" for the teacher dashboard). API title stays "Face Attendance API" (internal,
+  technical). `pubspec.yaml` package name `face_attendance` and import paths unchanged
+  (internal technical identifier; renaming would churn every import for zero user value).
+- **Login timeout root cause (real phone)**: `ApiService._defaultBaseUrl` was
+  `http://10.0.2.2:8000` — an emulator-only alias. On the Galaxy S24 that host does not
+  exist, so requests hung for 15 s and failed with "Server took too long to respond."
+  Diagnosis evidence: the uvicorn access log had **no** `GET /students/?nim=...` entry,
+  i.e. the request never left the phone; phone-browser `http://127.0.0.1:8000/health`
+  returned OK (adb reverse path works).
+  Fix: default is now `http://127.0.0.1:8000` (works for real device + emulator with
+  `adb reverse tcp:8000 tcp:8000`; LAN users override in Settings), and the timeout
+  message now tells the user exactly what to check.
+- Analyzer clean, Flutter widget test + backend dashboard test green. Rebuilt
+  `app-debug.apk`, reinstalled on the S24, app data cleared so the new default applies.
+- Design discussion recorded for M2/M3 (see conversation): away-episode tracking via
+  periodic ARP scans, RSSI threshold (~ -72 dBm ≈ "outside the room") read from the AP
+  management plane (SSH/SNMP/controller API), teacher status overrides (izin/sakit),
+  BSSID pinning using the existing `schedules.ap_bssid` column.
+
 ### 2026-10-25 — A: anti-cheat pass 1 + teacher-dashboard time bug FIXED + APK build started
 - Cheat-hole review done (see conversation notes): biggest gaps = (1) borrowed/
   shared MAC for wifi_verified, (2) photo-file identity swap / replay, plus

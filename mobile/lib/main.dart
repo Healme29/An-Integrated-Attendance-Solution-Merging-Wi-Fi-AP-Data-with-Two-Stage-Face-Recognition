@@ -20,7 +20,7 @@ class FaceAttendanceApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Face Attendance',
+      title: 'Student Attendance',
       theme: ThemeData(
         colorSchemeSeed: Colors.blue,
         useMaterial3: true,

@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {    return Scaffold(
       appBar: AppBar(
-        title: const Text("Face Attendance"),
+        title: const Text("Student Attendance"),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
