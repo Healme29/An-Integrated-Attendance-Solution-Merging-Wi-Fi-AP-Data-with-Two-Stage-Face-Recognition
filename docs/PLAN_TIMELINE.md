@@ -63,6 +63,24 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A (covering B): real-network Wi-Fi validation documented + data features verified
+- **B1 deliverable created:** `docs/B/network_validation.md` with measured results on the
+  real campus network — fresh scan **2.4 s**, cached **0 s**, 60 s dedupe confirmed
+  (`ap_logs` +1 row across two back-to-back scans), known/unknown MAC checks correct,
+  BSSID `54:2b:de:fd:90:21` stable, two real two-stage check-ins (`verified`, 0.71/0.72).
+- **Real finding (bug class):** `detect_local_subnet()` hard-codes `/24` while the laptop
+  interface is **/17** (`10.163.235.210/17`), and `_ping_sweep()` is capped at `.1–.254`.
+  On the campus SSID only the gateway was visible → **client isolation or VLAN splitting**;
+  ARP scanning works only on flat, small networks. Room-level presence therefore needs the
+  AP management plane (M2) — also the prerequisite for the RSSI "outside the room" idea.
+- **Demo-artifact warning recorded:** student Buchari (id 8) is registered with the
+  campus **gateway's** MAC, so his Wi-Fi check always passes. Real pilot students must be
+  enrolled with their own phone MAC.
+- **B5 verified:** `docs/B/data_features_check.md` — history pagination (`X-Total-Count: 12`,
+  `limit/offset` pages correct, newest first) and CSV export (`text/csv`, correct header,
+  local timestamps, `yes/no` Wi-Fi column).
+- **B2 summary ready:** paragraph + table for member D inside `network_validation.md §5`.
+
 ### 2026-10-25 — A: app renamed "Student Attendance", default backend URL fixed, phone login path cleared
 - **Rename (English UI)**: Android launcher label, login title, home AppBar, MaterialApp
   title, dashboard sidebar + page title → **"Student Attendance"** ("Student Attendance
