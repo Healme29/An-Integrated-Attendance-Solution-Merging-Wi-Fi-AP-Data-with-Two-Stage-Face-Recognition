@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Language Convention
+
+**Write everything in English** — code, comments, docstrings, docs, commit messages, UI text, log output. The only exception is conversation with the user (Indonesian is fine there).
+
 ## Project
 
 Integrated attendance system combining Wi-Fi AP connection logs with two-stage face recognition (start + end of class). Attendance is granted only when all three conditions are met: correct AP, valid class time, and both selfies matched.

@@ -440,4 +440,4 @@ class TestRootEndpoint:
         response = client.get("/dashboard")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        assert "Teacher Dashboard" in response.text
+        assert "Student Attendance System" in response.text

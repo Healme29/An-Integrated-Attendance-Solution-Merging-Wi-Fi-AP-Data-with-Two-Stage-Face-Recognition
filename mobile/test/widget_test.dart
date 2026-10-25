@@ -6,6 +6,6 @@ void main() {
   testWidgets('App builds and shows login when no session', (WidgetTester tester) async {
     await tester.pumpWidget(const FaceAttendanceApp());
 
-    expect(find.text('Face Attendance'), findsOneWidget);
+    expect(find.text('Student Attendance'), findsOneWidget);
   });
 }

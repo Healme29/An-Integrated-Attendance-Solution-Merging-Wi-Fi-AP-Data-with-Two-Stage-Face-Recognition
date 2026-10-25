@@ -15,7 +15,11 @@ class ApiException implements Exception {
 
 class ApiService {
   static const String _urlKey = "backend_base_url";
-  static const String _defaultBaseUrl = "http://10.0.2.2:8000";
+
+  /// Works on a real phone AND an emulator when the device is attached over
+  /// USB (`adb reverse tcp:8000 tcp:8000` maps this to the laptop's backend).
+  /// For LAN access, override it in Settings with the laptop's IP.
+  static const String _defaultBaseUrl = "http://127.0.0.1:8000";
   static const Duration _timeout = Duration(seconds: 15);
 
   static String baseUrl = _defaultBaseUrl;
@@ -43,7 +47,9 @@ class ApiService {
     } on SocketException {
       throw ApiException("Cannot reach server. Check your connection and backend URL.");
     } on TimeoutException {
-      throw ApiException("Server took too long to respond.");
+      throw ApiException(
+          "Server took too long to respond. Open Settings and check the server URL "
+          "(with USB attached, use http://127.0.0.1:8000 and run: adb reverse tcp:8000 tcp:8000).");
     } on http.ClientException {
       throw ApiException("Cannot reach server. Check the backend URL in Settings.");
     }
@@ -104,6 +110,13 @@ class ApiService {
   static Future<List<Student>> getStudents() async {
     final data = await _get("/students/") as List<dynamic>;
     return data.map((json) => Student.fromJson(json)).toList();
+  }
+
+  /// Auto check-in prompt: which stage (if any) is actionable right now.
+  /// Contract: docs/A/auto_prompt_spec.md (backend GET /me/prompt).
+  static Future<Map<String, dynamic>> getCheckInPrompt(int studentId) async {
+    final data = await _get("/me/prompt?student_id=$studentId");
+    return Map<String, dynamic>.from(data as Map);
   }
 
   /// Login lookup: returns the student with this NIM, or null if not found.

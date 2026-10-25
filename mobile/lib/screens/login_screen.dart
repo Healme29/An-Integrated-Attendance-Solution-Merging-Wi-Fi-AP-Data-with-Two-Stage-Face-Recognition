@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Icon(Icons.face_retouching_natural, size: 80, color: Colors.blue),
                 const SizedBox(height: 24),
                 const Text(
-                  "Face Attendance",
+                  "Student Attendance",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 ),

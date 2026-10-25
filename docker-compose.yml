@@ -3,14 +3,22 @@ services:
     build: ./backend
     container_name: face-attendance-backend
     ports:
-      - "8000:8000"
+      # Override with BACKEND_PORT when 8000 is already taken on the host.
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
-      DATABASE_PATH: /app/data/attendance.db
+      # Persisted state (database + InsightFace models) lives in the named
+      # volume mounted at /app/data/dbdata. Keeping it OUT of /app/data means
+      # the YOLO weights baked into the image at /app/data/models stay visible.
+      DATABASE_PATH: /app/data/dbdata/attendance.db
+      INSIGHTFACE_HOME: /app/data/dbdata/insightface
+      # Server timezone: schedule windows and stored timestamps follow this.
+      TIMEZONE: ${TIMEZONE:-Asia/Shanghai}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
       WI_FI_SUBNET: ${WI_FI_SUBNET:-192.168.1.0/24}
       FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.5}
       ATTENDANCE_CHECK_WINDOW_MINUTES: ${ATTENDANCE_CHECK_WINDOW_MINUTES:-15}
     volumes:
-      - backend-data:/app/data
+      - backend-data:/app/data/dbdata
     restart: unless-stopped
 
 volumes:

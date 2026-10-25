@@ -63,6 +63,192 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A (covering B): Docker deployment verified + seed script + compose fixes
+- **B3 done:** image builds and runs; `GET /health` OK; `TIMEZONE=Asia/Shanghai` applied;
+  smoke test **15/15** against the container (and 15/15 against the native server).
+- **Compose/Dockerfile fixes (real bugs found during deployment):**
+  - the volume `backend-data:/app/data` used to **shadow the baked-in YOLO weights**;
+    state now lives in `/app/data/dbdata` (verified: `yolov8m-face.pt` visible at runtime);
+  - `TIMEZONE` and `CORS_ORIGINS` were not passed into the container at all;
+  - host port is now overridable via `BACKEND_PORT`;
+  - torch/torchvision installed from the **CPU wheel index** — the default CUDA wheels
+    added ~3 GB for nothing (image now 3.4 GB total).
+- **China deployment note documented:** Docker Hub is unreachable from this network;
+  `docs/B/deployment_guide.md` explains registry mirrors (`docker.m.daocloud.io`,
+  `dockerproxy.com`) + `docker desktop restart`.
+- **Confirmed limitation (measured):** `/wifi/scan` inside the container returns
+  `devices: []` (subnet defaults to `192.168.1.0/24`, BSSID null) — containers cannot see
+  the host Wi-Fi LAN. Wi-Fi presence requires native run or Linux host networking; the
+  guide now states this explicitly.
+- **B4 (new):** `backend/scripts/seed_demo.py` — demo students, a schedule active now and
+  sample attendance rows; flags `--reset`, `--students N`, `--db PATH`; tested against a
+  temporary database (START before END, correct server timezone).
+- **Smoke test bug fixed:** `GET /dashboard` check looked for "Teacher Dashboard" (a string
+  that never existed); now checks the real page markers.
+
+### 2026-10-25 — A (covering B): real-network Wi-Fi validation documented + data features verified
+- **B1 deliverable created:** `docs/B/network_validation.md` with measured results on the
+  real campus network — fresh scan **2.4 s**, cached **0 s**, 60 s dedupe confirmed
+  (`ap_logs` +1 row across two back-to-back scans), known/unknown MAC checks correct,
+  BSSID `54:2b:de:fd:90:21` stable, two real two-stage check-ins (`verified`, 0.71/0.72).
+- **Real finding (bug class):** `detect_local_subnet()` hard-codes `/24` while the laptop
+  interface is **/17** (`10.163.235.210/17`), and `_ping_sweep()` is capped at `.1–.254`.
+  On the campus SSID only the gateway was visible → **client isolation or VLAN splitting**;
+  ARP scanning works only on flat, small networks. Room-level presence therefore needs the
+  AP management plane (M2) — also the prerequisite for the RSSI "outside the room" idea.
+- **Demo-artifact warning recorded:** student Buchari (id 8) is registered with the
+  campus **gateway's** MAC, so his Wi-Fi check always passes. Real pilot students must be
+  enrolled with their own phone MAC.
+- **B5 verified:** `docs/B/data_features_check.md` — history pagination (`X-Total-Count: 12`,
+  `limit/offset` pages correct, newest first) and CSV export (`text/csv`, correct header,
+  local timestamps, `yes/no` Wi-Fi column).
+- **B2 summary ready:** paragraph + table for member D inside `network_validation.md §5`.
+
+### 2026-10-25 — A: app renamed "Student Attendance", default backend URL fixed, phone login path cleared
+- **Rename (English UI)**: Android launcher label, login title, home AppBar, MaterialApp
+  title, dashboard sidebar + page title → **"Student Attendance"** ("Student Attendance
+  System" for the teacher dashboard). API title stays "Face Attendance API" (internal,
+  technical). `pubspec.yaml` package name `face_attendance` and import paths unchanged
+  (internal technical identifier; renaming would churn every import for zero user value).
+- **Login timeout root cause (real phone)**: `ApiService._defaultBaseUrl` was
+  `http://10.0.2.2:8000` — an emulator-only alias. On the Galaxy S24 that host does not
+  exist, so requests hung for 15 s and failed with "Server took too long to respond."
+  Diagnosis evidence: the uvicorn access log had **no** `GET /students/?nim=...` entry,
+  i.e. the request never left the phone; phone-browser `http://127.0.0.1:8000/health`
+  returned OK (adb reverse path works).
+  Fix: default is now `http://127.0.0.1:8000` (works for real device + emulator with
+  `adb reverse tcp:8000 tcp:8000`; LAN users override in Settings), and the timeout
+  message now tells the user exactly what to check.
+- Analyzer clean, Flutter widget test + backend dashboard test green. Rebuilt
+  `app-debug.apk`, reinstalled on the S24, app data cleared so the new default applies.
+- Design discussion recorded for M2/M3 (see conversation): away-episode tracking via
+  periodic ARP scans, RSSI threshold (~ -72 dBm ≈ "outside the room") read from the AP
+  management plane (SSH/SNMP/controller API), teacher status overrides (izin/sakit),
+  BSSID pinning using the existing `schedules.ap_bssid` column.
+
+### 2026-10-25 — A: anti-cheat pass 1 + teacher-dashboard time bug FIXED + APK build started
+- Cheat-hole review done (see conversation notes): biggest gaps = (1) borrowed/
+  shared MAC for wifi_verified, (2) photo-file identity swap / replay, plus
+  longer-term items (no server auth — device binding in M2; liveness
+  detection; MAC randomization on phones documented for C1).
+  First-line fixes implemented:
+  - **One MAC = one student**: `POST /students/` and `PUT /students/{id}/mac`
+    reject a MAC already registered to another student (409, normalized
+    comparison — dashes/uppercase caught). 404 added for missing student on
+    mac update. Live-verified.
+  - **Photo replay guard**: `backend/services/photo_guard.py` + hook in
+    `/attendance/check` — the same photo file may be accepted at most once
+    per day per student (blocks shared-file identity swap); cross-day reuse
+    still allowed; state is process-local (resets on restart, documented).
+- Teacher-dashboard "wrong time" bug root cause: `schedules.created_at` was
+  neither in the DB schema (older DBs) nor in `ScheduleResponse` (pydantic
+  stripped it before the dashboard could read it). Fixed everywhere:
+  column added to `models/database.py` + safe `ALTER TABLE` migration in
+  `init_db`, INSERT now writes an explicit **CST** timestamp (consistent
+  with attendance rows), and `ScheduleResponse.created_at` added.
+  Live-verified: `"created_at":"2026-10-25T08:42:51"` (CST, correct).
+- Demo-class creation in the browser simulator now matches the requested
+  behaviour: press at 10:00 → class **10:01–10:10** (opens +1 min, closes
+  +10 min, computed in server CST from the browser); log shows when the
+  banner will appear. Headless sim produces the same window.
+- Tests: 9 new anti-cheat tests in `backend/tests/test_anticheat.py`
+  (+ conftest: schedules schema match, per-test photo-guard reset) —
+  suite now **140/140**.
+- Task-C handover note updated in `docs/C/TASK.md` (already reviewed);
+  real-device route started: `flutter build apk --debug` for the user's
+  Android phone (HP asli = C1) since Windows-desktop run stays blocked by
+  the Developer-Mode symlink requirement.
+
+### 2026-10-25 — A: simulator upgraded to REAL WEBCAM (camera screen opens from the banner)
+- `docs/A/demo/auto_prompt_simulator.html` now mirrors the real app flow:
+  **Enable camera (live webcam)** button (getUserMedia, permission once per
+  browser), banner tap → phone display switches to a **camera screen**
+  (mirrored preview + big white capture button, "Back" = cancel), optional
+  **auto-capture 3 s** countdown, frame captured to canvas → JPEG →
+  `POST /attendance/check`. File-upload flow kept as fallback (photo picker)
+  when camera is denied/unavailable. All texts already English; headless
+  sim terminal output translated to English too.
+- Rationale answered for the team: a web page cannot silently open a webcam
+  (needs one user permission + requirement), so the old upload picker was a
+  stand-in; the FLUTTER app itself does open the camera screen directly.
+- C-task handover note added to `docs/C/TASK.md` (A prototyped the Flutter
+  prompt integration; C reviews commit `7803d27` on branch `a` before
+  continuing with real-device testing C1).
+- GitHub push configured: `git config --global http.proxy
+  socks5://127.0.0.1:10808`; branch `a` pushed & tracking origin.
+
+### 2026-10-24 — A: Flutter auto-prompt integration drafted + TWO local simulators running
+- Flutter side implemented (draft for **C** to review/own — user requested A
+  to prototype it now): `mobile/lib/services/prompt_service.dart` (polling
+  service, 20 s heartbeat, dedupe per stage `scheduleId:checkType`), API
+  method `getCheckInPrompt`, banner card + "Check in now / Later" in
+  `home_screen.dart` (lifecycle-aware: pauses when app backgrounded),
+  `auto_check_in_on` toggle in `session_service.dart` + Settings switch.
+  `flutter analyze`: **No issues found**. NOT committed to mobile branch —
+  sits on task-a for C's review.
+- Headless e2e test PASSED (`backend/scripts/simulate_phone.py`): creates a
+  fresh demo schedule (unique room, midnight-safe window), then
+  banner→tap→START (79.9%, partial) → banner flips END →tap (85.4%,
+  verified) → `check_in_complete` banner stops. Full loop 90 s.
+- Visual phone simulator: `docs/A/demo/auto_prompt_simulator.html`
+  (browser window mimicking the app: banner, Log, photo upload stand-in for
+  the camera, auto-tap option, demo-class creator with Shanghai-time
+  windows). Served at http://127.0.0.1:8765/auto_prompt_simulator.html
+  (`python -m http.server 8765` in `docs/A/demo`).
+- Blocked for REAL desktop app run: Windows build needs Developer Mode
+  (symlink) — admin denied in this shell. Everything else works on
+  emulator/real phone; `10.0.2.2:8000` already the app default.
+
+### 2026-10-24 — A: auto check-in prompt feature BUILT & VERIFIED live (tier 1)
+- New endpoint `GET /me/prompt?student_id=N` (`backend/routers/prompt.py`,
+  registered in `main.py`): polls-friendly contract for the mobile app —
+  returns `prompt` (strict: schedule active + stage open + device MAC seen on
+  the classroom network), `check_available`, `check_type` (auto start→end),
+  `wifi_seen`, `bssid`, `reason`. READS existing services only; no attendance
+  rule changed — check-ins still go through the fully-enforced
+  `POST /attendance/check`.
+- 7 new tests (`backend/tests/test_prompt.py`): whole suite now **131/131**
+  (includes 124 baseline).
+- Live verification (schedule "Uji Auto Prompt" id 9, Buchari MAC = gateway):
+  prompt start ✅ → start check (confidence 0.972) → prompt flips to `end`
+  ✅ → end check (0.955) → `reason: check_in_complete`, banner stops ✅.
+  Willian (no valid MAC): `check_available=true` but `prompt=false`,
+  `device_not_seen_on_network` ✅. Room-overlap guard also observed working.
+- Spec for C (Flutter heartbeat + banner + auto-navigate):
+  `docs/A/auto_prompt_spec.md`. Mobile files untouched (C's area).
+- (Earlier same day: threshold evaluation with 2 students → report + live
+  Wi-Fi/two-stage verification; see previous entries.)
+
+### 2026-10-24 — A: end-to-end Wi-Fi + two-stage check-in VERIFIED live
+- Server run with `TIMEZONE=Asia/Shanghai` (CST); Wi-Fi scan auto-detected
+  subnet 10.163.207.0/24 and BSSID 54:2b:de:fd:90:21 correctly in local time.
+- **Discovery: `/wifi/scan` on Windows does NOT need Npcap** — it uses ping
+  sweep + `arp -a` (see `wifi_scanner.py::_scan_windows`). The "Npcap required
+  on Windows" note in AGENTS.md/PROJECT_CONTEXT is outdated for this path;
+  Npcap only matters for raw Scapy (Linux path) capture. Candidate doc fix.
+- Set Buchari MAC (simulated as gateway device) via `PUT /students/8/mac`.
+- `POST /attendance/check?schedule_id=8&check_type=start` with a HELD-OUT
+  photo (never enrolled) → matched, confidence **0.943**, `wifi_verified=true`,
+  status `partial` ✅ (recognition works on unseen photos, not just enrolled ones)
+- `end` check with another held-out photo → confidence **0.688**,
+  `wifi_verified=true`, **status `verified`** — both rows finalized ✅
+- Full two-stage flow + Wi-Fi check automation confirmed working live.
+- Observed issue for review: `students/faces.created_at` + `ap_logs.scan_time`
+  use SQLite `CURRENT_TIMESTAMP` (UTC) while `attendance.timestamp` is local —
+  inconsistent; fix candidate in `models/database.py`.
+
+### 2026-10-24 — A: first enrollment + threshold evaluation done (2 students)
+- Fixed environment: `onnxruntime` failed to import because NumPy 2.2.6 was
+  installed; restored the pinned `numpy==1.26.4` from `backend/requirements.txt`.
+- Created students: Buchari `F25040126` (id 8) and Willian `F25040128` (id 9).
+- Enrolled faces: Buchari 5 selfies (varied location/lighting/expression),
+  Willian 3 selfies. Stored under `gambar_percobaan/orang_1|orang_2/` (gitignored).
+- Ran `evaluate_threshold.py` → wrote real FAR/FRR/EER to `docs/threshold_report.md`:
+  genuine min **0.708** vs impostor max **0.224** → distributions fully separated.
+  **Threshold kept at 0.5** (midpoint of safe gap [0.224, 0.708]).
+- ⚠️ Pending: still 2/3 students — recruit `orang_3` and re-run the evaluation
+  before the M1 progress report (~Nov 1). See caveats in `docs/threshold_report.md`.
+
 ### 2026-10-18 — Planning session + repository audit + docs restructure (all)
 - Audited the repository against reality: 124 tests, **123 passing**, 1 failing
   (`test_dashboard_served` — stale `"Teacher Dashboard"` assertion vs. redesigned

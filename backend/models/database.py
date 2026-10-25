@@ -35,7 +35,8 @@ async def init_db():
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
             ap_bssid TEXT,
-            room TEXT
+            room TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS attendance (
@@ -60,5 +61,12 @@ async def init_db():
             scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    await db.commit()
+    # Migration: very first schemas had no schedules.created_at; the dashboard
+    # reads it, so add it for databases created before this change. The INSERT
+    # path writes a CST (locale) timestamp explicitly.
+    try:
+        await db.execute("ALTER TABLE schedules ADD COLUMN created_at TIMESTAMP")
+        await db.commit()
+    except Exception:
+        pass  # column already exists
     await db.close()

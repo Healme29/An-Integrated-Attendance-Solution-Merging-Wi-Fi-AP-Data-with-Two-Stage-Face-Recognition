@@ -23,6 +23,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from main import app
+from services import photo_guard
 
 
 async def create_test_db():
@@ -50,7 +51,8 @@ async def create_test_db():
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
             ap_bssid TEXT,
-            room TEXT
+            room TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,6 +117,15 @@ async def test_db():
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_photo_guard():
+    """The replay guard is process-wide; isolate it per test (fake JPEGs are
+    deterministic, so bytes would otherwise collide across tests)."""
+    photo_guard.reset()
+    yield
+    photo_guard.reset()
 
 
 def make_fake_embedding():

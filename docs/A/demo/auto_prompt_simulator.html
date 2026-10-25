@@ -1,0 +1,455 @@
+<!doctype html>
+<!--
+  LOCAL PHONE SIMULATOR — Auto check-in prompt (tier 1, polling)
+  Visual stand-in for the Flutter app while the mobile build is not on a
+  device/emulator yet. Mirrors docs/A/auto_prompt_spec.md and the Dart code
+  in mobile/lib/services/prompt_service.dart:
+
+    poll GET /me/prompt every N s
+      -> prompt=true  -> show BANNER (once per stage "scheduleId:checkType")
+      -> student taps "Check in now" -> POST /attendance/check with a photo
+      -> next poll offers the next stage (start -> end) -> ... ->
+         reason check_in_complete stops the banner.
+
+  All attendance rules stay on the server; this page never bypasses them.
+  Serve it with any static file server and open it in a browser
+  (backend CORS allows any origin):
+      cd docs/A/demo && python -m http.server 8765
+      http://127.0.0.1:8765/auto_prompt_simulator.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auto Check-in Simulator</title>
+<style>
+  :root { --green:#2e7d32; --red:#c62828; --amber:#ff8f00; }
+  body { background:#1a1c22; color:#e8eaed; font-family:Segoe UI, Arial, sans-serif; display:flex; gap:24px; justify-content:center; padding:24px; }
+  .phone { width:360px; background:#101216; border:10px solid #26282f; border-radius:36px; padding:14px 14px 20px; height:740px; display:flex; flex-direction:column; box-shadow:0 12px 48px #000c; }
+  .notch { width:120px; height:18px; background:#26282f; border-radius:9px; margin:0 auto 10px; }
+  .statusbar { display:flex; justify-content:space-between; font-size:12px; color:#9aa0a6; padding:0 6px 8px; }
+  .appbar { background:var(--green); color:#fff; padding:12px 14px; border-radius:12px; font-weight:600; }
+  .screen { flex:1; overflow-y:auto; margin-top:10px; padding-right:2px; }
+  .card { background:#1e2129; border-radius:14px; padding:14px; margin-bottom:12px; }
+  .banner { background:#0b3d1e; border:1px solid var(--green); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .banner h3 { margin:0 0 6px; font-size:15px; }
+  .row { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+  button { cursor:pointer; border:0; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600; }
+  .btn-fill { background:var(--green); color:#fff; }
+  .btn-fill:disabled { background:#405c44; color:#b7c2b8; cursor:not-allowed; }
+  .btn-text { background:transparent; color:#8ab4f8; }
+  .btn-out { background:transparent; color:#9aa0a6; border:1px solid #3c4043; }
+  .muted { color:#9aa0a6; font-size:13px; }
+  .logline { font-size:12px; color:#9aa0a6; border-bottom:1px dashed #2a2d33; padding:6px 2px; }
+  .ok { color:#81c995; } .warn { color:#fdd663; } .err { color:#f28b82; }
+  .panel { width:430px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  label { font-size:13px; color:#9aa0a6; }
+  input, select { background:#20222a; color:#e8eaed; border:1px solid #3c4043; border-radius:8px; padding:8px; width:100%; box-sizing:border-box; margin:4px 0 12px; }
+  .switch { display:flex; align-items:center; gap:10px; margin:10px 0; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+  .pill-ok { background:#0b3d1e; color:#81c995; }
+  .pill-mid { background:#3d2e0b; color:#fdd663; }
+  #camView { width:100%; border-radius:14px; background:#000; transform:scaleX(-1); }
+  .camTop { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .shotBtn { width:72px; height:72px; border-radius:50%; background:#fff; border:6px solid var(--green); margin:14px auto 0; display:block; cursor:pointer; }
+  .shotBtn:disabled { opacity:.4; cursor:not-allowed; }
+  .countdown { text-align:center; color:#fdd663; font-weight:700; margin-top:8px; min-height:18px; }
+  #camHint { text-align:center; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<!-- ============ PHONE ============ -->
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar"><span id="clock"></span><span>&#128241; LTE &#128225; Wi-Fi</span></div>
+  <div class="appbar">&#128100; Face Attendance</div>
+  <div class="screen">
+    <!-- ===== HOME (mirrors the Flutter HomeScreen) ===== -->
+    <div id="homeBody">
+    <div class="card">
+      <div id="studentName" class="muted">Not logged in</div>
+      <div style="font-weight:700; margin-top:4px;" id="studentTitle">&#8212;</div>
+    </div>
+
+    <div class="banner" id="banner" style="display:none">
+      <h3 id="bannerTitle"></h3>
+      <div id="bannerBody" class="muted"></div>
+      <div class="row">
+        <button class="btn-text" onclick="dismiss()">Later</button>
+        <button class="btn-fill" onclick="accept()" id="checkBtn">Check in now</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span id="idleState" class="muted">Idle &#8212; waiting for a class...&#8230;</span>
+    </div>
+
+    <div class="card">
+      <div class="muted" style="margin-bottom:8px; font-weight:600;">SIM LOG</div>
+      <div id="log"></div>
+    </div>
+    </div>
+
+    <!-- ===== CAMERA SCREEN (mirrors the Flutter CameraScreen: banner tap
+          opens this automatically; capture = one tap or auto-capture) ===== -->
+    <div id="camScreen" style="display:none">
+      <div class="camTop">
+        <b id="camStage">Scan Face (START)</b>
+        <button class="btn-text" onclick="closeCamScreen()">Back</button>
+      </div>
+      <video id="camView" autoplay playsinline muted></video>
+      <div class="countdown" id="camCountdown"></div>
+      <button class="shotBtn" id="shotBtn" onclick="captureAndSubmit()"></button>
+      <div id="camHint" class="muted">Stand close with good light, then tap the white button
+        (or let the 3 s auto-capture run).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONTROL PANEL ============ -->
+<div class="panel">
+  <h2>&#127918; Simulator controls (student side)</h2>
+
+  <label>Student ID</label>
+  <input id="studentId" value="8" title="Buchari = 8, Willian = 9">
+  <button class="btn-out" onclick="loadStudent()">Load student</button>
+
+  <button class="btn-out" style="margin:4px 0 12px;" onclick="createDemoClass()">&#10133; Create demo class (opens +1 min, closes +10 min &#8212; CST)</button>
+
+  <div class="switch">
+    <input type="checkbox" id="polling" onchange="togglePolling()">
+    <label for="polling" style="color:#e8eaed;">Poll <code>/me/prompt</code> (heartbeat, like the app's PromptService)</label>
+  </div>
+  <label>Poll interval (s)</label>
+  <input id="interval" type="number" value="6" min="2" max="60">
+
+  <div class="switch">
+    <input type="checkbox" id="autoAccept" checked onchange="">
+    <label for="autoAccept" style="color:#e8eaed;">Auto-tap <b>&#8220;Check in now&#8221;</b> after 3 s (simulates the student confirming the banner)</label>
+  </div>
+
+  <div class="switch" style="margin-top:4px;">
+    <button class="btn-out" id="camBtn" onclick="enableCamera()" style="margin-right:10px;">&#128249; Enable camera (live webcam)</button>
+    <span id="camState" class="muted">camera off</span>
+  </div>
+  <div class="switch">
+    <input type="checkbox" id="autoCapture" checked>
+    <label for="autoCapture" style="color:#e8eaed;">Auto-capture 3 s after the camera screen opens</label>
+  </div>
+
+  <label>&#128247; Photo for START check (camera stand-in)</label>
+  <input type="file" id="photoStart" accept="image/*" onchange="photoPicked('start', this)">
+  <label>&#128247; Photo for END check</label>
+  <input type="file" id="photoEnd" accept="image/*" onchange="photoPicked('end', this)">
+  <div class="muted">Pick selfie photos from <code>gambar_percobaan/orang_1/</code> (held-out, never enrolled) so recognition is a real test.</div>
+
+  <h2 style="margin-top:20px;">&#128073; Result of last check-in</h2>
+  <div class="card" id="lastResult" class="muted"><span class="muted">&#8212;</span></div>
+</div>
+
+<script>
+const BASE = "http://127.0.0.1:8000";
+const CN_OFFSET_MIN = 8 * 60; // server runs TIMEZONE=Asia/Shanghai (UTC+8)
+
+/** Wall-clock time in Shanghai regardless of the browser's timezone,
+ *  so schedule windows line up with the backend. */
+function shNow() {
+  return new Date(Date.now() + (CN_OFFSET_MIN + new Date().getTimezoneOffset()) * 60000);
+}
+function shWeekday() { // 0 = Monday ... 6 = Sunday (backend convention)
+  return (shNow().getUTCDay() + 6) % 7;
+}
+function hm(d) {
+  return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
+}
+
+const state = {
+  studentId: null, student: null,
+  lastOffered: null, currentPrompt: null, files: { start: null, end: null },
+  timer: null, busy: false,
+  camArmed: false, camStream: null, countdownTimer: null
+};
+
+function log(msg, cls) {
+  const el = document.getElementById("log");
+  const line = document.createElement("div");
+  line.className = "logline " + (cls || "");
+  line.textContent = new Date().toLocaleTimeString([], { hour12: false }) + "  " + msg;
+  el.prepend(line);
+}
+function setStatus(html, cls) {
+  const el = document.getElementById("idleState");
+  el.innerHTML = html;
+  el.className = cls || "muted";
+}
+setInterval(() => {
+  document.getElementById("clock").textContent =
+      new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}, 1000);
+
+async function api(path, opts) {
+  const res = await fetch(BASE + path, opts);
+  if (!res.ok) {
+    let detail = String(res.status);
+    try { const j = await res.json(); if (j.detail) detail = j.detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function loadStudent() {
+  const id = parseInt(document.getElementById("studentId").value, 10);
+  if (!id) return log("Student ID must be a number", "err");
+  try {
+    const s = await api("/students/" + id);
+    state.studentId = id; state.student = s; state.lastOffered = null;
+    document.getElementById("studentTitle").textContent = s.name + " (" + (s.nim || "no NIM") + ")";
+    document.getElementById("studentName").textContent = "Student #" + s.id;
+    log("Logged in: " + s.name, "ok");
+  } catch (e) { log("Load student failed: " + e.message, "err"); }
+}
+
+async function createDemoClass() {
+  // Classroom runs on server time (Asia/Shanghai). Requested behaviour:
+  // press at 10:00 -> class 10:01 .. 10:10 (starts 1 min from now, ends
+  // 10 min from now; the banner appears once the clock reaches 10:01).
+  const n = shNow();
+  const start = hm(new Date(n.getTime() + 60 * 1000));      // opens at +1 min
+  let endMin = n.getTime() + 10 * 60000;                    // ends at +10 min
+  const end = n.getUTCDate() === new Date(endMin).getUTCDate()
+      ? hm(new Date(endMin)) : "23:59";                     // never cross midnight
+  const body = {
+    class_name: "Demo Interactive",
+    day_of_week: shWeekday(),
+    start_time: start, end_time: end,
+    room: "Ruang Demo " + String(n.getUTCMilliseconds()).padStart(3, "0"),
+  };
+  try {
+    const s = await api("/schedules/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    log("Demo class created: id " + s.id + " [" + body.class_name + "] " +
+        start + "-" + end + " (" + body.room + ") — Shanghai time. Banner will appear at " + start + ".", "ok");
+  } catch (e) { log("Create demo class failed: " + e.message, "err"); }
+}
+
+// ---------- Real webcam camera screen (stands in for Flutter CameraScreen) ----------
+async function enableCamera() {
+  const stateEl = document.getElementById("camState");
+  if (state.camArmed) { stateEl.textContent = "camera ready"; return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    stateEl.textContent = "camera not supported in this browser";
+    log("Camera API unavailable — falling back to photo upload.", "warn");
+    return;
+  }
+  try {
+    state.camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: 640, height: 480 }
+    });
+    document.getElementById("camView").srcObject = state.camStream;
+    state.camArmed = true;
+    stateEl.textContent = "camera ready";
+    stateEl.style.color = "#81c995";
+    document.getElementById("camBtn").textContent = "\u{1F4F9} Camera armed";
+    log("Live webcam enabled — banner taps will open the camera screen automatically.", "ok");
+  } catch (e) {
+    stateEl.textContent = "camera denied / unavailable";
+    log("Camera permission refused: " + e.message + " — falling back to photo upload.", "err");
+  }
+}
+
+function openCamScreen(p) {
+  state.busy = true;
+  // Banner goes away the moment the camera screen opens (real-app behaviour;
+  // currentPrompt is kept so the capture knows where to submit).
+  document.getElementById("banner").style.display = "none";
+  document.getElementById("camStage").textContent =
+      "Scan Face (" + (p.check_type || "").toUpperCase() + ")";
+  document.getElementById("camCountdown").textContent = "";
+  document.getElementById("shotBtn").disabled = false;
+  document.getElementById("camHint").textContent = state.camArmed
+      ? "Stand close with good light, then tap the white button (or let the 3 s auto-capture run)."
+      : "Camera not armed — pick a photo in the controls panel instead.";
+  document.getElementById("homeBody").style.display = "none";
+  document.getElementById("camScreen").style.display = "block";
+  const view = document.getElementById("camView");
+  if (!view.srcObject && state.camStream) view.srcObject = state.camStream;
+  log("Camera screen opened (" + (p.check_type || "").toUpperCase() + ") — exactly like the real app.", "ok");
+  if (document.getElementById("autoCapture").checked) {
+    let left = 3;
+    const cd = document.getElementById("camCountdown");
+    cd.textContent = "Auto-capture in 3 ...";
+    state.countdownTimer = setInterval(() => {
+      left -= 1;
+      if (left > 0) { cd.textContent = "Auto-capture in " + left + " ..."; return; }
+      clearInterval(state.countdownTimer); state.countdownTimer = null;
+      cd.textContent = "";
+      captureAndSubmit();
+    }, 1000);
+  }
+}
+
+function clearCam() {
+  if (state.countdownTimer) { clearInterval(state.countdownTimer); state.countdownTimer = null; }
+  document.getElementById("camCountdown").textContent = "";
+  document.getElementById("camScreen").style.display = "none";
+  document.getElementById("homeBody").style.display = "";
+  state.busy = false;
+}
+
+function closeCamScreen() {
+  clearCam();
+  log("Back from camera (check-in cancelled) — banner will not re-appear for this stage (same as the app).", "warn");
+}
+
+async function captureAndSubmit() {
+  const p = state.currentPrompt;
+  // busy is expected to be true here (set when the camera screen opened).
+  if (!p || !state.camArmed) return;
+  const video = document.getElementById("camView");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext("2d");
+  // Un-mirror: video is displayed flipped, so flip back for the upload.
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  document.getElementById("shotBtn").disabled = true;
+  try {
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.9));
+    await sendCheckIn(p, blob, "webcam_capture.jpg");
+  } finally {
+    clearCam();
+  }
+}
+
+async function sendCheckIn(p, blob, name) {
+  const type = p.check_type;
+  dismiss("silent");
+  try {
+    const fd = new FormData();
+    fd.append("file", blob, name);
+    const res = await fetch(BASE + "/attendance/check?schedule_id=" + p.schedule_id + "&check_type=" + type,
+                            { method: "POST", body: fd });
+    const j = await res.json();
+    const box = document.getElementById("lastResult");
+    if (!res.ok) {
+      box.innerHTML = "<span class='err'>" + j.detail + "</span>";
+      log(type + " check rejected: " + (j.detail || res.status), "err");
+    } else {
+      box.innerHTML =
+        "<b>" + j.student_name + "</b> &mdash; " + (j.check_type || "").toUpperCase() +
+        " check &mdash; " + new Date(j.timestamp).toLocaleTimeString([], { hour12: false }) + "<br>" +
+        "confidence <span class='ok'>" + (j.confidence * 100).toFixed(1) + "%</span>" +
+        " &nbsp; " + (j.wifi_verified ? "<span class='pill pill-ok'>Wi-Fi verified</span>"
+                                     : "<span class='pill pill-mid'>face only</span>") +
+        " &nbsp; status <b>" + j.status + "</b>";
+      log("Check-in sent: " + j.check_type + " -> status " + j.status +
+          " (confidence " + (j.confidence * 100).toFixed(1) + "%)", "ok");
+    }
+  } catch (e) {
+    log("Check-in failed: " + e.message, "err");
+  }
+}
+
+function stageKey(p) { return p.schedule_id + ":" + p.check_type; }
+
+function showBanner(p) {
+  state.currentPrompt = p;
+  document.getElementById("bannerTitle").textContent =
+      p.class_name + " (" + (p.room || "-") + ") detected!";
+  document.getElementById("bannerBody").textContent =
+      (p.check_type === "end" ? "End check-in" : "Start check-in") +
+      " is available now — device seen on the classroom Wi-Fi (BSSID " + (p.bssid || "-") + ").";
+  document.getElementById("banner").style.display = "block";
+}
+
+function dismiss(silent) {
+  const el = document.getElementById("banner");
+  const wasVisible = el.style.display !== "none";
+  el.style.display = "none";
+  state.currentPrompt = null;
+  if (wasVisible && !silent) log("Banner dismissed (Later)");
+}
+
+function photoPicked(type, input) {
+  state.files[type] = input.files[0] || null;
+  log("Photo for " + type + " check: " + (state.files[type] ? state.files[type].name : "none"));
+}
+
+async function accept(auto) {
+  const p = state.currentPrompt;
+  if (!p || state.busy) return;
+  const type = p.check_type;
+  // Real-app flow when the camera is armed: tap -> the app's camera screen
+  // opens automatically; the photo is taken there (one tap or auto-capture).
+  if (state.camArmed) { openCamScreen(p); return; }
+  const file = state.files[type];
+  if (!file) {
+    log("No photo selected for the " + type + " check — tap 'Check in now' again after picking one.", "warn");
+    return;
+  }
+  state.busy = true;
+  document.getElementById("checkBtn").disabled = true;
+  try {
+    await sendCheckIn(p, file, file.name);
+  } finally {
+    state.busy = false;
+    document.getElementById("checkBtn").disabled = false;
+  }
+}
+
+async function poll() {
+  if (!state.studentId) return;
+  try {
+    const p = await api("/me/prompt?student_id=" + state.studentId);
+    if (p.prompt) {
+      const key = stageKey(p);
+      if (key !== state.lastOffered) {
+        state.lastOffered = key;
+        showBanner(p);
+        log("PROMPT: " + p.check_type + " check for [" + p.class_name + "] (server says: offer the banner)", "ok");
+        if (document.getElementById("autoAccept").checked) {
+          setTimeout(() => {
+            if (state.currentPrompt && state.currentPrompt.schedule_id === p.schedule_id
+                && state.currentPrompt.check_type === p.check_type) accept(true);
+          }, 3000);
+        }
+      }
+    } else if (p.reason === "check_in_complete") {
+      setStatus("&#9989; Check-in complete for today &#8212; banner stops (like the app).", "ok");
+    } else if (p.reason === "no_active_schedule") {
+      setStatus("&#128197; No active class right now.", "warn");
+    } else if (p.reason === "device_not_seen_on_network") {
+      setStatus("&#128225; Class is active, but this device's MAC is NOT seen on the classroom network &#8212; banner must NOT appear (server rule).", "err");
+    } else {
+      setStatus("&#128164; " + (p.reason || "idle"));
+    }
+  } catch (e) {
+    setStatus("&#9888;&#65039; Server unreachable &#8212; will retry.", "err");
+  }
+}
+
+function togglePolling() {
+  const on = document.getElementById("polling").checked;
+  if (on) {
+    if (!state.studentId) { log("Load a student before polling", "warn"); document.getElementById("polling").checked = false; return; }
+    const secs = Math.max(2, parseInt(document.getElementById("interval").value, 10) || 8);
+    state.timer = setInterval(poll, secs * 1000);
+    poll();
+    log("Polling started (every " + secs + " s)");
+  } else {
+    clearInterval(state.timer); state.timer = null;
+    log("Polling stopped");
+  }
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && document.getElementById("banner").style.display !== "none") accept(false);
+});
+</script>
+</body>
+</html>
