@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from models.schemas import ScheduleCreate, ScheduleResponse
 from models.database import get_db
+from config import now_local
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -64,9 +65,13 @@ async def create_schedule(data: ScheduleCreate):
     db = await get_db()
     try:
         await check_room_overlap(db, data)
+        # Explicit local (CST) timestamp: SQLite's CURRENT_TIMESTAMP default
+        # is UTC, which was showing a shifted time on the teacher dashboard.
         await db.execute(
-            "INSERT INTO schedules (class_name, day_of_week, start_time, end_time, ap_bssid, room) VALUES (?, ?, ?, ?, ?, ?)",
-            (data.class_name, data.day_of_week, data.start_time, data.end_time, data.ap_bssid, data.room)
+            "INSERT INTO schedules (class_name, day_of_week, start_time, end_time, ap_bssid, room, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (data.class_name, data.day_of_week, data.start_time, data.end_time, data.ap_bssid, data.room,
+             now_local().strftime("%Y-%m-%d %H:%M:%S"))
         )
         await db.commit()
         cursor = await db.execute("SELECT * FROM schedules ORDER BY id DESC LIMIT 1")

@@ -78,6 +78,7 @@ class ScheduleResponse(BaseModel):
     end_time: str
     ap_bssid: Optional[str]
     room: Optional[str]
+    created_at: Optional[datetime] = None  # CST wall-clock (None for rows created before the migration)
 
     class Config:
         from_attributes = True

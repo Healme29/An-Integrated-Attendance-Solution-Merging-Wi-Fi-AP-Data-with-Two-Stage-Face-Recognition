@@ -63,6 +63,39 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A: anti-cheat pass 1 + teacher-dashboard time bug FIXED + APK build started
+- Cheat-hole review done (see conversation notes): biggest gaps = (1) borrowed/
+  shared MAC for wifi_verified, (2) photo-file identity swap / replay, plus
+  longer-term items (no server auth — device binding in M2; liveness
+  detection; MAC randomization on phones documented for C1).
+  First-line fixes implemented:
+  - **One MAC = one student**: `POST /students/` and `PUT /students/{id}/mac`
+    reject a MAC already registered to another student (409, normalized
+    comparison — dashes/uppercase caught). 404 added for missing student on
+    mac update. Live-verified.
+  - **Photo replay guard**: `backend/services/photo_guard.py` + hook in
+    `/attendance/check` — the same photo file may be accepted at most once
+    per day per student (blocks shared-file identity swap); cross-day reuse
+    still allowed; state is process-local (resets on restart, documented).
+- Teacher-dashboard "wrong time" bug root cause: `schedules.created_at` was
+  neither in the DB schema (older DBs) nor in `ScheduleResponse` (pydantic
+  stripped it before the dashboard could read it). Fixed everywhere:
+  column added to `models/database.py` + safe `ALTER TABLE` migration in
+  `init_db`, INSERT now writes an explicit **CST** timestamp (consistent
+  with attendance rows), and `ScheduleResponse.created_at` added.
+  Live-verified: `"created_at":"2026-10-25T08:42:51"` (CST, correct).
+- Demo-class creation in the browser simulator now matches the requested
+  behaviour: press at 10:00 → class **10:01–10:10** (opens +1 min, closes
+  +10 min, computed in server CST from the browser); log shows when the
+  banner will appear. Headless sim produces the same window.
+- Tests: 9 new anti-cheat tests in `backend/tests/test_anticheat.py`
+  (+ conftest: schedules schema match, per-test photo-guard reset) —
+  suite now **140/140**.
+- Task-C handover note updated in `docs/C/TASK.md` (already reviewed);
+  real-device route started: `flutter build apk --debug` for the user's
+  Android phone (HP asli = C1) since Windows-desktop run stays blocked by
+  the Developer-Mode symlink requirement.
+
 ### 2026-10-25 — A: simulator upgraded to REAL WEBCAM (camera screen opens from the banner)
 - `docs/A/demo/auto_prompt_simulator.html` now mirrors the real app flow:
   **Enable camera (live webcam)** button (getUserMedia, permission once per
