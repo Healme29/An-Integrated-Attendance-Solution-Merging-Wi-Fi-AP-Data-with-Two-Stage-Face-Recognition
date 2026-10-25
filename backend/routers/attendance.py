@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from models.schemas import AttendanceRequest, AttendanceResponse
 from models.database import get_db
 from services.attendance import recognize_face, mark_attendance, validate_schedule_time
+from services.photo_guard import fingerprint, assert_not_replayed, record as record_photo
 from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
@@ -18,12 +19,24 @@ async def check_attendance(
         raise HTTPException(status_code=400, detail="check_type must be 'start' or 'end'")
 
     contents = await file.read()
+    sha = fingerprint(contents)
     recognition = await recognize_face(contents)
 
     if not recognition["recognized"]:
         raise HTTPException(
             status_code=400,
             detail=f"Face not recognized: {recognition.get('reason', 'unknown')}"
+        )
+
+    # Capture-replay tripwire: the exact same photo file may only be accepted
+    # once per day per student (blocks shared-file identity swaps).
+    try:
+        assert_not_replayed(sha, recognition["student_id"])
+    except ValueError:
+        raise HTTPException(
+            status_code=409,
+            detail="This exact photo was already used for a check-in today — "
+                   "capture a fresh selfie in the app."
         )
 
     try:
@@ -55,6 +68,7 @@ async def check_attendance(
         if reason == "missing_start_check":
             raise HTTPException(status_code=409, detail="End check-in requires a prior start check-in")
         raise
+    record_photo(sha, result["student_id"], schedule_id, check_type)
     return result
 
 

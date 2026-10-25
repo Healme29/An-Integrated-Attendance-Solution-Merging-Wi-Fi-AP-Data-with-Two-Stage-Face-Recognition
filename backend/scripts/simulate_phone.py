@@ -78,12 +78,14 @@ def find_photo(folder: str, name_hint: str) -> Path:
 def find_or_create_schedule(student_id: int) -> dict:
     """Always create a FRESH demo schedule for this run (unique room name
     sidesteps the same-room overlap rule) so the prompt loop starts from
-    'start' even if an older active schedule is already complete."""
+    'start' even if an older active schedule is already complete.
+    Timing mirrors the browser simulator: opens at now+1 min, ends at
+    now+10 min (server timezone)."""
     now = datetime.now(TZ)
-    start = (now - timedelta(minutes=5)).strftime("%H:%M")
+    start = (now + timedelta(minutes=1)).strftime("%H:%M")
+    end_dt = now + timedelta(minutes=10)
     # Keep the window on the same day so start < end always holds;
-    # end clamps to 23:59 when the +90 min window would cross midnight.
-    end_dt = now + timedelta(minutes=90)
+    # end clamps to 23:59 when the window would cross midnight.
     end = end_dt.date().isoformat() == now.date().isoformat() and end_dt.strftime("%H:%M") or "23:59"
     room = f"Ruang Sim {student_id} {now.strftime('%H%M')}"
     payload = {

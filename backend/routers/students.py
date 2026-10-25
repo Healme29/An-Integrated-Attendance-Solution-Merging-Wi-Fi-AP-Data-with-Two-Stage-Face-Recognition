@@ -2,8 +2,24 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 from models.schemas import StudentCreate, StudentResponse
 from models.database import get_db
+from services.wifi_scanner import normalize_mac
 
 router = APIRouter(prefix="/students", tags=["students"])
+
+
+async def find_mac_owner(db, mac: str, exclude_id: int | None = None):
+    """Student (or None) already holding this normalized MAC."""
+    cursor = await db.execute("SELECT * FROM students")
+    rows = await cursor.fetchall()
+    for row in rows:
+        row_mac = (row["mac_address"] or "").strip()
+        if not row_mac:
+            continue
+        if exclude_id is not None and row["id"] == exclude_id:
+            continue
+        if normalize_mac(row_mac) == normalize_mac(mac):
+            return row
+    return None
 
 
 @router.get("/", response_model=list[StudentResponse])
@@ -22,6 +38,15 @@ async def list_students(nim: Optional[str] = None):
 @router.post("/", response_model=StudentResponse)
 async def create_student(data: StudentCreate):
     db = await get_db()
+    if data.mac_address:
+        owner = await find_mac_owner(db, data.mac_address)
+        if owner:
+            await db.close()
+            raise HTTPException(
+                status_code=409,
+                detail=f"MAC address already registered to {owner['name']} (id {owner['id']}) — "
+                       "one device belongs to one student"
+            )
     try:
         await db.execute(
             "INSERT INTO students (name, nim, mac_address) VALUES (?, ?, ?)",
@@ -64,6 +89,18 @@ async def delete_student(student_id: int):
 @router.put("/{student_id}/mac")
 async def update_mac(student_id: int, mac_address: str):
     db = await get_db()
+    cursor = await db.execute("SELECT * FROM students WHERE id = ?", (student_id,))
+    if not await cursor.fetchone():
+        await db.close()
+        raise HTTPException(status_code=404, detail="Student not found")
+    owner = await find_mac_owner(db, mac_address, exclude_id=student_id)
+    if owner:
+        await db.close()
+        raise HTTPException(
+            status_code=409,
+            detail=f"MAC address already registered to {owner['name']} (id {owner['id']}) — "
+                   "one device belongs to one student"
+        )
     await db.execute(
         "UPDATE students SET mac_address = ? WHERE id = ?",
         (mac_address, student_id)

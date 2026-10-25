@@ -115,7 +115,7 @@
   <input id="studentId" value="8" title="Buchari = 8, Willian = 9">
   <button class="btn-out" onclick="loadStudent()">Load student</button>
 
-  <button class="btn-out" style="margin:4px 0 12px;" onclick="createDemoClass()">&#10133; Create demo class (Shanghai now &plusmn; 20 min)</button>
+  <button class="btn-out" style="margin:4px 0 12px;" onclick="createDemoClass()">&#10133; Create demo class (opens +1 min, closes +10 min &#8212; CST)</button>
 
   <div class="switch">
     <input type="checkbox" id="polling" onchange="togglePolling()">
@@ -211,11 +211,14 @@ async function loadStudent() {
 }
 
 async function createDemoClass() {
+  // Classroom runs on server time (Asia/Shanghai). Requested behaviour:
+  // press at 10:00 -> class 10:01 .. 10:10 (starts 1 min from now, ends
+  // 10 min from now; the banner appears once the clock reaches 10:01).
   const n = shNow();
-  const start = hm(new Date(n.getTime() - 2 * 60000)); // started 2 min ago
-  let endMin = n.getTime() + 20 * 60000;              // ends in 20 min
+  const start = hm(new Date(n.getTime() + 60 * 1000));      // opens at +1 min
+  let endMin = n.getTime() + 10 * 60000;                    // ends at +10 min
   const end = n.getUTCDate() === new Date(endMin).getUTCDate()
-      ? hm(new Date(endMin)) : "23:59";               // never cross midnight
+      ? hm(new Date(endMin)) : "23:59";                     // never cross midnight
   const body = {
     class_name: "Demo Interactive",
     day_of_week: shWeekday(),
@@ -229,7 +232,7 @@ async function createDemoClass() {
       body: JSON.stringify(body),
     });
     log("Demo class created: id " + s.id + " [" + body.class_name + "] " +
-        start + "-" + end + " (" + body.room + ")", "ok");
+        start + "-" + end + " (" + body.room + ") — Shanghai time. Banner will appear at " + start + ".", "ok");
   } catch (e) { log("Create demo class failed: " + e.message, "err"); }
 }
 
