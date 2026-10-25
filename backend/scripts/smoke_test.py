@@ -33,7 +33,10 @@ def main(base_url: str) -> int:
     check("GET / (health)", r.status_code == 200)
 
     r = client.get("/dashboard")
-    check("GET /dashboard", r.status_code == 200 and "Teacher Dashboard" in r.text)
+    check("GET /dashboard",
+          r.status_code == 200
+          and "Presentation Dashboard" in r.text
+          and "Student Attendance" in r.text)
 
     # 2. Student create + login by NIM
     nim = f"smoke{int(datetime.now().timestamp()) % 100000000}"

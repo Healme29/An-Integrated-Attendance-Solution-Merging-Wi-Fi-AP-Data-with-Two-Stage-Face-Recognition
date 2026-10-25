@@ -63,6 +63,29 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A (covering B): Docker deployment verified + seed script + compose fixes
+- **B3 done:** image builds and runs; `GET /health` OK; `TIMEZONE=Asia/Shanghai` applied;
+  smoke test **15/15** against the container (and 15/15 against the native server).
+- **Compose/Dockerfile fixes (real bugs found during deployment):**
+  - the volume `backend-data:/app/data` used to **shadow the baked-in YOLO weights**;
+    state now lives in `/app/data/dbdata` (verified: `yolov8m-face.pt` visible at runtime);
+  - `TIMEZONE` and `CORS_ORIGINS` were not passed into the container at all;
+  - host port is now overridable via `BACKEND_PORT`;
+  - torch/torchvision installed from the **CPU wheel index** — the default CUDA wheels
+    added ~3 GB for nothing (image now 3.4 GB total).
+- **China deployment note documented:** Docker Hub is unreachable from this network;
+  `docs/B/deployment_guide.md` explains registry mirrors (`docker.m.daocloud.io`,
+  `dockerproxy.com`) + `docker desktop restart`.
+- **Confirmed limitation (measured):** `/wifi/scan` inside the container returns
+  `devices: []` (subnet defaults to `192.168.1.0/24`, BSSID null) — containers cannot see
+  the host Wi-Fi LAN. Wi-Fi presence requires native run or Linux host networking; the
+  guide now states this explicitly.
+- **B4 (new):** `backend/scripts/seed_demo.py` — demo students, a schedule active now and
+  sample attendance rows; flags `--reset`, `--students N`, `--db PATH`; tested against a
+  temporary database (START before END, correct server timezone).
+- **Smoke test bug fixed:** `GET /dashboard` check looked for "Teacher Dashboard" (a string
+  that never existed); now checks the real page markers.
+
 ### 2026-10-25 — A (covering B): real-network Wi-Fi validation documented + data features verified
 - **B1 deliverable created:** `docs/B/network_validation.md` with measured results on the
   real campus network — fresh scan **2.4 s**, cached **0 s**, 60 s dedupe confirmed

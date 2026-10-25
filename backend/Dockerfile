@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    INSIGHTFACE_HOME=/app/data/insightface
+    INSIGHTFACE_HOME=/app/data/dbdata/insightface
 
 WORKDIR /app
 
@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+# CPU-only torch/torchvision first: ultralytics would otherwise pull multi-GB
+# CUDA wheels, which are useless on the demo machine and slow down the build.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.4.1 torchvision==0.19.1
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
