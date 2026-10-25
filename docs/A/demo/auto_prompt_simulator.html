@@ -49,6 +49,12 @@
   .pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:600; }
   .pill-ok { background:#0b3d1e; color:#81c995; }
   .pill-mid { background:#3d2e0b; color:#fdd663; }
+  #camView { width:100%; border-radius:14px; background:#000; transform:scaleX(-1); }
+  .camTop { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .shotBtn { width:72px; height:72px; border-radius:50%; background:#fff; border:6px solid var(--green); margin:14px auto 0; display:block; cursor:pointer; }
+  .shotBtn:disabled { opacity:.4; cursor:not-allowed; }
+  .countdown { text-align:center; color:#fdd663; font-weight:700; margin-top:8px; min-height:18px; }
+  #camHint { text-align:center; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -59,6 +65,8 @@
   <div class="statusbar"><span id="clock"></span><span>&#128241; LTE &#128225; Wi-Fi</span></div>
   <div class="appbar">&#128100; Face Attendance</div>
   <div class="screen">
+    <!-- ===== HOME (mirrors the Flutter HomeScreen) ===== -->
+    <div id="homeBody">
     <div class="card">
       <div id="studentName" class="muted">Not logged in</div>
       <div style="font-weight:700; margin-top:4px;" id="studentTitle">&#8212;</div>
@@ -80,6 +88,21 @@
     <div class="card">
       <div class="muted" style="margin-bottom:8px; font-weight:600;">SIM LOG</div>
       <div id="log"></div>
+    </div>
+    </div>
+
+    <!-- ===== CAMERA SCREEN (mirrors the Flutter CameraScreen: banner tap
+          opens this automatically; capture = one tap or auto-capture) ===== -->
+    <div id="camScreen" style="display:none">
+      <div class="camTop">
+        <b id="camStage">Scan Face (START)</b>
+        <button class="btn-text" onclick="closeCamScreen()">Back</button>
+      </div>
+      <video id="camView" autoplay playsinline muted></video>
+      <div class="countdown" id="camCountdown"></div>
+      <button class="shotBtn" id="shotBtn" onclick="captureAndSubmit()"></button>
+      <div id="camHint" class="muted">Stand close with good light, then tap the white button
+        (or let the 3 s auto-capture run).</div>
     </div>
   </div>
 </div>
@@ -104,6 +127,15 @@
   <div class="switch">
     <input type="checkbox" id="autoAccept" checked onchange="">
     <label for="autoAccept" style="color:#e8eaed;">Auto-tap <b>&#8220;Check in now&#8221;</b> after 3 s (simulates the student confirming the banner)</label>
+  </div>
+
+  <div class="switch" style="margin-top:4px;">
+    <button class="btn-out" id="camBtn" onclick="enableCamera()" style="margin-right:10px;">&#128249; Enable camera (live webcam)</button>
+    <span id="camState" class="muted">camera off</span>
+  </div>
+  <div class="switch">
+    <input type="checkbox" id="autoCapture" checked>
+    <label for="autoCapture" style="color:#e8eaed;">Auto-capture 3 s after the camera screen opens</label>
   </div>
 
   <label>&#128247; Photo for START check (camera stand-in)</label>
@@ -135,7 +167,8 @@ function hm(d) {
 const state = {
   studentId: null, student: null,
   lastOffered: null, currentPrompt: null, files: { start: null, end: null },
-  timer: null, busy: false
+  timer: null, busy: false,
+  camArmed: false, camStream: null, countdownTimer: null
 };
 
 function log(msg, cls) {
@@ -200,44 +233,103 @@ async function createDemoClass() {
   } catch (e) { log("Create demo class failed: " + e.message, "err"); }
 }
 
-function stageKey(p) { return p.schedule_id + ":" + p.check_type; }
-
-function showBanner(p) {
-  state.currentPrompt = p;
-  document.getElementById("bannerTitle").textContent =
-      p.class_name + " (" + (p.room || "-") + ") detected!";
-  document.getElementById("bannerBody").textContent =
-      (p.check_type === "end" ? "End check-in" : "Start check-in") +
-      " is available now — device seen on the classroom Wi-Fi (BSSID " + (p.bssid || "-") + ").";
-  document.getElementById("banner").style.display = "block";
-}
-
-function dismiss() {
-  document.getElementById("banner").style.display = "none";
-  state.currentPrompt = null;
-  log("Banner dismissed (Later)");
-}
-
-function photoPicked(type, input) {
-  state.files[type] = input.files[0] || null;
-  log("Photo for " + type + " check: " + (state.files[type] ? state.files[type].name : "none"));
-}
-
-async function accept(auto) {
-  const p = state.currentPrompt;
-  if (!p || state.busy) return;
-  const type = p.check_type;
-  const file = state.files[type];
-  if (!file) {
-    log("No photo selected for the " + type + " check — tap 'Check in now' again after picking one.", "warn");
+// ---------- Real webcam camera screen (stands in for Flutter CameraScreen) ----------
+async function enableCamera() {
+  const stateEl = document.getElementById("camState");
+  if (state.camArmed) { stateEl.textContent = "camera ready"; return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    stateEl.textContent = "camera not supported in this browser";
+    log("Camera API unavailable — falling back to photo upload.", "warn");
     return;
   }
+  try {
+    state.camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: 640, height: 480 }
+    });
+    document.getElementById("camView").srcObject = state.camStream;
+    state.camArmed = true;
+    stateEl.textContent = "camera ready";
+    stateEl.style.color = "#81c995";
+    document.getElementById("camBtn").textContent = "\u{1F4F9} Camera armed";
+    log("Live webcam enabled — banner taps will open the camera screen automatically.", "ok");
+  } catch (e) {
+    stateEl.textContent = "camera denied / unavailable";
+    log("Camera permission refused: " + e.message + " — falling back to photo upload.", "err");
+  }
+}
+
+function openCamScreen(p) {
   state.busy = true;
-  document.getElementById("checkBtn").disabled = true;
-  dismiss();
+  // Banner goes away the moment the camera screen opens (real-app behaviour;
+  // currentPrompt is kept so the capture knows where to submit).
+  document.getElementById("banner").style.display = "none";
+  document.getElementById("camStage").textContent =
+      "Scan Face (" + (p.check_type || "").toUpperCase() + ")";
+  document.getElementById("camCountdown").textContent = "";
+  document.getElementById("shotBtn").disabled = false;
+  document.getElementById("camHint").textContent = state.camArmed
+      ? "Stand close with good light, then tap the white button (or let the 3 s auto-capture run)."
+      : "Camera not armed — pick a photo in the controls panel instead.";
+  document.getElementById("homeBody").style.display = "none";
+  document.getElementById("camScreen").style.display = "block";
+  const view = document.getElementById("camView");
+  if (!view.srcObject && state.camStream) view.srcObject = state.camStream;
+  log("Camera screen opened (" + (p.check_type || "").toUpperCase() + ") — exactly like the real app.", "ok");
+  if (document.getElementById("autoCapture").checked) {
+    let left = 3;
+    const cd = document.getElementById("camCountdown");
+    cd.textContent = "Auto-capture in 3 ...";
+    state.countdownTimer = setInterval(() => {
+      left -= 1;
+      if (left > 0) { cd.textContent = "Auto-capture in " + left + " ..."; return; }
+      clearInterval(state.countdownTimer); state.countdownTimer = null;
+      cd.textContent = "";
+      captureAndSubmit();
+    }, 1000);
+  }
+}
+
+function clearCam() {
+  if (state.countdownTimer) { clearInterval(state.countdownTimer); state.countdownTimer = null; }
+  document.getElementById("camCountdown").textContent = "";
+  document.getElementById("camScreen").style.display = "none";
+  document.getElementById("homeBody").style.display = "";
+  state.busy = false;
+}
+
+function closeCamScreen() {
+  clearCam();
+  log("Back from camera (check-in cancelled) — banner will not re-appear for this stage (same as the app).", "warn");
+}
+
+async function captureAndSubmit() {
+  const p = state.currentPrompt;
+  // busy is expected to be true here (set when the camera screen opened).
+  if (!p || !state.camArmed) return;
+  const video = document.getElementById("camView");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext("2d");
+  // Un-mirror: video is displayed flipped, so flip back for the upload.
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  document.getElementById("shotBtn").disabled = true;
+  try {
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.9));
+    await sendCheckIn(p, blob, "webcam_capture.jpg");
+  } finally {
+    clearCam();
+  }
+}
+
+async function sendCheckIn(p, blob, name) {
+  const type = p.check_type;
+  dismiss("silent");
   try {
     const fd = new FormData();
-    fd.append("file", file, file.name);
+    fd.append("file", blob, name);
     const res = await fetch(BASE + "/attendance/check?schedule_id=" + p.schedule_id + "&check_type=" + type,
                             { method: "POST", body: fd });
     const j = await res.json();
@@ -258,6 +350,50 @@ async function accept(auto) {
     }
   } catch (e) {
     log("Check-in failed: " + e.message, "err");
+  }
+}
+
+function stageKey(p) { return p.schedule_id + ":" + p.check_type; }
+
+function showBanner(p) {
+  state.currentPrompt = p;
+  document.getElementById("bannerTitle").textContent =
+      p.class_name + " (" + (p.room || "-") + ") detected!";
+  document.getElementById("bannerBody").textContent =
+      (p.check_type === "end" ? "End check-in" : "Start check-in") +
+      " is available now — device seen on the classroom Wi-Fi (BSSID " + (p.bssid || "-") + ").";
+  document.getElementById("banner").style.display = "block";
+}
+
+function dismiss(silent) {
+  const el = document.getElementById("banner");
+  const wasVisible = el.style.display !== "none";
+  el.style.display = "none";
+  state.currentPrompt = null;
+  if (wasVisible && !silent) log("Banner dismissed (Later)");
+}
+
+function photoPicked(type, input) {
+  state.files[type] = input.files[0] || null;
+  log("Photo for " + type + " check: " + (state.files[type] ? state.files[type].name : "none"));
+}
+
+async function accept(auto) {
+  const p = state.currentPrompt;
+  if (!p || state.busy) return;
+  const type = p.check_type;
+  // Real-app flow when the camera is armed: tap -> the app's camera screen
+  // opens automatically; the photo is taken there (one tap or auto-capture).
+  if (state.camArmed) { openCamScreen(p); return; }
+  const file = state.files[type];
+  if (!file) {
+    log("No photo selected for the " + type + " check — tap 'Check in now' again after picking one.", "warn");
+    return;
+  }
+  state.busy = true;
+  document.getElementById("checkBtn").disabled = true;
+  try {
+    await sendCheckIn(p, file, file.name);
   } finally {
     state.busy = false;
     document.getElementById("checkBtn").disabled = false;

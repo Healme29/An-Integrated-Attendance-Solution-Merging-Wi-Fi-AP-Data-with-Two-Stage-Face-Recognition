@@ -63,9 +63,9 @@ def post_multipart(path, file_path: Path):
 
 def banner(p: dict, stage: str) -> None:
     print("\n" + "=" * 62)
-    print(f"  [IPHONE BANNER]  {p['class_name']} ({p['room']}) terdeteksi!")
-    print(f"  {stage.upper()} check-in tersedia | BSSID {p.get('bssid')}")
-    print("  [isi: Check in now (3s)] / [Later]")
+    print(f"  [PHONE BANNER]  {p['class_name']} ({p['room']}) detected!")
+    print(f"  {stage.upper()} check-in available | BSSID {p.get('bssid')}")
+    print("  [auto-taps 'Check in now' in 3s] / [Later]")
 
 
 def find_photo(folder: str, name_hint: str) -> Path:
@@ -117,11 +117,11 @@ def main():
     args = ap.parse_args()
 
     student = get(f"/students/{args.student_id}")
-    print(f"[simulasi HP] login: {student['name']} (NIM {student['nim'] or '-'}) "
-          f"| MAC terdaftar: {student['mac_address'] or '-'}")
+    print(f"[SIM] login: {student['name']} (NIM {student['nim'] or '-'}) "
+          f"| registered MAC: {student['mac_address'] or '-'}")
 
     schedule = find_or_create_schedule(args.student_id)
-    print(f"[simulasi HP] heartbeat /me/prompt setiap {args.poll:.0f} s ...\n")
+    print(f"[SIM] heartbeat GET /me/prompt every {args.poll:.0f} s ...\n")
 
     tapped_stage = None
     for cycle in range(1, 200):
@@ -133,15 +133,15 @@ def main():
             if tapped_stage == p["schedule_id"]:
                 pass  # next stage banner — fine
             time.sleep(args.tap_delay)
-            print(f"  [{stamp}] SISWA MENYENTUH 'Check in now' -> kamera...")
+            print(f"  [{stamp}] STUDENT TAPPED 'Check in now' -> camera...")
             held = args.photo_start if stage == "start" else args.photo_end
             photo = find_photo(args.photo_dir, held)
-            print(f"  [kamera] mengirim foto held-out: {photo.name}")
+            print(f"  [camera] sending held-out photo: {photo.name}")
             result = post_multipart(
                 f"/attendance/check?schedule_id={p['schedule_id']}&check_type={stage}",
                 photo,
             )
-            print(f"  [HASIL] {result['student_name']} | {result['check_type'].upper()} "
+            print(f"  [RESULT] {result['student_name']} | {result['check_type'].upper()} "
                   f"| confidence {(result['confidence'] * 100):.1f}% "
                   f"| wifi={result['wifi_verified']} | status={result['status']}")
             tapped_stage = p["schedule_id"]
@@ -149,18 +149,18 @@ def main():
         else:
             reason = p.get("reason")
             if reason == "check_in_complete":
-                print(f"\n[{stamp}] reason=check_in_complete -> banner berhenti.")
-                print(f"[SELESAI] kehadiran {student['name']} hari ini lengkap "
-                      f"(start + end terverifikasi). Simulasi sukses.\n")
+                print(f"\n[{stamp}] reason=check_in_complete -> banner stops.")
+                print(f"[DONE] {student['name']}'s attendance today is complete "
+                      f"(start + end verified). Simulation succeeded.\n")
                 return
             hint = {
-                "no_active_schedule": "tidak ada kelas aktif",
+                "no_active_schedule": "no active class right now",
                 "device_not_seen_on_network":
-                    "kelas aktif tapi device tidak terlihat di jaringan (banner TIDAK muncul)",
+                    "class active but device NOT seen on the network (banner must NOT appear)",
             }.get(reason, reason)
             print(f"[{stamp}] poll: prompt=false ({hint})")
             time.sleep(args.poll)
-    print("[STOP] batas 200 poll tercapai.")
+    print(f"[STOP] 200-poll limit reached.")
 
 
 if __name__ == "__main__":

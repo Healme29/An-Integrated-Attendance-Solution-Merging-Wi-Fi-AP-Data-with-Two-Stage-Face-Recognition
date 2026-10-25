@@ -1,5 +1,13 @@
 # TUGAS C — Aplikasi Flutter, Pengujian Device Nyata & Rilis
 
+> **SERAH-TERIMA (24 Okt 2026):** integrasi auto check-in prompt sudah
+> **diprototipekan oleh A** atas permintaan team lead — kode draft ada di branch
+> `a`, commit `7803d27` (`mobile/lib/services/prompt_service.dart` + banner di
+> `home_screen.dart` + toggle di `settings_screen.dart`; spec:
+> `docs/A/auto_prompt_spec.md`, live test: `docs/A/demo/`). **C dimohon
+> review** sebelum melanjutkan — bukan mulai dari nol. Sisa tugas C di bawah
+> (uji HP asli dsb.) tetap seperti aslinya.
+
 > **Baca dulu:** `docs/PROJECT_CONTEXT.md` dan `docs/PLAN_TIMELINE.md`.
 > Estimasi total beban kerja: **18–22 jam** (seimbang dengan B dan D; A tetap terberat).
 

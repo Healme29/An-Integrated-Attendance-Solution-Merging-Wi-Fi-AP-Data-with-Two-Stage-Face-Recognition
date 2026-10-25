@@ -63,6 +63,24 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-25 — A: simulator upgraded to REAL WEBCAM (camera screen opens from the banner)
+- `docs/A/demo/auto_prompt_simulator.html` now mirrors the real app flow:
+  **Enable camera (live webcam)** button (getUserMedia, permission once per
+  browser), banner tap → phone display switches to a **camera screen**
+  (mirrored preview + big white capture button, "Back" = cancel), optional
+  **auto-capture 3 s** countdown, frame captured to canvas → JPEG →
+  `POST /attendance/check`. File-upload flow kept as fallback (photo picker)
+  when camera is denied/unavailable. All texts already English; headless
+  sim terminal output translated to English too.
+- Rationale answered for the team: a web page cannot silently open a webcam
+  (needs one user permission + requirement), so the old upload picker was a
+  stand-in; the FLUTTER app itself does open the camera screen directly.
+- C-task handover note added to `docs/C/TASK.md` (A prototyped the Flutter
+  prompt integration; C reviews commit `7803d27` on branch `a` before
+  continuing with real-device testing C1).
+- GitHub push configured: `git config --global http.proxy
+  socks5://127.0.0.1:10808`; branch `a` pushed & tracking origin.
+
 ### 2026-10-24 — A: Flutter auto-prompt integration drafted + TWO local simulators running
 - Flutter side implemented (draft for **C** to review/own — user requested A
   to prototype it now): `mobile/lib/services/prompt_service.dart` (polling
