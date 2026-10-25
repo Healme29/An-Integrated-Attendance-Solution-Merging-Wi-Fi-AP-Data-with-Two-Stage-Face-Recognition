@@ -20,8 +20,8 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller;
-  late Future<void> _initFuture;
+  CameraController? _controller;
+  Future<void>? _initFuture;
   bool _isProcessing = false;
 
   @override
@@ -37,18 +37,24 @@ class _CameraScreenState extends State<CameraScreen> {
       (c) => c.lensDirection == CameraLensDirection.front,
       orElse: () => cameras.first,
     );
-    _controller = CameraController(camera, ResolutionPreset.high);
-    await _controller.initialize();
+    final controller = CameraController(camera, ResolutionPreset.high);
+    await controller.initialize();
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+    setState(() => _controller = controller);
   }
 
   Future<void> _takePicture() async {
-    if (_isProcessing) return;
+    final controller = _controller;
+    if (controller == null || _isProcessing) return;
     setState(() => _isProcessing = true);
 
     try {
       final tempDir = await getTemporaryDirectory();
       final filePath = "${tempDir.path}/attendance_${DateTime.now().millisecondsSinceEpoch}.jpg";
-      final XFile picture = await _controller.takePicture();
+      final XFile picture = await controller.takePicture();
       await picture.saveTo(filePath);
 
       final result = await ApiService.checkAttendance(
@@ -84,7 +90,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    // Null-safe: the controller may never have been created when camera
+    // initialization failed (e.g. permission denied).
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -95,20 +103,53 @@ class _CameraScreenState extends State<CameraScreen> {
       body: FutureBuilder<void>(
         future: _initFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                CameraPreview(_controller),
-                if (_isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-              ],
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || _controller == null) {
+            // Camera init failed (permission denied, camera busy, ...).
+            // Show a human message + how to recover instead of a stuck spinner.
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.photo_camera_front, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Camera unavailable",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Camera access failed. If you denied the permission, "
+                      "allow the camera for this app in system Settings, then retry.",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() => _initFuture = _initCamera());
+                      },
+                      child: const Text("Retry"),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
-          return const Center(child: CircularProgressIndicator());
+          return Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              CameraPreview(_controller!),
+              if (_isProcessing)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+            ],
+          );
         },
       ),
       floatingActionButton: FloatingActionButton.large(
