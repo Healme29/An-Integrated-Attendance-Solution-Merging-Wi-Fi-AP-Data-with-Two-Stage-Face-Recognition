@@ -1,0 +1,411 @@
+================================================================================
+  SAMPLE PROGRESS REPORT — M1
+  Project: An Integrated Attendance Solution Merging Wi-Fi AP Data with
+           Two-Stage Face Recognition
+  Date: October 26, 2026
+  Status: M1 Progress Report (First Draft for Team D to finalize)
+================================================================================
+
+NOTE TO D: This is a SAMPLE/TEMPLATE. Fill in your name, adjust the tone,
+add your own section introductions, and customize as needed. All data below
+is REAL — taken from the project as of 2026-10-26.
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+This report presents the progress of the Integrated Attendance Solution
+project as of October 26, 2026 — 8 days into a planned 5-month development
+cycle (Oct 2026 – Mar 2027). The system combines Wi-Fi AP connection logs
+with two-stage face recognition (start-of-class and end-of-class selfies)
+to provide secure, multi-factor classroom attendance tracking.
+
+Key achievements to date:
+  ✓ Three students enrolled with 5 face samples each = 15 total embeddings
+  ✓ Face recognition threshold validated: 0% false accept / false reject in
+    the operating band (0.25–0.65), threshold set at 0.5
+  ✓ Two-stage check-in flow verified end-to-end on a real Samsung Galaxy S24
+  ✓ Teacher dashboard redesigned and fully functional
+  ✓ Backend: 139/140 tests passing + 15/15 smoke test checks passed
+  ✓ Docker deployment verified with full deployment guide
+  ✓ Auto check-in prompt (Tier 1 polling) implemented + tested
+  ✓ Anti-cheat measures: unique MAC enforcement + photo replay guard + SHA-256
+    fingerprinting
+  ✓ Release APK v0.9.0 built (51.7 MB) and installed on test device
+
+The system is on track for the M1 deadline (November 1, 2026) with all
+required deliverables complete or in final preparation.
+
+================================================================================
+2. SYSTEM ARCHITECTURE (SUMMARY)
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                      MOBILE APP (Flutter)                          │
+  │  Login → Pick Schedule → Camera (Selfie) → POST /attendance/check  │
+  └──────────────────────────┬──────────────────────────────────────────┘
+                             │ HTTP (USB adb reverse / LAN)
+                             ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                      BACKEND (FastAPI, Python)                     │
+  │  ┌─────────┐  ┌──────────┐  ┌────────────┐  ┌──────────────────┐  │
+  │  │Routes   │→ │Services  │→ │ML Pipeline │  │Wi-Fi Scanner     │  │
+  │  │(8 mods) │  │(6 svcs)  │  │YOLOv8→ArcFa│→ │Ping SW + arp -a  │  │
+  │  └─────────┘  └──────────┘  └────────────┘  └──────────────────┘  │
+  │                     │                                              │
+  │               ┌─────▼──────┐                                       │
+  │               │  SQLite DB │  (attendance.db)                      │
+  │               └────────────┘                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+            │                              │
+            ▼                              ▼
+  ┌─────────────────────┐    ┌───────────────────────────────┐
+  │ Teacher Dashboard   │    │ Student / Schedule Data       │
+  │ (HTML + JS, Web)    │    │ REST API for CRUD operations  │
+  └─────────────────────┘    └───────────────────────────────┘
+
+Technology stack:
+  - Backend: Python 3.11, FastAPI, uvicorn, SQLite, httpx, Pillow
+  - ML: YOLOv8m-face (50 MB) for detection, InsightFace ArcFace buffalo_l
+    for 512-D embedding extraction
+  - Mobile: Flutter 3.x, Dart, packages (http, camera, shared_preferences,
+    path_provider, intl)
+  - Deployment: Docker, docker-compose (CPU torch, 3.4 GB image)
+  - OS: Windows 11 (development), Linux (production target)
+
+================================================================================
+3. TEAM PROGRESS (per Member)
+================================================================================
+
+--- MEMBER A: ML/AI Backend Lead ---
+
+Progress: ~85% of M1 scope, ~50% of total project scope
+
+  Completed:
+  - Implemented YOLOv8m-face detection + InsightFace ArcFace pipeline
+  - Enrolled 3 students (Buchari, Willian, Latul) with 5 samples each
+  - Ran threshold evaluation: 15 total samples, 30 genuine pairs, 75 impostor
+    pairs → FAR = 0.00, FRR = 0.00 in threshold range 0.25–0.65
+  - Decision: Threshold set at 0.5 (midpoint of safe band, live-proven)
+  - Built and documented threshold evaluation script (evaluate_threshold.py)
+  - Built enrollment hardening: magic-byte check, MIN_FACE_BBOX_PX, file size cap
+  - Implemented anti-cheat pass 1: unique MAC per student, photo replay guard
+    (SHA-256 fingerprint), 9 dedicated tests
+  - Built auto check-in prompt endpoint (GET /me/prompt) — 7 tests
+  - Built two browser simulators (headless Python + visual HTML) for demo
+  - Built bulk enrollment script (bulk_enroll.py)
+  - Built phone simulator for automated end-to-end testing (simulate_phone.py)
+  - Generated threshold report with live data
+
+  Remaining:
+  - Anti-cheat pass 2 (device binding via auth token → M2)
+  - Liveness detection (future work, M2+)
+  - Re-evaluate threshold with larger population during pilot (M2)
+  - Timestamp consistency fix across database (identified — not yet patched)
+
+--- MEMBER B: Wi-Fi & Deployment ---
+
+Progress: ~95% of M1 scope, ~55% of total project scope
+
+  Completed:
+  - Validated Wi-Fi scan on real campus network:
+    * Fresh scan: 2.4 seconds (254 ping sweep)
+    * Cached scan: instant (60-second dedupe window)
+    * Real two-stage attendance: 0.71–0.72 confidence, verified
+  - Confirmed Windows ARP scan works WITHOUT Npcap (ping sweep + arp -a)
+  - Verified subnet auto-detection (correct /17 on campus, falls back to /24
+    for scanning)
+  - Documented findings in docs/B/network_validation.md
+  - Verified attendance history pagination (limit/offset, X-Total-Count header,
+    newest-first ordering) — documented in docs/B/data_features_check.md
+  - Verified CSV export functionality (correct header, local timestamps,
+    yes/no Wi-Fi column)
+  - Built and validated Docker deployment:
+    * Dockerfile with CPU torch optimization (3.4 GB image, not the 6+ GB
+      CUDA version)
+    * docker-compose with TIMEZONE, CORS_ORIGINS, port override, volume
+      management
+    * Verified: /health OK, smoke test 15/15 against container
+    * Noted limitation: container cannot see host Wi-Fi (documented)
+  - Documented China deployment workaround (registry mirrors:
+    docker.m.daocloud.io, dockerproxy.com)
+  - Built seed_demo.py for quick demo data setup
+  - Written comprehensive deployment guide (deployment_guide.md)
+
+  Remaining:
+  - Production hardening (CORS origins, TIMEZONE=Asia/Jakarta, DB backup → M2)
+  - AP management plane integration for room-level presence (M2+)
+
+--- MEMBER C: Flutter Mobile App ---
+
+Progress: ~70% of M1 scope, ~50% of total project scope
+
+  Completed:
+  - Full mobile app with 7 screens (Login, Home, Camera, Enroll, History,
+    Settings, Attendance Result)
+  - Real-device testing on Samsung Galaxy S24 (Android 16, API 36):
+    * Install ✓, Login ✓, Settings + Test Connection ✓
+    * START check-in → status partial ✓ (confidence 0.893)
+    * END check-in → status face_only ✓ (Wi-Fi not available on campus)
+    * Attendance history ✓
+  - Camera error state fix: previously showed infinite spinner when permission
+    was denied; now shows human-readable message + Retry button
+  - Empty states for schedules and history (friendly messages + icons)
+  - Auto check-in prompt Flutter integration reviewed and accepted:
+    * PromptService: 20s polling, dedupe per schedule_id:check_type
+    * HomeScreen banner: "Check in now" / "Later"
+    * Lifecycle-aware: pauses polling when app is backgrounded
+    * Settings toggle: ON by default
+  - Edge-case evidence gathered (server-side):
+    * Duplicate check-in (same stage) → 409 "Already checked in"
+    * Photo replay → 409 (anti-replay guard)
+    * Willian (no valid MAC) → prompt:false, device_not_seen_on_network
+    * Outside class hours → 403 "Attendance only allowed within class time"
+  - Release build v0.9.0 (app-release.apk, 51.7 MB)
+  - Custom launcher icon (person silhouette + green check on blue gradient,
+    all 5 Android densities)
+  - Version set to 0.9.0+1
+
+  Remaining:
+  - Build release and test on SECOND phone (November — needs a physical device)
+  - Upload release APK to team shared drive
+  - Final UI polish: loading indicators on all screens (partially done),
+    dark mode (optional)
+  - Live auto-prompt banner test (blocked by campus Wi-Fi isolation)
+  - Pilot classroom support + demo phone preparation (M2/December)
+
+--- MEMBER D: Dashboard & Reports ---
+
+Progress: ~75% of M1 scope, ~20% of total project scope
+
+  Completed:
+  - Teacher dashboard redesign committed (+1,185 lines)
+  - Dashboard test fixed to match new title ("Face Attendance System -
+    Presentation Dashboard")
+  - Evidence pack collected (7 files):
+    * pytest output (139 passed, 1 skipped)
+    * smoke test output (15/15)
+    * flutter analyze (0 issues)
+    * flutter test (passed)
+    * Full git commit log
+    * Release APK info + SHA-256 hash
+
+  Remaining:
+  - THIS REPORT — assemble inputs from A, B, C into final progress report
+    document. All inputs are complete and ready.
+
+================================================================================
+4. KEY TECHNICAL RESULTS
+================================================================================
+
+4.1 Face Recognition Accuracy
+
+  The face recognition system was evaluated with real enrollment photos from
+  three students (5 samples each, various lighting/angles):
+
+  Metric                          | Value
+  --------------------------------|------------------------------------------
+  Total samples                   | 15 (3 students × 5 each)
+  Genuine pairs (same student)    | 30
+  Impostor pairs (diff. student)  | 75
+  Min genuine similarity          | 0.708
+  Max impostor similarity         | 0.224
+  Safe separation gap             | 0.484
+  FAR at threshold 0.5            | 0.00 (0%)
+  FRR at threshold 0.5            | 0.00 (0%)
+  Operating band (FAR=FRR=0)      | 0.25 – 0.65
+
+  Interpretation: The distributions are fully separated — there is zero
+  overlap between genuine and impostor similarity scores. The gap of 0.484
+  provides a wide safety margin. The chosen threshold of 0.5 sits at the
+  midpoint of the safe band, well away from either edge.
+
+  Live verification on Galaxy S24:
+  - START check-in confidence: 0.893 (89.3%)
+  - END check-in confidence (different photo): 0.688 (68.8%)
+  - Both exceeded threshold by a wide margin.
+
+4.2 Wi-Fi Network Validation
+
+  The Wi-Fi presence detector was tested on the campus SSID:
+
+  Metric                          | Value
+  --------------------------------|------------------------------------------
+  Fresh scan (254 addresses)      | ~2.4 seconds
+  Cached scan (60-s dedupe)       | ~0 seconds (instant)
+  Client isolation                | ACTIVE on campus SSID
+  BSSID detected                  | 54:2b:de:fd:90:21 (gateway)
+
+  Finding: The campus network uses client isolation, meaning individual
+  devices cannot detect each other via ARP. This is an infrastructure
+  limitation, not a software bug. The system handles this gracefully by
+  recording attendance as face_only (Wi-Fi unverified) instead of blocking
+  the check-in entirely.
+
+  Recommendation for pilot/demo: Use a private network (hotspot, home router)
+  where ARP works normally. The scanner has no technical limitations — it
+  functions correctly on flat networks.
+
+4.3 Mobile App Performance
+
+  Metric                          | Value
+  --------------------------------|------------------------------------------
+  App size (release APK)          | 51.7 MB (tree-shaken icons: 99.8% reduction)
+  Test device                     | Samsung Galaxy S24, Android 16
+  Flutter analyze                 | 0 issues
+  Flutter test                    | All passed
+  Build type                      | app-release.apk (v0.9.0+1)
+
+4.4 Backend Test Coverage
+
+  Metric                          | Value
+  --------------------------------|------------------------------------------
+  Python test suite               | 139 passed, 1 skipped
+  Smoke test (end-to-end)         | 15/15 checks PASS
+  Test warnings                   | 3 (Pydantic deprecation — harmless)
+  Docker image size               | 3.4 GB (CPU-only torch)
+
+================================================================================
+5. IMPLEMENTED FEATURES (FULL LIST)
+================================================================================
+
+Core Attendance:
+  ✓ Two-stage face check-in (start → partial → end → verified/face_only)
+  ✓ Schedule time validation ±15 min grace window
+  ✓ Day-of-week enforcement
+  ✓ Duplicate/replay check-in rejection (409)
+  ✓ END-without-START rejection (409)
+  ✓ Student CRUD + face enrollment (5 samples max)
+  ✓ Student history with pagination
+  ✓ CSV export with date/schedule filters
+
+Face Recognition:
+  ✓ YOLOv8m-face detection pipeline
+  ✓ InsightFace ArcFace buffalo_l embedding extraction
+  ✓ Cosine similarity matching (threshold 0.5, proven with 3 students)
+  ✓ Enrollment validation (magic bytes, MIN_FACE_BBOX_PX, UPCAP_SUK)
+
+Wi-Fi Detection:
+  ✓ ARP ping sweep scanner (Windows — no Npcap required)
+  ✓ Subnet auto-detection
+  ✓ 60-second dedupe window
+  ✓ MAC check endpoints
+
+Auto Check-in Prompt (Tier 1):
+  ✓ Backend /me/prompt endpoint
+  ✓ Flutter PromptService (polling + dedupe)
+  ✓ HomeScreen banner UI
+  ✓ Settings toggle (ON by default)
+
+Anti-Cheat (Pass 1):
+  ✓ Unique MAC per student (409 on duplicate)
+  ✓ Photo replay guard (SHA-256 fingerprint, 1×/day/student)
+  ✓ Duplicate stage rejection per schedule
+
+Teacher Dashboard:
+  ✓ Real-time attendance table (student, NIM, times, confidence, status)
+  ✓ Schedule CRUD with overlap detection
+  ✓ CSV export button
+  ✓ Server health indicator
+  ✓ CST timezone display
+
+Infrastructure:
+  ✓ Docker + Compose (CPU torch, env vars, volumes)
+  ✓ Seed script for demo data
+  ✓ Deployment guide with China registry mirrors
+  ✓ Smoke test (15/15 checks)
+
+Mobile App (Flutter):
+  ✓ 7 screens (Login, Home, Camera, Enroll, History, Settings, Result)
+  ✓ Error-safe (no crashes on network errors, 403/409/404 shown as messages)
+  ✓ Empty states (no schedules, no history icons + text)
+  ✓ Auto-prompt integration reviewed and accepted
+  ✓ Release build v0.9.0 (51.7 MB)
+  ✓ Branded launcher icon (all densities)
+
+================================================================================
+6. KNOWN ISSUES & LIMITATIONS
+================================================================================
+
+  Issue                      | Severity  | Status               | Remediation
+  ----------------------------|-----------|----------------------|-------------------------------
+  Campus Wi-Fi client         | Medium    | Environment          | For demo/pilot: use private
+  isolation → wifi_verified   |           | limitation           | network; for production:
+  always false                |           | (not a bug)          | AP management plane (M2)
+                             |           |                      |
+  Timestamp inconsistency:    | Low       | Identified,          | Patch before M2 — align
+  attendance.timestamp uses   |           | not yet fixed        | all timestamps to same
+  local time, some other      |           |                      | timezone
+  tables use UTC              |           |                      |
+                             |           |                      |
+  Sample size: 3 students     | Low       | Sufficient for       | Expand during pilot (M2)
+  for threshold evaluation    |           | demonstration        | with 10+ subjects
+                             |           |                      |
+  Server clock drift          | Medium    | Fixed (workaround)   | Add to deployment checklist
+  (Windows time sync)         |           |                      | — verify clock before sessions
+                             |           |                      |
+  USB-only student            | Medium    | Workaround           | Demo: use hotspot; no impact
+  connectivity (campus Wi-Fi  |           | (adb reverse)         | on code quality or system
+  blocks LAN)                 |           |                      | design
+
+================================================================================
+7. PLANNED NEXT STEPS
+================================================================================
+
+Immediate (M1 — due November 1):
+  - [D] Finalize and submit this progress report
+  - [All] Review each other's deliverables; ensure 140/140 tests green
+
+November 2026 (M2 preparation):
+  - [B] Deploy backend on school/demo machine (Docker or bare metal)
+  - [C] Test release APK on a SECOND phone
+  - [C] Full UX polish pass (loading indicators, dark mode if time allows)
+  - [A] Experiment with YOLO confidence/img-size for robustness
+  - [A] Anti-cheat pass 2 research (device binding)
+  - [D] Polish teacher dashboard (filters, status colors, print-friendly view)
+
+December 2026 (PILOT):
+  - Execute classroom pilot with 5–10 real students
+  - Collect real-world feedback on UX, accuracy, Wi-Fi detection
+  - Triage and fix top issues
+
+January 2027:
+  - Demo script, slides, video recording
+  - Two full dry runs before presentation
+
+March 2027 (FINAL SUBMISSION):
+  - Code freeze: March 2
+  - Release build v1.0
+  - Final report with chapters from all members
+  - Repository cleanup
+
+================================================================================
+8. LIST OF DOCUMENTS / EVIDENCE (attachments to this report)
+================================================================================
+
+  Item                                          | Location in Repository
+  ----------------------------------------------|------------------------------
+  Threshold evaluation report (3 students)      | docs/threshold_report.md
+  Wi-Fi network validation results              | docs/B/network_validation.md
+  Data feature verification (CSV / pagination)  | docs/B/data_features_check.md
+  Deployment guide (Docker + China mirrors)     | docs/B/deployment_guide.md
+  Real-device test log (Galaxy S24)             | docs/C/device_test_log.md
+  Progress summary from C for D                 | docs/C/progress_summary_for_D.md
+  Auto-prompt handover review                   | docs/C/review_7803d27.md
+  Auto-prompt specification                     | docs/A/auto_prompt_spec.md
+  Project plan and timeline (master)            | docs/PLAN_TIMELINE.md
+  Project technical context                     | docs/PROJECT_CONTEXT.md
+  Team planning meeting notes (Oct 18)          | docs/meetings/2026-10-18_team_planning.md
+  pytest output (139 passed, 1 skipped)         | docs/D/evidence/pytest_result.txt
+  Smoke test output (15/15 checks PASS)         | docs/D/evidence/smoke_test_result.txt
+  Flutter analyze (0 issues)                    | docs/D/evidence/flutter_analyze.txt
+  Flutter test (all passed)                     | docs/D/evidence/flutter_test.txt
+  Release APK info (51.7 MB, SHA-256)           | docs/D/evidence/release_apk_info.txt
+  Git commit log (37+ commits since start)      | docs/D/evidence/commits_since_start.txt
+  Release APK (v0.9.0)                          | mobile/build/app/outputs/flutter-apk/app-release.apk
+  Per-member task documents                     | docs/A/TASK.md, docs/B/TASK.md,
+                                                | docs/C/TASK.md, docs/D/TASK.md
+
+================================================================================
+END OF SAMPLE REPORT
+================================================================================

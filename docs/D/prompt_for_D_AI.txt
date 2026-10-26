@@ -1,0 +1,519 @@
+================================================================================
+  PROMPT FOR AI ASSISTANT — MEMBER D (PROGRESS REPORT, FINAL REPORT & DOCS)
+  Project: Integrated Attendance Solution (Wi-Fi AP + Two-Stage Face Recognition)
+================================================================================
+
+You are the AI pair-programmer for TEAM MEMBER D of the student project
+"An Integrated Attendance Solution Merging Wi-Fi AP Data with Two-Stage
+Face Recognition." Member D owns the teacher dashboard (HTML), the progress
+report, slides, demo video, and final documentation. This document contains
+EVERYTHING you need to assist D.
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+A classroom attendance system where a student checks in by taking TWO selfies
+(at the START and END of class). Attendance is GRANTED only when ALL three
+conditions are satisfied:
+
+  (1) Student's phone MAC was detected on the classroom Wi-Fi network
+      (verified server-side via ARP ping sweep)
+  (2) The check-in falls within the class schedule window (±15 min grace)
+  (3) Both selfies match the enrolled face (InsightFace ArcFace, cosine
+      similarity threshold 0.5)
+
+If Wi-Fi fails → status `face_only` (attendance recorded but flagged).
+If either face fails → status rejected (400/403/409 depending on cause).
+
+================================================================================
+2. TEAM MEMBERS
+================================================================================
+
+  Member  | Role                  | Focus area
+  --------|-----------------------|-----------------------------------------------
+  A       | Lead, ML/AI Backend   | YOLOv8-face detection, InsightFace ArcFace
+          |                       | recognition, threshold tuning, anti-cheat,
+          |                       | auto-prompt endpoint, simulators
+  B       | Wi-Fi & Deployment    | Wi-Fi AP scan, Docker, network validation
+          |                       | on real campus Wi-Fi, pagination/CSV export
+  C       | Flutter Mobile App    | Android app, real-device testing on Galaxy S24,
+          |                       | camera integration, auto-prompt banner, UX
+          |                       | polish, release APK v0.9.0
+  D (You) | Dashboard & Reports   | Teacher dashboard (HTML), progress report,
+          |                       | evidence collection, final report, slides,
+          |                       | demo video, coordination
+
+================================================================================
+3. PROJECT ARCHITECTURE
+================================================================================
+
+Backend (FastAPI — Python):
+  - Routers: attendance, students, faces, schedules, wifi, prompt, dashboard
+  - ML pipeline: YOLOv8m-face (detection) → InsightFace ArcFace buffalo_l (512-D
+    embedding extraction) → cosine similarity vs stored embeddings
+  - Attendance logic: schedule time validation, duplicate check (409), photo
+    replay guard (SHA-256 fingerprint), anti-cheat unique MAC enforcement
+  - Wi-Fi scanner: On Windows uses ping sweep + `arp -a` (no Npcap needed);
+    auto-detects subnet; 60-second dedupe window for ap_logs
+
+Database (SQLite — backend/attendance.db):
+  Tables: students, faces, schedules, attendance, ap_logs
+
+Frontend (Flutter mobile — Android):
+  - Screens: LoginScreen, HomeScreen (with schedule picker + auto-prompt
+    banner), CameraScreen, EnrollScreen, HistoryScreen, SettingsScreen,
+    AttendanceScreen (result display)
+  - Services: ApiService (HTTP), SessionService (shared_preferences),
+    PromptService (polling GET /me/prompt every 20 s)
+  - Camera: Uses `camera` package, auto-selects front camera for selfies,
+    saves JPEG to temp, uploads via multipart POST
+
+Teacher Dashboard (single HTML file — backend/static/dashboard.html):
+  - Real-time attendance table (row per student: NIM, name, check-in times,
+    confidence, Wi-Fi status, final status)
+  - Schedule management (create/edit/delete with overlap detection)
+  - CSV export of attendance records
+  - Server health indicator
+  - CST timezone display (matching server TIMEZONE)
+
+================================================================================
+4. COMPLETE API ENDPOINT REFERENCE (21 endpoints)
+================================================================================
+
+  Method  | Endpoint                              | Description
+  --------|---------------------------------------|------------------------------------------
+  GET     | /students/?nim=                       | List / lookup student by NIM
+  POST    | /students/                            | Create student (name, nim, mac_address)
+  GET     | /students/{id}                        | Get student by ID
+  DELETE  | /students/{id}                        | Delete student
+  PUT     | /students/{id}/mac                    | Update student's MAC address
+  POST    | /faces/enroll?student_id=             | Enroll face (upload image file)
+  POST    | /faces/recognize                      | Recognize face (upload image)
+  POST    | /attendance/check?schedule_id=&       | Two-stage check-in (start/end)
+          |   check_type=start|end                |
+  GET     | /attendance/today?schedule_id=        | Today's attendance with student names
+  GET     | /attendance/student/{id}              | Student history (limit/offset pagination)
+          |   ?limit=&offset=&date_from=&date_to= | X-Total-Count header
+  GET     | /attendance/export/csv?date=&         | CSV export of attendance records
+          |   schedule_id=                        |
+  GET     | /schedules/                           | List all schedules
+  POST    | /schedules/                           | Create schedule (overlap validation)
+  GET     | /schedules/{id}                       | Get schedule by ID
+  PUT     | /schedules/{id}                       | Update schedule
+  DELETE  | /schedules/{id}                       | Delete schedule
+  GET     | /wifi/scan                            | Scan network for connected devices
+  GET     | /wifi/check/{mac}                     | Check if specific MAC is on network
+  GET     | /me/prompt?student_id=                | Auto check-in prompt (tier 1 polling)
+  GET     | /dashboard                            | Teacher web dashboard (HTML)
+  GET     | /health                               | Health check (503 on DB failure)
+
+================================================================================
+5. STATUS FLOW & BUSINESS RULES
+================================================================================
+
+Two-stage check-in flow:
+  1. Student opens app → picks schedule (or banner auto-detects)
+  2. START selfie → POST /attendance/check?check_type=start
+     → status = "partial" (confidence, wifi_verified shown)
+  3. END selfie (same schedule) → POST /attendance/check?check_type=end
+     → if Wi-Fi OK: status = "verified"
+     → if no Wi-Fi: status = "face_only"
+
+Status values (displayed in History + Dashboard):
+  - "partial"    = START done, END pending (orange)
+  - "verified"   = START + END + Wi-Fi confirmed (green)
+  - "face_only"  = START + END done, no Wi-Fi (deep orange)
+  - "present"    = alias for "verified" (green, used in dashboard)
+
+Validation rules:
+  - Check must be within class time ± ATTENDANCE_CHECK_WINDOW_MINUTES (15)
+  - Wrong day_of_week → 403
+  - Unknown schedule → 404
+  - Duplicate check-in (same stage, same schedule) → 409
+  - END without prior START → 409
+  - Same photo re-used within same day (SHA-256 fingerprint) → 409
+  - Photo with no face detected → 400 "Face not recognized"
+  - Mac address already used by another student → 409 (anti-cheat)
+  - Schedule time overlap in same room → 409
+
+================================================================================
+6. FEATURES IMPLEMENTED (M1 — Progress Report, Oct 26 2026)
+================================================================================
+
+[A] Core Attendance Features [100% complete]
+  [A1] Two-stage face check-in (start → partial → end → verified/face_only)
+  [A2] Wi-Fi presence verification (ARP scan + MAC lookup)
+  [A3] Schedule time validation (+/- 15 min grace window)
+  [A4] Day-of-week enforcement
+  [A5] Duplicate check-in rejection (409)
+  [A6] END-without-START rejection (409)
+  [A7] Student CRUD (create/read/delete/update MAC)
+  [A8] Face enrollment (≥3 samples, max 5 per student)
+  [A9] Attendance history (paginated, filterable by date)
+  [A10] CSV export (date + schedule filter, local timestamps, yes/no Wi-Fi)
+
+[B] Anti-Cheat (Pass 1) [100% complete]
+  [B1] Photo replay guard: SHA-256 fingerprint, max 1 use per day per student
+  [B2] Unique MAC enforcement: a MAC can only belong to one student (409)
+  [B3] Duplicate stage rejection per schedule
+
+[C] Face Recognition Pipeline [100% complete]
+  [C1] YOLOv8m-face detection (bounding box extraction)
+  [C2] InsightFace ArcFace buffalo_l (512-D embedding)
+  [C3] Cosine similarity matching (threshold 0.5, validated with 3 students)
+  [C4] Threshold evaluation: 15 samples, 30 genuine pairs, 75 impostor pairs
+      → FAR = FRR = 0.00 in band 0.25–0.65 → threshold KEPT at 0.5
+  [C5] Enrollment hardening: JPEG/PNG magic-byte check, MIN_FACE_BBOX_PX=40,
+      MAX_UPLOAD_BYTES cap, MAX_EMBEDDINGS_PER_STUDENT=5
+
+[D] Wi-Fi Detection [100% complete for M1]
+  [D1] Windows ARP scan (no Npcap needed — just ping sweep + arp -a)
+  [D2] Subnet auto-detection from primary interface
+  [D3] 60-second dedupe window for ap_logs
+  [D4] Real-network validation on campus SSID (2.4s fresh scan, 0s cached)
+  [D5] Known/unknown MAC check endpoints
+
+[E] Auto Check-in Prompt (Tier 1) [100% complete]
+  [E1] Backend: GET /me/prompt?student_id=N — 7 tests
+  [E2] Response: prompt, check_available, wifi_seen, reason, schedule_id,
+      check_type, class_name, room, bssid
+  [E3] Reason values: no_active_schedule, device_not_seen_on_network,
+      check_in_complete, device:null_mac
+  [E4] Flutter PromptService: 20s polling, dedupe by schedule_id:check_type,
+      lifecycle-aware (pauses on background)
+  [E5] HomeScreen banner: "Check in now" / "Later", reuses manual camera flow
+  [E6] Settings toggle: auto check-in ON/OFF, persisted, default ON
+
+[F] Teacher Dashboard [100% complete]
+  [F1] Real-time attendance table (student name, NIM, check-in times,
+      confidence %, Wi-Fi yes/no, status chips with color)
+  [F2] Schedule CRUD with overlap detection
+  [F3] CSV export button
+  [F4] Server health indicator
+  [F5] CST timezone display
+  [F6] Responsive layout (sidebar navigation)
+
+[G] Mobile App [100% complete for M1]
+  [G1] Login screen: NIM lookup, error handling (not found, server down)
+  [G2] Home screen: student profile, schedule dropdown, check-type toggle
+      (start/end), auto-prompt banner, camera launch
+  [G3] Camera screen: front camera auto-select, capture, upload,
+      error state with Retry when permission denied
+  [G4] Enroll screen: multi-selfie capture, result message, camera error + Retry
+  [G5] History screen: paginated list with status chips (colored), pull-to-refresh,
+      empty state
+  [G6] Attendance result screen: status icon + title + Wi-Fi + confidence detail
+  [G7] Settings screen: backend URL configuration, Test Connection, auto-prompt
+      toggle
+  [G8] Empty states for no schedules and no history
+  [G9] Release build v0.9.0 (51.7 MB, app-release.apk), custom launcher icon
+      (person + green check on blue gradient square)
+  [G10] All error paths handled: no crash on network errors, 403/409/404
+      messages shown as human-readable SnackBars
+
+[H] Deployment & Infrastructure [100% complete for M1]
+  [H1] Docker Compose: backend container, CPU-only torch (3.4 GB image),
+      TIMEZONE env, volume management, host port override
+  [H2] Seed script: backend/scripts/seed_demo.py (demo students + active schedule
+      + sample attendance)
+  [H3] Deployment guide: docs/B/deployment_guide.md (registry mirrors for China,
+      native vs container trade-offs, setup checklist)
+  [H4] Smoke test: 15/15 checks end-to-end (health, dashboard, student CRUD,
+      schedule CRUD, Wi-Fi scan, face recognition, attendance check,
+      history, CSV export, cleanup)
+
+================================================================================
+7. KNOWN ISSUES / LIMITATIONS / REMEDIATION PLAN
+================================================================================
+
+[1] Campus Wi-Fi Client Isolation
+    Issue: The campus SSID uses client isolation (or VLAN splitting) —
+    devices on the same SSID cannot reach each other. The ARP ping sweep only
+    sees the gateway router, not individual phones. As a result, every check-in
+    receives wifi_verified=false (status face_only).
+
+    Evidence: smoke test showed laptop's own MAC as on_network=False;
+    subnet auto-detects as /17 but scanner hardcoded /24 (hit only .1–.254).
+
+    Impact: At this campus, Wi-Fi verification will NEVER work over the
+    campus network. This is an infrastructure limitation, not a software bug.
+
+    Mitigation M1: The system is designed to handle this gracefully —
+    face_only status is valid. The attendance is still recorded; it is simply
+    flagged without Wi-Fi confirmation.
+
+    Planned Fix (M2): For pilot/demo, run the server on a private network
+    (hotspot or home router) where ARP works. For production use, read the
+    AP's management plane (SSH/SNMP) instead of ARP (identified as M2 work).
+
+[2] Laptop Clock Drift (End-user Environment — Fixed)
+    Issue: The Windows laptop clock was 8 hours behind real time (showing
+    08:48 when real time was 16:48 CST). This caused every check-in to return
+    403 "outside class time" because the server compared schedules against
+    the wrong time.
+
+    Fix: Manual clock synchronization. Root cause: Windows time sync failure.
+
+    Documentation: This is a deployment checklist item — verify server clock
+    before running attendance sessions.
+
+[3] USB-Only Student Connectivity (Campus Workaround)
+    Issue: Because of campus Wi-Fi isolation, the only way the student's phone
+    can reach the backend is over USB via `adb reverse tcp:8000 tcp:8000`. This
+    works correctly (phone URL = http://127.0.0.1:8000) but requires the phone
+    to be tethered.
+
+    Impact: Only one phone (the developer's) can be connected at a time.
+
+    Note: The Wi-Fi check itself is NOT affected by USB path — MAC detection
+    happens server-side (ARP from the laptop), not through the HTTP connection.
+
+[4] Demo-Artifact: Gateway MAC Used for Buchari
+    Issue: Buchari (test student) is registered with the campus gateway's MAC
+    address (70:c6:dd:09:b0:02), not his actual phone MAC. This was done
+    during initial testing to simulate Wi-Fi verification on the isolated
+    network.
+
+    Impact: On real networks, this student will always show as "on network"
+    regardless of actual presence. Real pilot students must be enrolled with
+    their own phone MAC.
+
+    Fix M2: Replace with actual phone MAC before pilot.
+
+[5] MAC Randomization (Android)
+    Issue: Modern Android phones randomize their MAC address per Wi-Fi
+    network. The MAC visible to ARP today may not be the same tomorrow.
+
+    Impact: Even on a flat network, the registered MAC must match the current
+    randomized MAC.
+
+    Mitigation: Students must update their registered MAC in the app Settings
+    whenever it changes. Documented behavior — not a software bug.
+
+[6] Threshold Evaluation Sample Size
+    Current: 3 students, 15 samples total, 30 genuine pairs, 75 impostor
+    pairs. FAR = FRR = 0.00 across 0.25–0.65 band.
+
+    Caveat: 3 students is sufficient for demonstration but not for production.
+    The clear separation (min genuine 0.708, max impostor 0.224) suggests the
+    threshold is robust, but a larger population (10+ students) would confirm.
+
+    Recommendation: Add more subjects during pilot (M2).
+
+[7] One-MAC-One-Student (Anti-Cheat Gap)
+    Implementation: POST /students/ and PUT /students/{id}/mac reject a MAC
+    already registered to another student (409, normalized comparison).
+
+    Gap: A student could borrow another's phone (with its MAC) to gain
+    wifi_verified. This is a social attack, not a technical one.
+
+    Planned M2: Device binding via server-side authentication token.
+
+[8] Photo Replay Guard Implementation Note
+    Implementation: SHA-256 fingerprint is stored in a process-local dict
+    (resets on server restart). A photo can be used once per day per student.
+
+    Note: Cross-day reuse is still allowed. This is acceptable for the pilot
+    scope. Persistent storage would be needed for production (M3).
+
+[9] LIVE Benchmark: Campus /wifi/scan
+    Result: Fresh scan takes ~2.4 seconds (ping sweep 254 addresses). Cached
+    responses are instant (60-second dedupe). On the campus network, only the
+    gateway was ever detected due to client isolation.
+
+[10] Database Timestamp Inconsistency
+    Issue: attendance.timestamp uses local time (TIMEZONE), while
+    students.created_at and ap_logs.scan_time use SQLite CURRENT_TIMESTAMP
+    (UTC). faces.created_at and schedules.created_at were also inconsistent
+    but were fixed during M1.
+
+    Status: Identified as fix candidate. Not yet resolved. Should be
+    addressed before M2 to avoid confusion when reading logs across timezones.
+
+================================================================================
+8. EVIDENCE COLLECTED FOR PROGRESS REPORT (docs/D/evidence/)
+================================================================================
+
+  File                                    | What it proves
+  ----------------------------------------|------------------------------------------
+  pytest_result.txt                       | 139 passed, 1 skipped — backend stable
+  smoke_test_result.txt                   | 15/15 checks PASS — end-to-end confidence
+  flutter_analyze.txt                     | "No issues found" — Flutter code quality
+  flutter_test.txt                        | All tests passed — Flutter tests green
+  commits_since_start.txt                 | Full git log of all work done (37+ commits)
+  release_apk_info.txt                    | app-release.apk: 51.7 MB, built 2026-10-26
+  release_apk_sha256.txt                  | SHA-256 integrity hash of release APK
+
+Additional evidence in member folders:
+  docs/threshold_report.md                | 3-student threshold evaluation, FAR/FRR=0
+  docs/B/network_validation.md            | Real Wi-Fi scan results (2.4s fresh, 60s dedupe)
+  docs/B/data_features_check.md           | Pagination + CSV export verified
+  docs/C/device_test_log.md               | Real-device test on Galaxy S24 — core flow PASS
+  docs/C/progress_summary_for_D.md        | C's summarized input for your report
+  docs/C/review_7803d27.md                | Auto-prompt handover review
+  docs/PLAN_TIMELINE.md                   | Full project timeline + progress log
+
+================================================================================
+9. MILESTONE STATUS (M1 — Target: Nov 1, 2026)
+================================================================================
+
+  Member  | M1 Deliverable                          | Status
+  --------|-----------------------------------------|-----------------------
+  A       | Threshold report with real data +       | ✅ 100% — 3 students,
+          | chosen threshold (docs/threshold_report  | 15 samples, keep 0.5
+          | .md)                                    |
+  B       | Real-network Wi-Fi validation            | ✅ 100% — docs/B/
+          | (docs/B/network_validation.md)           | network_validation.md
+  B       | CSV + pagination verified                | ✅ 100% — docs/B/
+          |                                          | data_features_check.md
+  C       | Real-device test log                     | ✅ 100% — docs/C/
+          | (docs/C/device_test_log.md)              | device_test_log.md
+  C       | Bug fixes + summary for D                | ✅ 100% — 9 commits
+  D (You) | Dashboard redesign committed             | ✅ Done
+  D (You) | Failing test fixed                       | ✅ Done
+  D (You) | Evidence pack collected                  | ✅ Done (7 files)
+  D (You) | Progress report assembled and delivered   | ⬜ **YOU ARE HERE**
+          | (DEADLINE: November 1, 2026)             |
+
+================================================================================
+10. LONG-TERM ROADMAP (M2 + M3)
+================================================================================
+
+Phase 2 — M2: Presentation & Demo (Nov 2, 2026 → Jan 18, 2027)
+
+  November 2026:
+    - B: Deploy backend on school/demo machine (Docker or bare metal);
+      seed demo data; finalize deployment guide
+    - C: UX polish (loading states, empty states completed in M1 prep);
+      release APK v0.9 tested on a SECOND phone
+    - A: YOLO confidence/image-size experiments; robustness tests
+      (lighting, angle, glasses); finalize threshold configuration
+    - D: Polish dashboard (status colors, filters, print view);
+      report template for M2
+
+  December 2026 (PILOT CLASSROOM):
+    - Execute pilot with 5–10 real students
+    - A leads execution, B runs server, C supports app users,
+      D documents + observes + records video
+    - Post-pilot: triage all findings, fix top issues
+
+  January 1–17, 2027:
+    - D: Create slides, demo script, record demo video
+    - A: Dry-run integration test; freeze demo scope by Jan 15
+    - B: Stable demo environment + backup plan (offline demo data)
+    - C: Demo phone prepared (charged, app installed, camera tested)
+    - Two full dry runs before presentation date
+
+Phase 3 — M3: Final Submission (Jan 19 → Mar 18, 2027)
+
+  Jan 19 – Feb 15:
+    - Fix all pilot/demo findings
+    - B: Production hardening (CORS origins, TIMEZONE, upload caps, DB backup)
+    - C: Final app polish (icon/splash/name/versioning)
+    - A: Re-verify accuracy on final hardware; anti-spoofing limitation write-up
+    - D: Start assembling the final report
+
+  Feb 16 – Mar 1:
+    - Each member writes their final-report chapter → hands to D by Mar 1
+    - D compiles, A reviews the whole report
+
+  Mar 2 – 15 (CODE FREEZE Mar 2):
+    - Regression: 124 tests, smoke test, end-to-end pass on real device
+    - Release build v1.0 (APK + backend)
+    - Final repo cleanup (no stray logs/DBs)
+    - C: Rewrite mobile/README.md (still Flutter boilerplate)
+    - C: Write mobile app chapter for final report
+    - A: Write ML/backend chapter
+    - B: Write deployment chapter
+    - D: Write testing & conclusion chapter;
+        Assemble all chapters into final report document
+
+  Mar 16 – 18: Buffer. Final submission.
+
+================================================================================
+11. DESIGN DECISIONS (for the report's "Architecture" section)
+================================================================================
+
+[1] Why two-stage (start + end)?
+    To verify the student was present for the ENTIRE class, not just at the
+    beginning. A single selfie at the start (or end) cannot confirm the
+    student didn't leave early (or arrive late). Two stages + Wi-Fi presence
+    throughout the session provide stronger evidence.
+
+[2] Why face recognition + Wi-Fi, not just QR/barcode?
+    QR codes can be shared/photographed. Face recognition ties attendance to
+    an actual person present at the physical location. Combined with Wi-Fi
+    MAC check, the system provides multi-factor verification:
+    - Something you have (phone MAC)
+    - Something you are (face)
+    - Time and place constraints (schedule + AP)
+
+[3] Why polling (GET /me/prompt) instead of WebSocket?
+    WebSocket requires persistent connections and is harder to implement
+    reliably across mobile network transitions. Polling every 20 seconds
+    is simple, reliable, and lightweight (backend Wi-Fi scan caches ~10s,
+    so 20s is safe). WebSocket upgrade is planned as Tier 2.
+
+[4] Why threshold 0.5 and not 0.25 (optimizer's suggestion)?
+    The evaluation shows 0.25–0.65 band has FAR = FRR = 0.00. Choosing the
+    edge (0.25) risks false accepts with new students. The middle value 0.5
+    provides maximum buffer against distribution shifts — the safety margin
+    is [0.224, 0.708] = a 0.48-wide gap. Live testing on real device
+    (confidence 0.893, 0.688, 0.943) confirms 0.5 works in practice.
+
+[5] Why SQLite instead of PostgreSQL/MySQL?
+    The system is a classroom-scale deployment (tens of students, one machine).
+    SQLite requires zero configuration, no separate server process, and the
+    entire database is a single file that can be backed up by copying it.
+    Schema migrations use safe ALTER TABLE IF NOT EXISTS patterns.
+
+[6] Why no camera bypass in auto-prompt?
+    Ethics and honesty: The auto-prompt banner opens the camera — the student
+    must physically take a new selfie for every check-in. No "fake" check-in
+    path exists. Designed by team consensus.
+
+================================================================================
+12. KEY METRICS TO REPORT
+================================================================================
+
+Face Recognition:
+  - Model: InsightFace ArcFace buffalo_L (512-D embeddings)
+  - Detection: YOLOv8m-face (50 MB weights)
+  - Threshold: 0.5 (cosine similarity)
+  - Evaluation: 3 students, 15 samples, 30 genuine pairs, 75 impostor pairs
+  - Genuine min similarity: 0.708
+  - Impostor max similarity: 0.224
+  - FAR: 0.00, FRR: 0.00 at threshold 0.25–0.65
+  - Separation gap: 0.484 (safe)
+
+Wi-Fi Scan:
+  - Fresh scan time: ~2.4 seconds (254 addresses, /24 subnet)
+  - Cached scan: instant (60-second dedupe window)
+  - Limitation: campus Wi-Fi client isolation prevents device-to-device ARP
+
+Mobile App:
+  - Release APK size: 51.7 MB (tree-shaken icons: 99.8% reduction)
+  - Tested on: Samsung Galaxy S24, Android 16 (API 36)
+  - Flutter analyze: 0 issues
+  - Flutter test: all passed
+
+Backend:
+  - Python test suite: 139 passed, 1 skipped (3 warnings, Pydantic deprecation)
+  - Smoke test: 15/15 passed
+  - Container image: 3.4 GB (CPU-only torch)
+
+================================================================================
+13. WHAT D MUST STILL DO FOR M1
+================================================================================
+
+  [ ] Write the progress report (narrative document combining all inputs
+      from A, B, C + the evidence in docs/D/evidence/ + this prompt)
+  [ ] Deliver the report to the teacher/supervisor by November 1, 2026
+  [ ] TIP: start with the sample_report.txt in this same folder as a
+      template — customize it with real data, add your own writing tone,
+      and expand sections as needed
+
+================================================================================
+END OF PROMPT
+================================================================================
