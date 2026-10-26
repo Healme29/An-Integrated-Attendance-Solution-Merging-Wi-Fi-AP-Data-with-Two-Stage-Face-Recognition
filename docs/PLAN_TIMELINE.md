@@ -63,6 +63,38 @@
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-10-26 — C: REAL-DEVICE TEST PASSED (C1 core) + edge-case evidence + v0.9 prep; A: 3-student threshold re-run
+- **C1 PASSED on the real phone** (Samsung Galaxy S24, Android 16): install,
+  login (NIM), Settings + Test Connection, camera + selfie, **START →
+  `partial`**, END check, History — user-confirmed; details + environment
+  notes in `docs/C/device_test_log.md`.
+  - Connectivity path documented: campus WLAN blocks phone→PC HTTP
+    (firewall/AP isolation) → **`adb reverse tcp:8000 tcp:8000` + URL
+    `http://127.0.0.1:8000`**; Wi-Fi verification stays server-side (ping
+    sweep + ARP) and is unaffected. A laptop-clock drift of 8 h was also
+    found and fixed during testing (cause of all schedule 403s).
+- **Edge-case evidence (server-side, schedule id 18 `EDGE demo`):** fresh
+  held-out photo → 200 `partial` (0.893); duplicate same-stage second photo →
+  **409** ("Already checked in (start)"); same-photo replay → **409**;
+  Willian (no valid MAC) → `prompt:false,
+  reason:device_not_seen_on_network`. All logged in C's device log.
+- **C3 fix:** camera init failure previously showed an infinite spinner (+
+  latent `LateInitializationError` crash on dispose) — now error state with
+  instructions + **Retry** (`53ba44d`).
+- **C4/C5 prep:** friendly empty states for schedules & history (`de4a1bf`);
+  release prep v0.9.0+1 + new launcher icon in 5 densities (`c0ee76b`).
+  Release-side C5 next: `flutter build apk --release`, install on a SECOND
+  phone (Nov item).
+- **Handover review recorded:** `docs/C/review_7803d27.md` — prompt draft
+  accepted (spec-compliant). C2 summary finalized:
+  `docs/C/progress_summary_for_D.md` (the D-input that was due Oct 29 — done
+  early).
+- **A's M1 blocker cleared:** student #3 enrolled (5 embeddings from
+  `gambar_percobaan/orang_3`) → `evaluate_threshold.py` re-run with **3
+  students / 13 samples / 23 genuine + 55 impostor pairs**: FAR = FRR = 0.00
+  in the 0.25–0.65 band → **threshold kept 0.5** (decision note in
+  `docs/threshold_report.md`).
+
 ### 2026-10-25 — A (covering B): Docker deployment verified + seed script + compose fixes
 - **B3 done:** image builds and runs; `GET /health` OK; `TIMEZONE=Asia/Shanghai` applied;
   smoke test **15/15** against the container (and 15/15 against the native server).
