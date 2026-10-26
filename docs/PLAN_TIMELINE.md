@@ -93,7 +93,16 @@
   `gambar_percobaan/orang_3`) → `evaluate_threshold.py` re-run with **3
   students / 13 samples / 23 genuine + 55 impostor pairs**: FAR = FRR = 0.00
   in the 0.25–0.65 band → **threshold kept 0.5** (decision note in
-  `docs/threshold_report.md`).
+  `docs/threshold_report.md`). Later same day: student #3 renamed
+  **Latul (`F25040131`)** and Willian topped up to the full **5/5
+  embeddings** → re-run now **15 samples / 30 genuine / 75 impostor
+  pairs**, FAR = FRR = 0.00 at 0.25–0.65 — decision unchanged (0.5).
+- **D3 evidence pack collected** (`docs/D/evidence/`): pytest 139 passed
+  +1 skipped, smoke test **15/15**, `flutter analyze` clean, `flutter test`
+  pass, **release APK v0.9.0 (`app-release.apk`, 51.7 MB) built and
+  install-verified on the S24**; APK also pushed to
+  `Download/StudentAttendance-v0.9.0.apk` on the user's phone for sharing
+  with teammate Willian (no APK in git).
 
 ### 2026-10-25 — A (covering B): Docker deployment verified + seed script + compose fixes
 - **B3 done:** image builds and runs; `GET /health` OK; `TIMEZONE=Asia/Shanghai` applied;
