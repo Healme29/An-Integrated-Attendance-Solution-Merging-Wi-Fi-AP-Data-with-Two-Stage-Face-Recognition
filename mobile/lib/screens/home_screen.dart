@@ -343,6 +343,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ElevatedButton(onPressed: _loadSchedules, child: const Text("Retry")),
                         ],
                       )
+                    else if (_schedules.isEmpty)
+                      Column(
+                        children: [
+                          const Icon(Icons.event_busy, size: 44, color: Colors.grey),
+                          const SizedBox(height: 8),
+                          const Text(
+                            "No class schedules yet",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Ask your teacher to create a schedule first.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _loadSchedules,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text("Refresh"),
+                          ),
+                        ],
+                      )
                     else
                       DropdownButton<int>(
                         isExpanded: true,

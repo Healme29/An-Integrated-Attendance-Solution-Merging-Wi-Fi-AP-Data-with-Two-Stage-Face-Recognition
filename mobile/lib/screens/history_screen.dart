@@ -80,7 +80,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 )
               : _records.isEmpty
                   ? const Center(
-                      child: Text("No attendance records yet", style: TextStyle(color: Colors.grey)),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text(
+                            "No attendance records yet",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     )
                   : RefreshIndicator(
                       onRefresh: _loadHistory,
