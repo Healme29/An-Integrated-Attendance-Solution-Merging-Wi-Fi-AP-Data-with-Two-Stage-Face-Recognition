@@ -45,6 +45,27 @@
 
 ---
 
-## Entri M2 (tambahkan di bawah ini)
+## Entri M2
 
-<!-- Mulai dari sini. Entri pertama yang diharapkan: konfigurasi YOLO final (gate G3). -->
+### D-002 — Detection settings for the demo: keep conf 0.25, drop img size to 640
+- **Date:** 2026-11-01 · **Stage:** M2 stage 2 / gate G3
+- **Problem:** `YOLO_CONF_THRESHOLD=0.25` and `YOLO_IMG_SIZE=1280` were defaults nobody had
+  measured; we needed a defensible setting for enrollment, check-in and the demo.
+- **Options:** (1) keep 0.25/1280 — status quo, no measurement needed; (2) 0.25/640 — about
+  4× faster, unknown recall cost on distance; (3) 0.30/640 — fewer false positives, risk of
+  losing dim faces; (4) raise to 0.35/1280 — safest against false positives, slowest.
+- **Evidence:** `docs/A/yolo_tuning.md` — 52 original photos × 6 combinations. Detection
+  52/52 in every combination; conf 0.25/0.30/0.35 identical; 640 median 481 ms / p95
+  618 ms vs 1280 median 1816 ms / p95 1985 ms (3.8×); detected face height 594 px vs
+  582 px. On the 15 stored enrollment crops, 1280 produced nested duplicate boxes in 15/15
+  images, 640 in 0/15.
+- **Decision:** `YOLO_CONF_THRESHOLD=0.25` and `YOLO_IMG_SIZE=640`, applied as deployment
+  environment values for the demo/pilot machine. The code default in `config.py` stays 1280
+  until classroom-distance photos confirm 640 — changing a production default on 52
+  close-up selfies would be over-fitting.
+- **Consequences:** check-in spends ~1.3 s less in detection per photo; duplicate boxes
+  stop inflating enrollment embeddings. Counter-risk: distant faces at the back of the room
+  may be missed at 640 and were not measured here. A separate finding is now tracked: a
+  photo with two people still enrolls both faces (not fixed by this decision).
+- **Revisit by:** G7 (classroom enrollment photos) — decide whether enrollment needs a
+  higher `imgsz` than check-in; re-check at G10 with pilot numbers.

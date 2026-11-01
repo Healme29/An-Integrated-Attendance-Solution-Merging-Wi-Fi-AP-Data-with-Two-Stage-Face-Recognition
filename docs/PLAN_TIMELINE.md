@@ -299,6 +299,29 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-01 — A: G3 closed — YOLOv8-face measured; conf 0.25 + img size 640 chosen
+- New script `backend/scripts/yolo_tuning.py` calls the YOLO model directly with explicit
+  `conf`/`imgsz` (production code and its config import untouched). Grid: conf
+  0.25/0.30/0.35 × imgsz 640/1280 over the **52 original photos**
+  (`gambar_percobaan/orang_1..3`).
+- **Detection: 52/52 in all six combinations.** The confidence threshold changes nothing in
+  the 0.25–0.35 band on close-up well-lit selfies (mean confidence 0.893).
+- **`imgsz=1280` costs 3.8× for zero recall gain:** median 1816 ms vs 481 ms, p95
+  1985 ms vs 618 ms; detected face height 582 px vs 594 px (−2%).
+- **Side finding (duplicates):** on the 15 stored enrollment crops, 1280 produced nested
+  duplicate boxes in **15/15** images, 640 in **0/15**. `POST /faces/enroll` stores one
+  embedding per detected box, so one photo could burn 2–3 of the 5 embedding slots.
+- **Second finding (identity contamination):** 7 of the 52 photos genuinely contain two
+  people, and enrollment accepts every face in the frame — a friend in the photo gets
+  enrolled into that student's profile. Tracked as follow-up #2 in `docs/A/yolo_tuning.md`,
+  not fixed in this change.
+- **Decision D-002 recorded** (`docs/A/DECISIONS.md`): keep `YOLO_CONF_THRESHOLD=0.25`, set
+  `YOLO_IMG_SIZE=640` as a deployment env value. The code default in `config.py` stays 1280
+  until classroom-distance photos at G7 confirm 640.
+- Deliverables: `docs/A/yolo_tuning.md`, `backend/scripts/yolo_tuning.py`, D-002.
+- **Handover:** B sets `YOLO_IMG_SIZE=640` on the demo/pilot machine and records it in the
+  runbook (G1/G8).
+
 ### 2026-11-01 — A: M2 stage 1 closed — baseline green, no dangling branches
 - `python -m pytest backend/tests -q` → **140 passed** in 19.1 s (warnings only:
   pytest-asyncio loop-scope notice, pydantic v1-style config).
