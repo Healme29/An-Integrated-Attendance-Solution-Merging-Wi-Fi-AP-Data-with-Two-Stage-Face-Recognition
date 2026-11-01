@@ -299,6 +299,20 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-01 — A: M2 stage 1 closed — baseline green, no dangling branches
+- `python -m pytest backend/tests -q` → **140 passed** in 19.1 s (warnings only:
+  pytest-asyncio loop-scope notice, pydantic v1-style config).
+- Branch sweep: no unmerged branches on origin or locally; `origin/a` and `origin/task-c`
+  fully merged (`git log main..origin/a` empty). Legacy `tugas-a..d` (2026-09-17) untouched
+  — delete at M3 cleanup.
+- Working tree clean, `main` == `origin/main`.
+- Stage-2 environment verified: numpy 1.26.4, ultralytics 8.2.100, onnxruntime 1.18.1,
+  torch 2.14.0+cpu, cv2 4.12.0.
+- Stage-2 inputs ready: 52 photos (`gambar_percobaan/orang_1..3` = 17/21/14), 3 students
+  with stored embeddings (8, 9, 11), `yolov8m-face.pt` present.
+- Next: `backend/scripts/yolo_tuning.py` → conf 0.25/0.30/0.35 × img 640/1280 →
+  `docs/A/yolo_tuning.md` + D-002, closing **G3**.
+
 ### 2026-11-01 — M2 plan published: 16 gates + four large work packages + critical-thinking rules
 - **M1 closed out.** Progress report delivered today; baseline suite green (140/140 after
   the anti-cheat tests), threshold decision recorded at 0.5, Docker deployment verified,
