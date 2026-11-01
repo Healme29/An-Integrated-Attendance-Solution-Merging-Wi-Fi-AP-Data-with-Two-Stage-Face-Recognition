@@ -299,6 +299,38 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-01 — A: Package A evidence base — 640 default, clean profiles, robustness protocol, pilot plan
+- **Config default:** `YOLO_IMG_SIZE` in `backend/config.py` is now **640** (the owner approved
+  the flip after G3, D-002 update note). Env override stays for the G7 classroom
+  re-measurement. `docs/PROJECT_CONTEXT.md`, `docs/A/yolo_tuning.md` (recommendation +
+  follow-up #3) and `docs/A/DECISIONS.md` follow.
+- **Clean re-enrollment (D-004):** new `backend/scripts/reenroll_clean.py` — scan with the
+  same detect → dedupe → tiny-filter → distinct-people path as the API, reset rows/pickle/
+  crops, enroll through the real `POST /faces/enroll`, then verify. Backed up the DB,
+  embeddings and crops first. Rebuilt students 8/9/11: **5 embeddings each, every one from a
+  single-person photo**. `orang_1` 17/17 usable, `orang_3` 14/14, `orang_2` 17/21 — the 4
+  rejected photos had a second face at ratio **0.147–0.243** (same range as D-003).
+- **Contamination confirmed:** after the rebuild `evaluate_threshold.py` still reports 15
+  samples / 30 genuine / 75 impostor pairs, but FAR at threshold 0.15 dropped
+  **0.1733 → 0.0400** and at 0.20 **0.0400 → 0.0000**. The old profiles really contained
+  impostor-side data. Threshold decision unchanged at **0.5**.
+- **Robustness:** protocol `docs/A/robustness_test.md` — 5 conditions (bright, dim, angled,
+  glasses, mask) × 5 people × 3 frames, consent, isolated `DATABASE_PATH`/`DATA_DIR`,
+  pre-registered acceptance thresholds, metrics and decision rules. New
+  `backend/scripts/robustness_eval.py` mirrors the check-in path (multi-face rejection
+  included). Sanity run on the 52 existing selfies: 46 usable, 46 accepted, **0 false
+  accepts**, 4 multi-face (the known two-person photos), 2 no-embedding, p50 1069 ms. The
+  result tables stay `not measured yet` — P4/P5 and the five conditions are the blocker.
+- **Pilot:** `docs/A/pilot_plan.md` draft — dates/gates G4→G10, G7/G8 checklists, T−90..T+90
+  runbook, success metrics (linkage ≥ 90%, verified ≥ 80%, retry ≤ 15%, p50 ≤ 5 s), data
+  collection, failure matrix, roles, ethics. Roster/room/AP BSSID are placeholders until D
+  confirms G4 (Nov 22); enrollment in the real room is G7 (Nov 29).
+- **Repo hygiene:** `.gitignore` now excludes `robustness_captures/` and `docs/A/pilot/`
+  (face photos and signed forms stay out of git).
+- **Verification:** `python -m pytest backend/tests -q` → **153 passed**;
+  `smoke_test.py` against the live server → **15/15**; no production behaviour changed
+  besides the 640 detection default.
+
 ### 2026-11-01 — A: multi-face identity hole closed (D-003)
 - **Hole:** `/attendance/check` had no `student_id`, so the recorded student was whoever
   the detector saw. A photo of A+B could record B (and grant B attendance) while A got

@@ -19,6 +19,8 @@ backend/data/faces/
 
 # Experiment photos (do not commit face photos)
 gambar_percobaan/
+robustness_captures/
+docs/A/pilot/
 
 # Uvicorn runtime artifacts
 backend/uvicorn_*.log

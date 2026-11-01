@@ -44,3 +44,30 @@ the value already live-proven on the real device today (START `partial`
 - Suggested threshold: **0.25** (FAR 0.0000 / FRR 0.0000)
 - Approximate EER: **0.0000**
 - Current `FACE_SIMILARITY_THRESHOLD` env: **0.5**
+- Decision unchanged (see above): **0.5**.
+
+## Re-measurement after clean re-enrollment (2026-11-01)
+
+The three profiles were rebuilt by `backend/scripts/reenroll_clean.py` using only
+single-person photos (5 embeddings each), because the first enrollment stored every face in
+frame and could contain a friend's face (D-003). Same 15 samples / 30 genuine / 75 impostor
+pairs, new embeddings:
+
+| threshold | FAR | FRR | change vs first run |
+|---|---|---|---|
+| 0.10 | 0.3600 | 0.0000 | FAR 0.4267 → 0.3600 |
+| 0.15 | 0.0400 | 0.0000 | FAR 0.1733 → 0.0400 |
+| 0.20 | 0.0000 | 0.0000 | FAR 0.0400 → 0.0000 |
+| 0.25 – 0.65 | 0.0000 | 0.0000 | unchanged |
+| 0.70 | 0.0000 | 0.1000 | FRR 0.0333 → 0.1000 |
+| 0.75 | 0.0000 | 0.3333 | FRR 0.3667 → 0.3333 |
+| 0.80 | 0.0000 | 0.5333 | FRR 0.6000 → 0.5333 |
+| 0.85 | 0.0000 | 0.7333 | FRR 0.7333 → 0.7333 |
+| 0.90 | 0.0000 | 0.8667 | FRR 0.8667 → 0.8667 |
+
+The impostor tail moved down (FAR reaches 0 already at 0.20, not 0.25) while the genuine
+side stayed separated up to 0.65, so the clean profiles widened the safe band. The
+recommendation minimum drops from 0.25 to 0.20, but the decision does not change:
+**0.5 stays**, because the band is wide and the deployed value is the live-proven one. This
+re-measurement is evidence that contamination was real, not a reason to re-tune.
+

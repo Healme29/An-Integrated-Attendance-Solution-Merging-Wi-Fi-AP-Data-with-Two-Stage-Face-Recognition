@@ -6,9 +6,9 @@
 
 ## Question
 
-The service runs with `YOLO_CONF_THRESHOLD=0.25` and `YOLO_IMG_SIZE=1280` by default
-(`backend/config.py`). Nobody had measured what those two numbers cost or buy. Two
-questions:
+The service ran with `YOLO_CONF_THRESHOLD=0.25` and `YOLO_IMG_SIZE=1280` by default
+(`backend/config.py`) when this measurement was taken. Nobody had measured what those two
+numbers cost or buy. Two questions:
 
 1. Does raising the confidence threshold lose faces?
 2. What does `imgsz=1280` buy compared with `imgsz=640`, and what does it cost in latency?
@@ -93,10 +93,11 @@ one person.
 | `YOLO_CONF_THRESHOLD` | **0.25** | No recall difference in the 0.25–0.35 band; keep the value that maximises recall for distant or dim classroom faces |
 | `YOLO_IMG_SIZE` | **640** for check-in and enrollment | Identical detection on all 52 photos, 3.8× lower latency, and no duplicate boxes on small inputs |
 
-Set it as a deployment env value (`YOLO_IMG_SIZE=640`) on the demo/pilot machine. The code
-default in `backend/config.py` stays 1280 until the pilot measurement below confirms 640 on
-classroom-distance photos — changing a production default on 52 close-up selfies would be
-over-fitting.
+Set it as the `config.py` default (`YOLO_IMG_SIZE=640`) and keep the env override for the
+pilot machine. The default was 1280 when this was measured; the owner approved the flip on
+2026-11-01 after reviewing the table above. Gate G7 still re-measures 640 vs 1280 on
+classroom-distance photos before the pilot — a 640 default is not a claim that 640 is right
+for faces 30–80 px tall, only that 1280 is not paying for itself on selfies.
 
 ## Known limits of this measurement
 
@@ -115,7 +116,7 @@ over-fitting.
 |---|------|-------|------|
 | 1 | Re-run this benchmark on classroom photos (distant faces) and decide whether enrollment needs a different `imgsz` than check-in | A | G7, before the pilot |
 | 2 | ~~Deduplicate detector output (merge nested boxes) or enroll only the largest face, so one photo cannot consume several embedding slots~~ **Done 2026-11-01** (D-003: dedupe + single-face enrollment) | A | closed |
-| 3 | Set `YOLO_IMG_SIZE=640` in the demo/pilot environment and record it in the runbook | B (with A) | G1/G8 |
+| 3 | Confirm `YOLO_IMG_SIZE=640` (now the code default) on the demo/pilot machine and record it in the runbook | B (with A) | G1/G8 |
 
 ## Reproduction
 

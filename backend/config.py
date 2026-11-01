@@ -10,7 +10,9 @@ DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "attendance.db"))
 
 YOLO_MODEL_PATH = MODELS_DIR / "yolov8m-face.pt"
 YOLO_CONF_THRESHOLD = float(os.getenv("YOLO_CONF_THRESHOLD", "0.25"))
-YOLO_IMG_SIZE = int(os.getenv("YOLO_IMG_SIZE", "1280"))
+# 640 measured at 3.8x the speed of 1280 with identical detection on 52 photos
+# (D-002); env override kept for the G7 classroom re-measurement.
+YOLO_IMG_SIZE = int(os.getenv("YOLO_IMG_SIZE", "640"))
 
 # Two detector boxes belong to the same face when their intersection covers
 # at least this fraction of the smaller box. Containment, not plain IoU:

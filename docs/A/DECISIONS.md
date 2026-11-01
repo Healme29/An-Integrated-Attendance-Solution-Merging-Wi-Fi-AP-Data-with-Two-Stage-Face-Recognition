@@ -67,6 +67,10 @@
   stop inflating enrollment embeddings. Counter-risk: distant faces at the back of the room
   may be missed at 640 and were not measured here. A separate finding is now tracked: a
   photo with two people still enrolls both faces (not fixed by this decision).
+- **Update (2026-11-01, same day):** the owner approved flipping the code default to
+  `YOLO_IMG_SIZE=640` as well, so a machine where nobody sets env values still runs the
+  measured setting. The env override stays for G7. This does not change the counter-risk
+  above: G7 must still measure 640 vs 1280 on classroom-distance faces.
 - **Revisit by:** G7 (classroom enrollment photos) — decide whether enrollment needs a
   higher `imgsz` than check-in; re-check at G10 with pilot numbers.
 
@@ -112,7 +116,51 @@
   of that friend (Wi-Fi then requires the friend's device on the classroom network). This
   fix closes accidental and obvious impersonation, not a colluding pair; real prevention
   needs an authenticated session, which is out of scope for M2 and recorded for M3.
+- **Update (2026-11-01, same day):** the contaminated demo profiles were rebuilt with
+  `backend/scripts/reenroll_clean.py`, which classifies every source photo with the same
+  detect → dedupe → tiny-filter → distinct-people path as the API, deletes the old
+  rows/pickle/crops, and enrolls through `POST /faces/enroll`. Result: students 8, 9 and 11
+  each ended with exactly 5 embeddings, and all 15 came from single-person photos
+  (`orang_1` 17/17 usable, `orang_2` 17/21 usable — the 4 rejected photos had a second face
+  at ratio 0.147–0.243, `orang_3` 14/14 usable). `docs/threshold_report.md` shows the
+  impostor tail moving down after the rebuild (FAR 0.1733 → 0.0400 at threshold 0.15,
+  0.0400 → 0.0000 at 0.20), which is direct evidence that the old profiles were
+  contaminated. Deployment on real students is still G7.
 - **Revisit by:** G7 (classroom photos, more faces at distance) and G10 (pilot logs: count
   of 400 "multiple faces" and 403 "identity mismatch"; raise/lower the 0.10 ratio if either
   is too frequent).
+
+### D-004 — Rebuild demo profiles from scratch instead of topping them up
+- **Date:** 2026-11-01 · **Stage:** M2 stage 3 / cleanup after D-003
+- **Problem:** students 8, 9 and 11 were enrolled before D-003, so their 5 stored embeddings
+  may include a friend's face. How do we make the demo profiles trustworthy without losing
+  the students, their attendance history or the dashboard rows?
+- **Options:** (1) top up to 5 with clean photos — impossible under the cap without deleting
+  something, and there is no way to tell which stored embedding belongs to the friend;
+  (2) delete all faces rows, pickle and crops, then re-enroll only single-person photos —
+  provable result, but it destroys the old embeddings; (3) create new student records —
+  clean profiles, but attendance history, dashboard names and NIMs split in two;
+  (4) leave the profiles until G7 — zero work, but the demo and any threshold re-measurement
+  would keep using possibly contaminated data.
+- **Evidence:** `backend/scripts/reenroll_clean.py` classifies every source photo with the
+  same path as the API and found `orang_2` **17/21 usable**, with 4 photos rejected for a
+  second face at ratio **0.147–0.243** (the same range as D-003). A real top-up is therefore
+  not possible without deleting rows, which confirms option 1 is not safe. After the rebuild:
+  students 8/9/11 each have exactly **5 rows = 5 pickle entries = 5 crops**, all from
+  single-person photos. `docs/threshold_report.md` re-measurement: FAR at 0.15 dropped
+  **0.1733 → 0.0400** and at 0.20 **0.0400 → 0.0000** with the same 15 samples, i.e. the old
+  profiles really were contaminated. Attendance history is unaffected because rows reference
+  `student_id`, not `faces.id`.
+- **Decision:** option 2. Back up `attendance.db`, `backend/data/embeddings/` and
+  `backend/data/faces/` first, reset the three profiles, re-enroll 5 accepted photos each
+  through the real `POST /faces/enroll` endpoint, and verify count equality. The script stays
+  in the repo for the G7 classroom enrollment and for any future suspected contamination.
+- **Consequences:** the old embeddings are gone from the live profile (kept in the local
+  backup only), so earlier per-photo scores cannot be recomputed without restoring that
+  backup. The demo now uses profiles that provably contain one face per photo. This does not
+  fix contamination for real students; G7 still re-enrolls the pilot group from scratch.
+- **Revisit by:** G7 — repeat the same script for the pilot roster, and re-run it if a profile
+  ever produces a suspicious false accept.
+
+---
 

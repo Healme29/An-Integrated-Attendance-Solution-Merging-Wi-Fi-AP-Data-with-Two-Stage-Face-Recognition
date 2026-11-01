@@ -189,7 +189,7 @@ project-root/
 | `FACE_SIMILARITY_THRESHOLD` | `0.5` | Cosine match threshold (to be tuned by A) |
 | `INSIGHTFACE_MODEL` | `buffalo_l` | Recognition model pack |
 | `YOLO_CONF_THRESHOLD` | `0.25` | Detection confidence |
-| `YOLO_IMG_SIZE` | `1280` | Detection input size |
+| `YOLO_IMG_SIZE` | `640` | Detection input size (D-002; 1280 only via env for re-measurement) |
 | `ATTENDANCE_CHECK_WINDOW_MINUTES` | `15` | Grace period around class time |
 | `WI_FI_SUBNET` | *(unset → auto-detect)* | Subnet to scan |
 | `WI_FI_SCAN_TIMEOUT` | `3` | Seconds |
