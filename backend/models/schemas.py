@@ -49,6 +49,9 @@ class AttendanceResponse(BaseModel):
     status: str
     timestamp: datetime
     class_name: Optional[str] = None
+    # Raw YOLO box count at check-in. Kept for audit: a value > 1 means the
+    # detector saw more than one box, even when it was one face duplicated.
+    faces_detected: int = 0
 
     class Config:
         from_attributes = True

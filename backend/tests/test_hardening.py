@@ -285,7 +285,7 @@ class TestHistoryPagination:
                 "room": f"Room {100 + i}",
             })
             client.post(
-                f"/attendance/check?schedule_id={i + 1}&check_type=start",
+                f"/attendance/check?student_id=1&schedule_id={i + 1}&check_type=start",
                 files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
             )
 

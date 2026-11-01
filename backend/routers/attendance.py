@@ -11,27 +11,58 @@ router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 @router.post("/check", response_model=AttendanceResponse)
 async def check_attendance(
+    student_id: int,
     schedule_id: int,
     check_type: str,
     file: UploadFile = File(...)
 ):
+    """Two-stage check-in for the logged-in student.
+
+    `student_id` is the account that is signed in on the phone. It is not
+    trusted on its own: the uploaded selfie must match that same student. This
+    closes the "friend's face in front of my camera" hole (see D-003).
+    """
     if check_type not in ("start", "end"):
         raise HTTPException(status_code=400, detail="check_type must be 'start' or 'end'")
+
+    db = await get_db()
+    cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
+    student_row = await cursor.fetchone()
+    await db.close()
+    if not student_row:
+        raise HTTPException(status_code=404, detail="Student not found")
 
     contents = await file.read()
     sha = fingerprint(contents)
     recognition = await recognize_face(contents)
 
     if not recognition["recognized"]:
+        reason = recognition.get("reason", "unknown")
+        if reason == "multiple_faces_detected":
+            raise HTTPException(
+                status_code=400,
+                detail="Multiple faces detected. Take a selfie alone, with only "
+                       "your own face in frame."
+            )
         raise HTTPException(
             status_code=400,
-            detail=f"Face not recognized: {recognition.get('reason', 'unknown')}"
+            detail=f"Face not recognized: {reason}"
+        )
+
+    # Identity binding: the face must belong to the account that is logged in.
+    # Without this, the endpoint would happily mark the person the camera sees
+    # (a friend holding the phone), not the student who signed in.
+    if recognition["student_id"] != student_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Identity mismatch: the face in this photo does not belong "
+                   "to the logged-in student. Refusing to record attendance."
         )
 
     # Capture-replay tripwire: the exact same photo file may only be accepted
     # once per day per student (blocks shared-file identity swaps).
     try:
-        assert_not_replayed(sha, recognition["student_id"])
+        assert_not_replayed(sha, student_id)
     except ValueError:
         raise HTTPException(
             status_code=409,
@@ -56,10 +87,11 @@ async def check_attendance(
 
     try:
         result = await mark_attendance(
-            student_id=recognition["student_id"],
+            student_id=student_id,
             schedule_id=schedule_id,
             check_type=check_type,
-            confidence=recognition["confidence"]
+            confidence=recognition["confidence"],
+            faces_detected=recognition.get("faces_detected", 0),
         )
     except ValueError as e:
         reason = str(e)
@@ -114,7 +146,7 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
     query = """
         SELECT a.id, a.timestamp, a.check_type, a.confidence, a.wifi_verified, a.status,
                a.student_id, st.name AS student_name, st.nim,
-               a.schedule_id, s.class_name, s.room
+               a.schedule_id, s.class_name, s.room, a.faces_detected
         FROM attendance a
         LEFT JOIN students st ON a.student_id = st.id
         LEFT JOIN schedules s ON a.schedule_id = s.id
@@ -134,14 +166,17 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
     writer = csv.writer(output)
     writer.writerow([
         "id", "timestamp", "check_type", "confidence", "wifi_verified", "status",
-        "student_id", "student_name", "nim", "schedule_id", "class_name", "room"
+        "student_id", "student_name", "nim", "schedule_id", "class_name", "room",
+        "faces_detected"
     ])
     for row in rows:
         record = dict(row)
         record["wifi_verified"] = "yes" if record["wifi_verified"] else "no"
+        record["faces_detected"] = record.get("faces_detected") or 0
         writer.writerow([record.get(col, "") for col in [
             "id", "timestamp", "check_type", "confidence", "wifi_verified", "status",
-            "student_id", "student_name", "nim", "schedule_id", "class_name", "room"
+            "student_id", "student_name", "nim", "schedule_id", "class_name", "room",
+            "faces_detected"
         ]])
 
     filename = f"attendance_{date}" + (f"_schedule{schedule_id}" if schedule_id is not None else "") + ".csv"

@@ -1,7 +1,7 @@
 from datetime import datetime, time, timedelta
 from models.database import get_db
 from services.face_recognition import get_embedding, compare_faces, is_match, load_embeddings
-from services.face_detection import detect_faces_from_bytes
+from services.face_detection import detect_faces_from_bytes, dedupe_faces, distinct_people
 from services.wifi_scanner import check_mac_on_network, get_current_bssid, is_same_bssid
 from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
 
@@ -69,22 +69,46 @@ async def get_existing_check(student_id: int, schedule_id: int, check_type: str)
     return dict(row) if row else None
 
 
-async def recognize_face(image_bytes: bytes) -> dict:
-    """Detect and recognize a face from image bytes."""
+async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -> dict:
+    """Detect and recognize one face from image bytes.
+
+    The photo must contain exactly one person. Multiple detector boxes for the
+    same face (nested boxes) are merged first; a genuinely different second
+    face is rejected with `multiple_faces_detected` so a photo of a friend can
+    never be used to check someone else in. When several faces are present the
+    largest box is used, not the most confident one: a face close to the
+    camera is the person taking the selfie.
+
+    Returns `faces_detected` (raw detector boxes) so callers can audit what the
+    model saw.
+    """
     from utils.helpers import image_bytes_to_array
 
     image = image_bytes_to_array(image_bytes)
     if image is None:
         return {"recognized": False, "reason": "invalid_image"}
 
-    faces = detect_faces_from_bytes(image_bytes)
-    if not faces:
+    detected = detect_faces_from_bytes(image_bytes)
+    if not detected:
         return {"recognized": False, "reason": "no_face_detected"}
 
-    best_face = max(faces, key=lambda f: f["confidence"])
-    embedding = get_embedding(image, best_face["bbox"])
+    faces = dedupe_faces(detected)
+    people = distinct_people(faces)
+    if enforce_single_face and len(people) > 1:
+        return {
+            "recognized": False,
+            "reason": "multiple_faces_detected",
+            "faces_detected": len(detected),
+        }
+
+    primary = faces[0]
+    embedding = get_embedding(image, primary["bbox"])
     if embedding is None:
-        return {"recognized": False, "reason": "embedding_extraction_failed"}
+        return {
+            "recognized": False,
+            "reason": "embedding_extraction_failed",
+            "faces_detected": len(detected),
+        }
 
     from models.database import get_db
     db = await get_db()
@@ -110,12 +134,23 @@ async def recognize_face(image_bytes: bytes) -> dict:
             "recognized": True,
             "student_id": best_match["id"],
             "student_name": best_match["name"],
-            "confidence": best_score
+            "confidence": best_score,
+            "faces_detected": len(detected),
         }
-    return {"recognized": False, "reason": "no_match"}
+    return {
+        "recognized": False,
+        "reason": "no_match",
+        "faces_detected": len(detected),
+    }
 
 
-async def mark_attendance(student_id: int, schedule_id: int, check_type: str, confidence: float) -> dict:
+async def mark_attendance(
+    student_id: int,
+    schedule_id: int,
+    check_type: str,
+    confidence: float,
+    faces_detected: int = 0,
+) -> dict:
     """Mark attendance with two-stage (start/end) pairing.
 
     Rules:
@@ -124,6 +159,7 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
     - 'start' is recorded with status 'partial' until the 'end' check arrives.
     - 'end' finalizes the pair: 'verified' when Wi-Fi is confirmed on both,
       otherwise 'face_only'. The start row is updated to the final status.
+    - `faces_detected` is the raw detector box count, stored for audit.
     """
     duplicate = await get_existing_check(student_id, schedule_id, check_type)
     if duplicate:
@@ -165,9 +201,9 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
     # which would break DATE() comparisons against local class days).
     timestamp = now_local().strftime("%Y-%m-%d %H:%M:%S")
     await db.execute(
-        """INSERT INTO attendance (student_id, schedule_id, check_type, confidence, wifi_verified, status, timestamp)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (student_id, schedule_id, check_type, confidence, int(wifi_verified), status, timestamp)
+        """INSERT INTO attendance (student_id, schedule_id, check_type, confidence, wifi_verified, status, timestamp, faces_detected)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (student_id, schedule_id, check_type, confidence, int(wifi_verified), status, timestamp, faces_detected)
     )
 
     if check_type == "end":
@@ -195,5 +231,6 @@ async def mark_attendance(student_id: int, schedule_id: int, check_type: str, co
         "confidence": confidence,
         "wifi_verified": wifi_verified,
         "status": status,
+        "faces_detected": faces_detected,
         "timestamp": timestamp
     }

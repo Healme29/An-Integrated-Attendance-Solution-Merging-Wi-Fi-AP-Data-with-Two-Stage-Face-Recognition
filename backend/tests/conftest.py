@@ -63,6 +63,7 @@ async def create_test_db():
             wifi_verified INTEGER DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'pending',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            faces_detected INTEGER DEFAULT 0,
             FOREIGN KEY (student_id) REFERENCES students(id),
             FOREIGN KEY (schedule_id) REFERENCES schedules(id)
         );

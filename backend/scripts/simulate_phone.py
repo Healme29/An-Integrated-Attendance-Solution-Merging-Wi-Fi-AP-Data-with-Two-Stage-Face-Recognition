@@ -140,7 +140,8 @@ def main():
             photo = find_photo(args.photo_dir, held)
             print(f"  [camera] sending held-out photo: {photo.name}")
             result = post_multipart(
-                f"/attendance/check?schedule_id={p['schedule_id']}&check_type={stage}",
+                f"/attendance/check?student_id={args.student_id}"
+                f"&schedule_id={p['schedule_id']}&check_type={stage}",
                 photo,
             )
             print(f"  [RESULT] {result['student_name']} | {result['check_type'].upper()} "

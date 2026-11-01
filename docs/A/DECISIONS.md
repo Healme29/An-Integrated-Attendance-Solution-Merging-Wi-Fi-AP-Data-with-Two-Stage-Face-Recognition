@@ -69,3 +69,50 @@
   photo with two people still enrolls both faces (not fixed by this decision).
 - **Revisit by:** G7 (classroom enrollment photos) — decide whether enrollment needs a
   higher `imgsz` than check-in; re-check at G10 with pilot numbers.
+
+### D-003 — Bind check-in to the logged-in student; one photo, one face
+- **Date:** 2026-11-01 · **Stage:** M2 stage 3 / pre-G7 security fix
+- **Problem:** `POST /attendance/check` had no `student_id`, so the student was decided
+  purely by the face in the photo (`max(faces, key=confidence)`). If student A's phone sent
+  a photo containing A and friend B, the server could record B (and grant B attendance if
+  B's device was on the classroom network), while A got nothing and no error. Separately,
+  `POST /faces/enroll` stored one embedding per detected face, so a friend in the frame was
+  enrolled into the owner's profile.
+- **Options:** (1) status quo — zero work, hole stays and is trivially demonstrable;
+  (2) bind the check to the signed-in `student_id` and reject a face that matches somebody
+  else (403) — small change, closes impersonation, but a two-person photo still has to pick
+  one face; (3) reject any photo with more than one detected box — one rule, but nested
+  duplicate boxes would block legitimate selfies (15/15 cropped enrollment inputs);
+  (4) enroll only the largest face and silently ignore the rest — stops profile
+  contamination but hides the mistake from the student; (5) combine 2 + dedupe +
+  significance filter + one-face enrollment + audit column.
+- **Evidence:** Code path before the change: `backend/services/attendance.py:84` and
+  `backend/routers/faces.py:80-91`. 7 of the 52 original photos really contain two people
+  (`docs/A/yolo_tuning.md`). Measured on those photos at conf 0.25 / imgsz 640: second-face
+  area relative to the largest = **0.147–0.243** for a real second person and
+  **0.007–0.028** for background faces, so a 0.10 threshold separates them with margin.
+  Nested duplicate boxes: **1 box in 1 of 52** original photos, but **15/15** cropped
+  enrollment inputs — dedupe is required before "more than one face" can be trusted.
+  After the change: 13 new tests (`backend/tests/test_identity_binding.py`), full suite
+  **153 passed**.
+- **Decision:** Implement option 5. `student_id` is a required query parameter; the
+  recognized face must equal it (403 "Identity mismatch"), and an unknown student is 404.
+  Detector boxes are deduplicated by containment (intersection / smaller area ≥ 0.6), and
+  a second face with ≥ 10% of the largest face's area is rejected with 400 "Multiple faces
+  detected" at both check-in and enrollment. Enrollment stores exactly one embedding (the
+  largest face). `attendance.faces_detected` stores the raw box count for audit.
+- **Consequences:** every client must send `student_id` (Flutter app, demo simulator, smoke
+  test, phone simulator updated). A student photographed with a friend now gets a clear
+  rejection and must retake the selfie alone; a distant bystander does not block a normal
+  selfie. Existing enrolled profiles may still contain a friend's embeddings from before
+  this fix (7/52 source photos had two people), so re-enrollment is required before the
+  pilot. The 0.10 threshold is measured on 3 people only. **Honest limitation:** the
+  endpoint has no session token, so `student_id` is claimed, not proven; a determined pair
+  could still do a "buddy check-in" by sending the friend's id together with a fresh photo
+  of that friend (Wi-Fi then requires the friend's device on the classroom network). This
+  fix closes accidental and obvious impersonation, not a colluding pair; real prevention
+  needs an authenticated session, which is out of scope for M2 and recorded for M3.
+- **Revisit by:** G7 (classroom photos, more faces at distance) and G10 (pilot logs: count
+  of 400 "multiple faces" and 403 "identity mismatch"; raise/lower the 0.10 ratio if either
+  is too frequent).
+

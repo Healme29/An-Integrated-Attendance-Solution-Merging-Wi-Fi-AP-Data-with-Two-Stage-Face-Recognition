@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from models.schemas import FaceEnrollResponse, RecognizeResponse
 from models.database import get_db
-from services.face_detection import detect_faces_from_bytes
+from services.face_detection import (
+    detect_faces_from_bytes,
+    dedupe_faces,
+    distinct_people,
+)
 from services.face_recognition import get_embedding, save_embeddings, load_embeddings
 from utils.helpers import image_bytes_to_array
 from datetime import datetime
@@ -57,12 +61,24 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
     if image is None:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
-    faces = detect_faces_from_bytes(contents)
-    faces, had_faces = filter_tiny_faces(faces)
+    detected = detect_faces_from_bytes(contents)
+    faces, had_faces = filter_tiny_faces(dedupe_faces(detected))
     if not faces:
         if had_faces:
             raise HTTPException(status_code=400, detail="Detected face is too small in the image")
         raise HTTPException(status_code=400, detail="No face detected in image")
+
+    # One photo, one student. A friend in the frame must not end up in this
+    # student's profile: their embedding would later authenticate them as the
+    # owner (D-003). Duplicate boxes of the same face were already merged.
+    people = distinct_people(faces)
+    if len(people) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Multiple faces detected. Enroll alone, with only your own "
+                   "face in the photo."
+        )
+    face = people[0]
 
     db = await get_db()
     cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
@@ -77,13 +93,11 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
     FACES_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    for i, face in enumerate(faces):
-        emb = get_embedding(image, face["bbox"])
-        if emb is None:
-            continue
+    emb = get_embedding(image, face["bbox"])
+    if emb is not None:
         new_embeddings.append(emb)
 
-        image_path = FACES_DIR / f"student_{student_id}_{timestamp}_{i}.jpg"
+        image_path = FACES_DIR / f"student_{student_id}_{timestamp}_0.jpg"
         x1, y1, x2, y2 = [int(v) for v in face["bbox"]]
         h, w = image.shape[:2]
         crop = image[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
@@ -116,7 +130,7 @@ async def enroll_face(student_id: int, file: UploadFile = File(...)):
         message="Face enrolled successfully",
         student_id=student_id,
         face_count=len(new_embeddings),
-        faces_detected=len(faces),
+        faces_detected=len(detected),
         total_embeddings=len(all_embeddings)
     )
 

@@ -50,8 +50,10 @@ Nilai `reason` yang mungkin saat `prompt=false`:
    dengan parameter `student`, `schedule_id`, `check_type` (parameter yang sama
    seperti tombol manual yang sudah ada — reuse flow camera & service).
 3. **Navigasi otomatis**: setelah tombol Ya, lanjutkan alur kamera lama
-   (`camera screen` → POST `/attendance/check`) — endpoint & validasi TIDAK
-   berubah. Jangan pernah bypass kamera manual (kunci UX jujur).
+   (`camera screen` → POST `/attendance/check`) — validasi tetap sama. The
+   endpoint now also requires the logged-in `student_id` query parameter, so
+   the face must match the account that is signed in. Jangan pernah bypass
+   kamera manual (kunci UX jujur).
 4. **Settings**: tambah field "Auto check-in (on/off)" default ON — kuesioner
    etika: kamera tidak boleh membuka semuanya tanpa satu konfirmasi tap siswa.
 5. **Error handling**: server down / timeout → sembunyikan banner; coba lagi

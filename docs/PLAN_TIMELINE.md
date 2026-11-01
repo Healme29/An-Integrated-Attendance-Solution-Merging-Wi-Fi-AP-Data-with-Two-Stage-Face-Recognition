@@ -299,6 +299,31 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-01 — A: multi-face identity hole closed (D-003)
+- **Hole:** `/attendance/check` had no `student_id`, so the recorded student was whoever
+  the detector saw. A photo of A+B could record B (and grant B attendance) while A got
+  nothing and no error. Enrollment stored every face in frame, so a friend could be
+  enrolled into someone else's profile.
+- **Check-in fix:** `student_id` is now a required query parameter; the matched face must
+  equal it, otherwise **403 "Identity mismatch"** and no row. Unknown student → 404.
+- **Multi-face fix:** detector boxes are deduplicated first (containment ≥ 0.6; 15/15
+  cropped inputs produced nested duplicates, 1/52 originals). A second face with ≥ 10% of
+  the largest face's area → **400 "Multiple faces detected"**. Measured separation: real
+  second person 0.147–0.243, background faces 0.007–0.028.
+- **Enrollment fix:** stores exactly one embedding (the largest distinct face) and rejects
+  photos with two people.
+- **Audit:** new column `attendance.faces_detected` (raw box count) + migration, returned
+  by the API and included in the CSV export.
+- **Clients updated:** `mobile/lib/services/api_service.dart`, `camera_screen.dart`,
+  `home_screen.dart`; `backend/scripts/smoke_test.py`, `simulate_phone.py`;
+  `docs/A/demo/auto_prompt_simulator.html`.
+- **Tests:** new `backend/tests/test_identity_binding.py` (13 tests) → full suite
+  **153 passed**.
+- **Follow-ups:** re-enroll all demo students at G7 (pre-fix profiles may contain a
+  friend's embeddings); re-check the 0.10 ratio with classroom photos; count 400/403 in
+  pilot logs at G10. **Known limit:** no session token yet, so `student_id` is claimed, not
+  proven — a colluding pair could still swap identities (M3: authenticated session).
+
 ### 2026-11-01 — A: G3 closed — YOLOv8-face measured; conf 0.25 + img size 640 chosen
 - New script `backend/scripts/yolo_tuning.py` calls the YOLO model directly with explicit
   `conf`/`imgsz` (production code and its config import untouched). Grid: conf

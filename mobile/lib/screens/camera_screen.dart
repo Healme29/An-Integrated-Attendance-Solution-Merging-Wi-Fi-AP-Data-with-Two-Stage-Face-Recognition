@@ -6,11 +6,13 @@ import '../services/api_service.dart';
 import 'attendance_screen.dart';
 
 class CameraScreen extends StatefulWidget {
+  final int studentId;
   final int scheduleId;
   final String checkType;
 
   const CameraScreen({
     super.key,
+    required this.studentId,
     required this.scheduleId,
     required this.checkType,
   });
@@ -58,6 +60,7 @@ class _CameraScreenState extends State<CameraScreen> {
       await picture.saveTo(filePath);
 
       final result = await ApiService.checkAttendance(
+        studentId: widget.studentId,
         scheduleId: widget.scheduleId,
         checkType: widget.checkType,
         imageFile: File(filePath),

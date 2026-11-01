@@ -21,15 +21,16 @@ Recognition."** Member C is an experienced "vibe coder" who owns the Flutter mob
 - Backend the app talks to (FastAPI, running on the team PC):
   - `GET /students/?nim=` → login lookup
   - `POST /faces/enroll?student_id=` → multipart image upload
-  - `POST /attendance/check?schedule_id=&check_type=start|end` → returns
+  - `POST /attendance/check?student_id=&schedule_id=&check_type=start|end` → returns
     `{id, student_id, student_name, schedule_id, check_type, confidence, wifi_verified,
-    status, timestamp}`; statuses: `partial` (start ok), `verified` (start+end+Wi-Fi),
-    `face_only` (start+end, no Wi-Fi)
+    status, timestamp, faces_detected}`; statuses: `partial` (start ok), `verified`
+    (start+end+Wi-Fi), `face_only` (start+end, no Wi-Fi)
   - `GET /attendance/student/{id}` → history with `limit`/`offset`, total in
     `X-Total-Count`
   - Errors use HTTP codes: 409 duplicate/missing-start, 403 outside class time/wrong
-    day, 404 unknown schedule, 413 too large — the app must show the backend `detail`
-    message, not crash.
+    day, 403 identity mismatch (face does not match the logged-in student), 400 multiple
+    faces in the frame, 404 unknown schedule/student, 413 too large — the app must show
+    the backend `detail` message, not crash.
 - Server URL on a real phone is `http://<PC-LAN-IP>:8000` (`10.0.2.2` only works in the
   Android emulator). Phone and PC must share the Wi-Fi network.
 - Backend tests must stay green (they are owned by the backend members):

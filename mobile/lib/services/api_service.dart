@@ -136,13 +136,14 @@ class ApiService {
   }
 
   static Future<AttendanceResult> checkAttendance({
+    required int studentId,
     required int scheduleId,
     required String checkType,
     required File imageFile,
   }) async {
     final data = await _send(
       "POST",
-      "/attendance/check?schedule_id=$scheduleId&check_type=$checkType",
+      "/attendance/check?student_id=$studentId&schedule_id=$scheduleId&check_type=$checkType",
       imageFile: imageFile,
     );
     return AttendanceResult.fromJson(data);

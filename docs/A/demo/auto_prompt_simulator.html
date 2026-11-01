@@ -333,7 +333,8 @@ async function sendCheckIn(p, blob, name) {
   try {
     const fd = new FormData();
     fd.append("file", blob, name);
-    const res = await fetch(BASE + "/attendance/check?schedule_id=" + p.schedule_id + "&check_type=" + type,
+    const res = await fetch(BASE + "/attendance/check?student_id=" + state.studentId +
+                            "&schedule_id=" + p.schedule_id + "&check_type=" + type,
                             { method: "POST", body: fd });
     const j = await res.json();
     const box = document.getElementById("lastResult");

@@ -12,6 +12,17 @@ YOLO_MODEL_PATH = MODELS_DIR / "yolov8m-face.pt"
 YOLO_CONF_THRESHOLD = float(os.getenv("YOLO_CONF_THRESHOLD", "0.25"))
 YOLO_IMG_SIZE = int(os.getenv("YOLO_IMG_SIZE", "1280"))
 
+# Two detector boxes belong to the same face when their intersection covers
+# at least this fraction of the smaller box. Containment, not plain IoU:
+# nested duplicate boxes at imgsz=1280 reach IoU 0.70 but containment ~1.0.
+FACE_DUPLICATE_IO_MIN = float(os.getenv("FACE_DUPLICATE_IO_MIN", "0.6"))
+
+# A second face whose area is at least this fraction of the largest face is
+# treated as a second person in frame, not background noise. Measured on the
+# project photos: genuine second people score 0.147-0.243, background faces
+# 0.007-0.028 (evidence in docs/A/DECISIONS.md, entry D-003).
+MULTIPLE_FACES_MIN_RELATIVE_AREA = float(os.getenv("MULTIPLE_FACES_MIN_RELATIVE_AREA", "0.10"))
+
 INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")
 FACE_SIMILARITY_THRESHOLD = float(os.getenv("FACE_SIMILARITY_THRESHOLD", "0.5"))
 

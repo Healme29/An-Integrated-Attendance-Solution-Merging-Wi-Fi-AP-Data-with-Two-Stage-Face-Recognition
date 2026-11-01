@@ -79,7 +79,7 @@ class TestPromptEndpoint:
         client.post("/schedules/", json=active_schedule_payload())
         schedule_id = client.get("/schedules/").json()[0]["id"]
         check = client.post(
-            f"/attendance/check?schedule_id={schedule_id}&check_type=start",
+            f"/attendance/check?student_id={student_id}&schedule_id={schedule_id}&check_type=start",
             files={"file": ("a.jpg", fake_jpeg, "image/jpeg")},
         )
         assert check.status_code == 200
@@ -93,7 +93,7 @@ class TestPromptEndpoint:
         schedule_id = client.get("/schedules/").json()[0]["id"]
         for stage in ("start", "end"):
             res = client.post(
-                f"/attendance/check?schedule_id={schedule_id}&check_type={stage}",
+                f"/attendance/check?student_id={student_id}&schedule_id={schedule_id}&check_type={stage}",
                 files={"file": ("a.jpg", fake_jpeg, "image/jpeg")},
             )
             assert res.status_code == 200

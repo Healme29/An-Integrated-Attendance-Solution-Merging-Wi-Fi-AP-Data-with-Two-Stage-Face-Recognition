@@ -70,6 +70,13 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 - Attendance requires ALL 3 conditions: correct AP + valid class time + both selfies matched
 - Two-stage status flow: `start` → `partial`, `end` → `verified` (Wi-Fi ok) or `face_only` (no Wi-Fi); start row finalized on end check-in
 - Duplicate check-ins rejected (409); `end` without prior `start` rejected (409)
+- Check-in is bound to the logged-in `student_id`: the accepted face must match that
+  student, otherwise 403 `identity mismatch` (no row written). A second *significant*
+  face in the frame (area ≥ 10% of the largest) → 400 `Multiple faces detected`; nested
+  duplicate boxes of one face are merged first (containment ≥ 0.6)
+- Enrollment stores only the largest distinct face and rejects photos with two people;
+  enrollment with a friend in frame no longer contaminates the profile
+- `attendance.faces_detected` records the raw YOLO box count per check-in (audit)
 - Attendance outside class window ± grace → 403; wrong day → 403; unknown schedule → 404
 - `get_embedding(image, bbox)` expects the FULL image + YOLO bbox (crops with margin internally)
 - Wi-Fi detection requires Npcap on Windows (WinPcap API-compatible mode)
@@ -92,7 +99,7 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | PUT | `/students/{id}/mac` | Update MAC address |
 | POST | `/faces/enroll?student_id=` | Enroll face (upload image) |
 | POST | `/faces/recognize` | Recognize face (upload image) |
-| POST | `/attendance/check?schedule_id=&check_type=` | Check attendance with face scan (time-enforced) |
+| POST | `/attendance/check?student_id=&schedule_id=&check_type=` | Check attendance with face scan (identity-bound, time-enforced) |
 | GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
 | GET | `/attendance/student/{id}` | Get student history (supports `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count`) |
 | GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |

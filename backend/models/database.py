@@ -48,6 +48,7 @@ async def init_db():
             wifi_verified INTEGER DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'pending',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            faces_detected INTEGER DEFAULT 0,
             FOREIGN KEY (student_id) REFERENCES students(id),
             FOREIGN KEY (schedule_id) REFERENCES schedules(id)
         );
@@ -66,6 +67,14 @@ async def init_db():
     # path writes a CST (locale) timestamp explicitly.
     try:
         await db.execute("ALTER TABLE schedules ADD COLUMN created_at TIMESTAMP")
+        await db.commit()
+    except Exception:
+        pass  # column already exists
+
+    # Migration: attendance.faces_detected was added with the identity-binding
+    # fix (D-003) so the detector box count is auditable per check-in.
+    try:
+        await db.execute("ALTER TABLE attendance ADD COLUMN faces_detected INTEGER DEFAULT 0")
         await db.commit()
     except Exception:
         pass  # column already exists

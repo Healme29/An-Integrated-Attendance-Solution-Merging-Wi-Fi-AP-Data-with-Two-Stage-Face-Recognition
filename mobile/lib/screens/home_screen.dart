@@ -126,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context,
       MaterialPageRoute(
         builder: (_) => CameraScreen(
+          studentId: widget.student.id,
           scheduleId: _selectedScheduleId!,
           checkType: _selectedCheckType,
         ),

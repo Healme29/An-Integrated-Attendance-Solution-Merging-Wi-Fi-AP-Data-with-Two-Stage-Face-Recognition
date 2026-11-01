@@ -70,13 +70,18 @@ one person.
    same (582 px vs 594 px, −2%). On this CPU a single check-in spends ~1.8 s in detection
    alone at 1280.
 3. **`imgsz=1280` creates nested duplicate boxes on small images.** Measured on 15/15
-   enrolled crops. This matters because `POST /faces/enroll` loops over **every** detected
-   face and stores one embedding per box (`backend/routers/faces.py`), so one photo can
-   consume 2–3 of the 5 allowed embedding slots with copies of the same face.
+   already-cropped enrollment inputs. On the 52 original photos this was rare: 1 duplicate
+   box in 1 image, so the slot-burn risk was mostly limited to cropped inputs, not to normal
+   selfies. It still mattered because `POST /faces/enroll` used to loop over **every**
+   detected face and store one embedding per box (`backend/routers/faces.py`), so any
+   duplicate could consume several of the 5 allowed embedding slots with the same face.
+   **Status: fixed on 2026-11-01** — detector output is deduplicated and enrollment stores
+   exactly one face.
 4. **7 of the 52 photos genuinely contain two people** (6 in `orang_2`, 1 in `orang_3`).
-   This is not a detector error — but it does expose a separate risk: enrollment accepts
-   every face in the image, so a student who enrolls with a friend in frame stores the
-   friend's face in their own profile. Recorded as a follow-up (see below), not fixed here.
+   This is not a detector error — but it exposed a separate risk: enrollment accepted every
+   face in the image, so a student who enrolled with a friend in frame stored the friend's
+   face in their own profile. **Status: fixed on 2026-11-01** — enrollment now rejects a
+   second significant face; see D-003.
 5. The one extra "distinct face" at 1280 (8 vs 7) is a face found at higher resolution
    only. At this dataset size it cannot be classified as a true distant face or as a false
    positive without labels.
@@ -109,7 +114,7 @@ over-fitting.
 | # | Item | Owner | When |
 |---|------|-------|------|
 | 1 | Re-run this benchmark on classroom photos (distant faces) and decide whether enrollment needs a different `imgsz` than check-in | A | G7, before the pilot |
-| 2 | Deduplicate detector output (merge nested boxes) or enroll only the largest face, so one photo cannot consume several embedding slots | A | before G7 |
+| 2 | ~~Deduplicate detector output (merge nested boxes) or enroll only the largest face, so one photo cannot consume several embedding slots~~ **Done 2026-11-01** (D-003: dedupe + single-face enrollment) | A | closed |
 | 3 | Set `YOLO_IMG_SIZE=640` in the demo/pilot environment and record it in the runbook | B (with A) | G1/G8 |
 
 ## Reproduction

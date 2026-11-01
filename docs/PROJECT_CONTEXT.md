@@ -167,7 +167,7 @@ project-root/
 | PUT | `/students/{id}/mac` | Update MAC address |
 | POST | `/faces/enroll?student_id=` | Multipart upload, hardening rules apply |
 | POST | `/faces/recognize` | Multipart upload → recognized + confidence |
-| POST | `/attendance/check?schedule_id=&check_type=` | Time-enforced two-stage check-in |
+| POST | `/attendance/check?student_id=&schedule_id=&check_type=` | Identity-bound two-stage check-in |
 | GET | `/attendance/today?schedule_id=` | Today's records, joined with names |
 | GET | `/attendance/student/{id}` | History: `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count` |
 | GET | `/attendance/export/csv?date=&schedule_id=` | CSV export |

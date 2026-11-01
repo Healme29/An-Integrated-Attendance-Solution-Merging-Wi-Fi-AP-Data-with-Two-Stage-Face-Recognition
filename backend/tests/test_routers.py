@@ -181,7 +181,7 @@ class TestAttendanceAPI:
         client.post("/schedules/", json=active_schedule_payload())
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 200
@@ -194,7 +194,7 @@ class TestAttendanceAPI:
 
     def test_check_attendance_invalid_check_type(self, client, setup_test_db, fake_jpeg):
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=invalid",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=invalid",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 400
@@ -209,7 +209,7 @@ class TestAttendanceAPI:
         client.post("/schedules/", json=active_schedule_payload())
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 400
@@ -218,7 +218,7 @@ class TestAttendanceAPI:
         client.post("/students/", json={"name": "Alice", "nim": "12345"})
 
         response = client.post(
-            "/attendance/check?schedule_id=999&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=999&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 404
@@ -230,7 +230,7 @@ class TestAttendanceAPI:
         ))
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 403
@@ -241,7 +241,7 @@ class TestAttendanceAPI:
         client.post("/schedules/", json=active_schedule_payload(day_of_week=wrong_day))
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 403
@@ -249,10 +249,10 @@ class TestAttendanceAPI:
     def test_check_attendance_duplicate_check_in(self, client, setup_test_db, fake_jpeg):
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 409
@@ -262,7 +262,7 @@ class TestAttendanceAPI:
         client.post("/schedules/", json=active_schedule_payload())
 
         response = client.post(
-            "/attendance/check?schedule_id=1&check_type=end",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=end",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert response.status_code == 409
@@ -272,14 +272,14 @@ class TestAttendanceAPI:
         client.post("/schedules/", json=active_schedule_payload())
 
         start_resp = client.post(
-            "/attendance/check?schedule_id=1&check_type=start",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert start_resp.status_code == 200
         assert start_resp.json()["status"] == "partial"
 
         end_resp = client.post(
-            "/attendance/check?schedule_id=1&check_type=end",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=end",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert end_resp.status_code == 200
@@ -297,9 +297,9 @@ class TestAttendanceAPI:
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
 
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
         end_resp = client.post(
-            "/attendance/check?schedule_id=1&check_type=end",
+            "/attendance/check?student_id=1&schedule_id=1&check_type=end",
             files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")}
         )
         assert end_resp.status_code == 200
@@ -313,7 +313,7 @@ class TestAttendanceAPI:
     def test_get_today_attendance_with_data(self, client, setup_test_db, fake_jpeg):
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.get("/attendance/today")
         assert response.status_code == 200
@@ -326,7 +326,7 @@ class TestAttendanceAPI:
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
         client.post("/schedules/", json=active_schedule_payload(class_name="Physics", room="Room 202"))
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.get("/attendance/today?schedule_id=2")
         assert response.status_code == 200
@@ -338,7 +338,7 @@ class TestAttendanceAPI:
     def test_export_csv_with_data(self, client, setup_test_db, fake_jpeg):
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.get("/attendance/export/csv")
         assert response.status_code == 200
@@ -362,7 +362,7 @@ class TestAttendanceAPI:
     def test_get_student_attendance(self, client, setup_test_db, fake_jpeg):
         client.post("/students/", json={"name": "Alice", "nim": "12345", "mac_address": "aa:bb:cc:dd:ee:ff"})
         client.post("/schedules/", json=active_schedule_payload())
-        client.post("/attendance/check?schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
+        client.post("/attendance/check?student_id=1&schedule_id=1&check_type=start", files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")})
 
         response = client.get("/attendance/student/1")
         assert response.status_code == 200

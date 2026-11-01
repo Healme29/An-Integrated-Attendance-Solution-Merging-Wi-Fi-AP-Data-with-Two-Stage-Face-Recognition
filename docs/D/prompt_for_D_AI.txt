@@ -90,8 +90,8 @@ Teacher Dashboard (single HTML file — backend/static/dashboard.html):
   PUT     | /students/{id}/mac                    | Update student's MAC address
   POST    | /faces/enroll?student_id=             | Enroll face (upload image file)
   POST    | /faces/recognize                      | Recognize face (upload image)
-  POST    | /attendance/check?schedule_id=&       | Two-stage check-in (start/end)
-          |   check_type=start|end                |
+  POST    | /attendance/check?student_id=&       | Two-stage check-in (start/end),
+          |   schedule_id=&check_type=start|end   | face must match student_id
   GET     | /attendance/today?schedule_id=        | Today's attendance with student names
   GET     | /attendance/student/{id}              | Student history (limit/offset pagination)
           |   ?limit=&offset=&date_from=&date_to= | X-Total-Count header

@@ -108,7 +108,7 @@ def main(base_url: str) -> int:
           str(r.json())[:80] if r.status_code == 200 else r.text[:80])
 
     r = client.post(
-        f"/attendance/check?schedule_id={schedule['id']}&check_type=start",
+        f"/attendance/check?student_id={student['id']}&schedule_id={schedule['id']}&check_type=start",
         files={"file": ("blank.jpg", blank_jpeg, "image/jpeg")},
     )
     check("POST /attendance/check (no face -> 400)",
@@ -116,7 +116,7 @@ def main(base_url: str) -> int:
 
     # 8. Unknown schedule -> 404
     r = client.post(
-        "/attendance/check?schedule_id=999999&check_type=start",
+        f"/attendance/check?student_id={student['id']}&schedule_id=999999&check_type=start",
         files={"file": ("blank.jpg", blank_jpeg, "image/jpeg")},
     )
     # 400 (no face checked first) OR 404 depending on validation order - both acceptable?
