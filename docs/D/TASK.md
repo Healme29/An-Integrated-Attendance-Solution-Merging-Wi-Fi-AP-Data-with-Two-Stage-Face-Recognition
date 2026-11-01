@@ -10,9 +10,23 @@ Your areas: (1) the **teacher dashboard** (one HTML file — perfect for guided 
 (2) **test evidence** for every report, (3) **the progress report, final report, slides,
 demo video**, and (4) **communication with the teacher/school**.
 
+> **LANGUAGE RULE:** OUTPUT AND INPUT IN ALL SYSTEMS OF THIS PROJECT MUST BE IN ENGLISH
+> BECAUSE THIS ASSIGNMENT USES ENGLISH (THE RESULT). This means: app UI, API responses and
+> errors, logs, code comments, commit messages, every file in `docs/**`, CSV headers,
+> dashboard text, slides, video, and the final report are all in English. Only the group
+> chat may be Indonesian.
+
+> **M2:** your work is one large package in "M2 WORK PACKAGE D" below. You split your own
+> weeks; only the order of the stages and the gate dates are fixed
+> (`docs/PLAN_TIMELINE.md` §2.1). Every non-trivial decision goes into
+> `docs/D/DECISIONS.md` — that file is graded.
+
 ---
 
-## PRIORITY 0 — must be done before the progress report (~Nov 1, 2026)
+## PRIORITY 0 — M1 (DONE, Nov 1, 2026)
+
+> ✅ Dashboard redesign committed, the failing test fixed, evidence pack collected, progress
+> report delivered. The section below is kept as a record; do not redo it.
 
 ### D1. Commit the dashboard redesign that is sitting in the working tree
 There is a big, finished-looking dashboard redesign that was never committed
@@ -78,38 +92,44 @@ short report with this skeleton (2–4 pages is enough):
 
 ---
 
-## PRIORITY 1 — November–December 2026
+## M2 WORK PACKAGE D — "Evidence, communication and presentation" (Nov 2, 2026 → Jan 18, 2027)
 
-### D5. Dashboard polish (one tiny change at a time — see your PROMPT.md)
-Work from a prioritized wish list; each item = one small guided change = one commit:
-- [ ] Status colors: `verified` green, `partial` yellow, `face_only` orange
-- [ ] Filter by schedule (dropdown) and by date on the today view
-- [ ] "Export CSV" button linking to `/attendance/export/csv`
-- [ ] Print-friendly CSS (`@media print`) so teachers can print the list
-- [ ] Works on a phone screen (responsive)
+> One large package. You decide how to split the weeks; the **stage order** and the **gate
+> dates** are fixed (`docs/PLAN_TIMELINE.md` §2.1). Every non-trivial decision goes into
+> `docs/D/DECISIONS.md` — graded.
 
-Rule: after every single change → save → refresh the browser → check → commit.
-If anything breaks and you cannot fix it in 10 minutes → `git checkout -- <file>` is
-NOT allowed to be scary; just ask A/B in the group chat.
+**Big goal:** the project must be defensible in front of a teacher or panel using real
+evidence, and the demo must run on a script that cannot fail silently.
 
-### D6. Teacher communication
-- Get the teacher's requirements for the final report (format, length, what the demo
-  must show) and write them down in `docs/D/teacher_requirements.md`.
-- Arrange the December pilot class test date with the teacher (A executes, you arrange
-  and document; take photos/video, ~10 minutes of recording).
+| # | Stage | Window | Gate | What you produce |
+|---|-------|--------|------|------------------|
+| 1 | Finish the dashboard + refresh evidence | Nov 2–15 | — | Remaining polish items (status colors, schedule/date filter, CSV button, print CSS, responsive). One small change → one commit → one browser check. Refresh `docs/D/evidence/` |
+| 2 | Teacher requirements + pilot logistics | Nov 16–29 | **G4** | `docs/D/teacher_requirements.md` written, and the **pilot date + student roster locked**. This is the project's critical path — treat it as your most important deadline |
+| 3 | Pilot pack + slide skeleton | Nov 30–Dec 6 | — | Observation sheet, metrics form, recording plan, who stands where, slide outline |
+| 4 | Document the pilot | Dec 7–13 | **G9** | Photos, video, notes, timings into `docs/D/pilot_evidence/` |
+| 5 | Slides v1 + pilot results | Dec 14–27 | — | 10–12 slides: problem → three-condition rule → architecture → live demo → real numbers → limitations → future work |
+| 6 | Demo script + backup video | Dec 28–Jan 10 | **G14** | Minute-by-minute roles (A backend, C phone, B fallback standby, D narrates + keeps time) + a 30–60 s recording of the full flow |
+| 7 | Dry runs + final materials | Jan 11–18 | **G13, G15, G16** | Run both dry runs, fix what breaks, final slides, printed handout, timekeeper on the day |
 
----
+**Done when:** dashboard final; `teacher_requirements.md` and the pilot date locked early;
+the pilot documented with photos, video and numbers; slides + script + backup video
+finished; two dry-run reports written; you can run the demo from paper without improvising.
 
-## PRIORITY 2 — January 2027 (presentation & demo)
+**Critical-thinking questions you must answer yourself** (`docs/D/DECISIONS.md`):
 
-### D7. Presentation materials
-1. **Slides** (10–12 is enough): problem → 3-condition solution → architecture diagram
-   (ask A/B for theirs) → live demo → real results (threshold table, pilot numbers,
-   screenshots) → limitations (anti-spoofing) → future work.
-2. **Demo script**: minute-by-minute who does what (A runs backend, C runs the phone,
-   B on standby with seeded fallback data, you narrate and keep time).
-3. **Backup video**: record the full flow once (30–60 s) in case Wi-Fi fails on stage.
-4. Schedule **two dry runs** with the whole team before the date.
+- What exactly must the panel see in the first 60 seconds, and what can be cut without
+  weakening the claim?
+- Which evidence is a real measurement and which is only a screenshot? Label them
+  differently in the slides.
+- If the live demo fails on stage, what is the exact sentence you say and what do you show
+  next?
+- What would a skeptical examiner attack first (anti-spoofing, Wi-Fi reliability, small
+  sample size), and where in the slides is the honest answer?
+
+**Escalation:** stage 2 is the only stage in the whole plan that can stop everyone else.
+If the teacher has not answered by **Nov 20**, tell A the same day — do not wait.
+
+Old task IDs still apply: D5 = stage 1, D6 = stage 2, D7 = stages 3–7.
 
 ---
 
@@ -130,11 +150,14 @@ NOT allowed to be scary; just ask A/B in the group chat.
 - You may edit: `backend/static/dashboard.html`, `docs/D/**`, and the ONE test line in
   D2. Anything else in Python/Dart → ask A or B first. Never use
   `git push --force`, `git reset --hard`, or delete files you didn't create.
-- Stuck more than 30 minutes → ask in the group chat. That is normal and expected.
+- Stuck more than 30 minutes → ask in the group chat **with a proposal**, never with a raw
+  problem. "I tried A and B, results here, I pick B because this" is the expected shape.
+- Every non-trivial decision goes into `docs/D/DECISIONS.md` (problem → at least 2 options
+  → evidence → decision → consequences → revisit trigger).
 
 ## Deliverables per milestone
 | Milestone | What must exist from you |
 |---|---|
-| M1 (~Nov 1, 2026) | D1–D4 done: dashboard committed, 124/124 tests, evidence pack, progress report delivered |
-| M2 (~Jan 18, 2027) | Slides + demo script + backup video + dashboard final polish; dry runs done |
+| M1 (~Nov 1, 2026) | ✅ D1–D4 done: dashboard committed, tests green, evidence pack, progress report delivered |
+| M2 (~Jan 18, 2027) | G4 teacher date + roster · G14 slides + script + backup video · dashboard final · dry-run reports |
 | M3 (~Mar 18, 2027) | Final report assembled + your "Testing & Conclusion" chapter + teacher requirements documented |

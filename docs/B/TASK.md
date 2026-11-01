@@ -8,9 +8,21 @@ di jaringan Wi-Fi nyata, di Docker, di mesin demo — dan menyiapkan lingkungan 
 untuk presentasi. Logika two-stage & schedule enforcement SUDAH selesai dan lolos tes;
 jangan diubah.
 
+> **ATURAN BAHASA:** OUTPUT DAN INPUT DI SEMUA SISTEM PROYEK INI HARUS DALAM BAHASA
+> INGGRIS, karena tugas besar ini berbahasa Inggris dan hasilnya juga dinilai dalam bahasa
+> Inggris. Artinya: UI, response/error API, log server, komentar kode, commit message,
+> seluruh `docs/**` (termasuk laporanmu), header CSV, teks dashboard, slides, dan video —
+> semuanya Inggris. Yang boleh tetap Indonesia: arahan tugas ini dan obrolan di grup.
+
+> **M2:** paket kerjamu ada di bagian "PAKET KERJA M2" di bawah. Kamu yang membagi waktu
+> per minggu; yang tetap hanya urutan tahap + tanggal gate (`docs/PLAN_TIMELINE.md` §2.1).
+
 ---
 
-## PRIORITAS 0 — wajib sebelum laporan kemajuan (~1 Nov 2026)
+## PRIORITAS 0 — M1 (SELESAI 1 Nov 2026)
+
+> ✅ `docs/B/network_validation.md` berisi hasil nyata, Docker terverifikasi,
+> `seed_demo.py` ada, fitur data (CSV + pagination) sudah dicek. Jangan dikerjakan ulang.
 
 ### B1. Validasi Wi-Fi di jaringan NYATA
 Wi-Fi scanner belum pernah diuji di router sungguhan. Uji dan catat hasilnya:
@@ -38,43 +50,44 @@ Ringkas hasil B1 jadi 1 paragraf + tabel untuk D paling lambat **29 Okt 2026**.
 
 ---
 
-## PRIORITAS 1 — November 2026
+## PAKET KERJA M2 — "Sistem siap kelas & siap demo" (2 Nov 2026 → 18 Jan 2027)
 
-### B3. Deployment di mesin demo
-1. `docker compose up -d --build` dari root → cek `docker compose logs -f backend`.
-2. Verifikasi: `GET /health` ok, database persist setelah container di-restart
-   (volume `backend-data`), env variables terbaca (`TIMEZONE=Asia/Jakarta`,
-   `CORS_ORIGINS` spesifik, `FACE_SIMILARITY_THRESHOLD` dari A).
-3. Jalankan smoke test ke server Docker:
-   `python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000`
-4. Tulis `docs/B/deployment_guide.md`: langkah dari nol (install Docker → build →
-   set env → verifikasi), ditulis untuk orang non-teknis sekalipun (bakal dipakai D & guru).
+> Satu paket besar. Kamu yang membagi waktu per minggu; yang tetap adalah **urutan tahap**
+> dan **tanggal gate** (`docs/PLAN_TIMELINE.md` §2.1). Setiap keputusan tidak sepele wajib
+> ditulis di `docs/B/DECISIONS.md` — itu bagian dari penilaian M2.
 
-### B4. Data demo untuk presentasi
-Buat script `backend/scripts/seed_demo.py` (koordinasi dulu dengan A sebelum menambah
-script): bikin siswa contoh + jadwal yang aktif pas jam presentasi + data presensi
-contoh, plus opsi `--reset` untuk membersihkan. Ini cadangan kalau demo live gagal.
+**Tujuan besar:** backend terbukti jalan di luar laptop pengembang — di mesin demo, di
+jaringan kelas, tanpa internet, dan bisa dipulihkan kalau rusak di hari demo.
 
-### B5. Verifikasi fitur data teacher
-- `GET /attendance/export/csv?date=&schedule_id=` → buka CSV-nya, cek kolom & format tanggal.
-- `GET /attendance/student/{id}` → cek pagination (`limit`, `offset`) dan header
-  `X-Total-Count` benar.
-- Dashboard guru membaca data yang sama (jangan ubah `dashboard.html` — itu milik D).
+| # | Tahap | Periode | Gate | Yang dikerjakan + bukti |
+|---|-------|---------|------|--------------------------|
+| 1 | Lingkungan demo nyata | 2–8 Nov | **G1** | Deploy di mesin yang benar-benar akan dipakai; `/health` ok, data persist setelah restart, `TIMEZONE` + threshold dari A terbaca, smoke test lulus |
+| 2 | Peta batas jaringan + fallback offline | 9–22 Nov | **G5** | Timebox investigasi AP management plane (SSH/SNMP/controller) → tulis "layak / tidak layak" + alasan. Wajib juga: `seed_demo.py` + hotspot + prosedur "internet mati" satu halaman. **Spike ini tidak boleh menahan demo** |
+| 3 | Uji panduan deploy dari nol | 23–29 Nov | — | Ikuti `docs/B/deployment_guide.md` persis seperti orang non-teknis; perbaiki setiap langkah yang membingungkan (catat: langkah mana yang gagal) |
+| 4 | Operasi server pilot | 6–13 Des | **G8, G9** | DB bersih, `TIMEZONE`, `CORS`, threshold dari A, backup sebelum & sesudah, catat semua gangguan jaringan saat pilot |
+| 5 | Analisis jaringan + mulai hardening | 14 Des–3 Jan | **G11** | Temuan pilot masuk `docs/B/network_validation.md`; perbaiki bug scanner yang ketemu; mulai checklist produksi (CORS spesifik, backup rutin, batas upload) |
+| 6 | Latihan ketahanan + runbook demo | 4–18 Jan | **G12–G16** | Uji restore backup, uji fallback end-to-end, cetak runbook demo (port, `adb reverse`, urutan menyalakan, siapa menghubungi siapa) |
+
+**Selesai jika (DoD):** backend jalan di mesin demo; `deployment_guide.md` berhasil diikuti
+orang lain tanpa bantuanmu; fallback offline terbukti; runbook demo tercetak dan diuji di
+dry run #1.
+
+**Pertanyaan kritis wajib kamu jawab sendiri** (di `docs/B/DECISIONS.md`):
+
+- Kalau `/wifi/scan` hanya melihat gateway (sudah terukur di kampus), apakah `face_only`
+  kita sebut kegagalan sistem atau perilaku yang dimengerti? Siapa yang memutuskan, dan di
+  dokumen mana keputusan itu hidup?
+- Masih tepatkah Docker untuk mesin demo, mengingat container tidak bisa melihat Wi-Fi LAN
+  host? Bandingkan dengan jalan native + bukti pengukuran.
+- Berapa lama waktu pemulihan kalau DB rusak di hari demo? Ukur, jangan tebak.
+- Fitur apa yang harus **dimatikan** saat demo supaya risiko turun?
+
+ID lama (B3–B7) tetap berlaku dan menempel pada tahap di atas: B3 = tahap 1+3, B4 = tahap 2,
+B5 = bagian dari tahap 4, B6 = tahap 4, B7 = tahap 5+6.
 
 ---
 
-## PRIORITAS 2 — Desember 2026 – Februari 2027
-
-### B6. Dukungan pilot kelas nyata
-Bersama A: siapkan server di ruang kelas (kunci: Wi-Fi AP kelas, `TIMEZONE`, threshold
-final), pantau selama pilot, catat masalah jaringan yang muncul.
-
-### B7. Hardening produksi (checklist, kerjakan setelah pilot)
-- `CORS_ORIGINS`: ganti `*` dengan origin dashboard/HP yang dipakai sekolah.
-- Backup `attendance.db` (langkah manual singkat, masukkan ke deployment guide).
-- Pastikan `MAX_UPLOAD_BYTES`, `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`
-  sesuai kebutuhan sekolah.
-- Rencana fallback demo offline (bahan M2): server lokal + hotspot + data seed.
+## M3 (19 Jan – 18 Mar 2027) — belum dimulai
 
 ### B8. Bab laporan akhir — "Arsitektur Backend & Alur Presensi"
 Serahkan ke D paling lambat **1 Mar 2027**: diagram alur check-in (request → validasi
@@ -91,11 +104,13 @@ arsitektur service, hasil validasi jaringan, deployment.
 - JANGAN ubah: `backend/static/dashboard.html` (milik D), `mobile/**` (milik C),
   `backend/services/attendance.py` & `face_recognition.py` (milik A) tanpa izin.
 - Jangan commit: `attendance.db`, `*.pkl`, model `.pt`, foto wajah, log.
-- Macet >30 menit → tanya di grup.
+- Macet >30 menit → tanya di grup **dengan usulan**, bukan dengan masalah mentah.
+- Setiap keputusan tidak sepele wajib masuk `docs/B/DECISIONS.md` (problem → minimal 2 opsi
+  → bukti → keputusan → konsekuensi → kapan ditinjau ulang).
 
 ## Deliverable per milestone
 | Milestone | Yang harus ada dari kamu |
 |---|---|
-| M1 (~1 Nov 2026) | `docs/B/network_validation.md` berisi hasil nyata + ringkasan untuk laporan |
-| M2 (~18 Jan 2027) | Backend ter-deploy di mesin demo + `seed_demo.py` + deployment guide awal |
+| M1 (~1 Nov 2026) | ✅ `docs/B/network_validation.md` berisi hasil nyata + ringkasan untuk laporan |
+| M2 (~18 Jan 2027) | G1 mesin demo · G5 fallback offline · panduan deploy tervalidasi dari nol · runbook demo tercetak |
 | M3 (~18 Mar 2027) | Hardening selesai + deployment guide final + bab backend laporan |

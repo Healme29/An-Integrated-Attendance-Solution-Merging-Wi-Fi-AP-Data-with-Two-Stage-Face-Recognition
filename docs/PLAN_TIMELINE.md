@@ -1,9 +1,10 @@
-# PROJECT PLAN & TIMELINE
+﻿# PROJECT PLAN & TIMELINE
 
 > Living document. Everyone updates the **Progress Log** at the bottom when they finish
 > a unit of work. Project-wide status lives here — nowhere else.
 >
 > Planning session: 2026-10-18. Minutes: `docs/meetings/2026-10-18_team_planning.md`.
+> M2 replanning: 2026-11-01 — gates + four large work packages (see Phase 2 below).
 > Full technical context: `docs/PROJECT_CONTEXT.md`.
 
 ---
@@ -13,7 +14,7 @@
 | Milestone | Deadline (approx.) | Success criteria |
 |-----------|--------------------|-------------------|
 | **M1 — Progress report** | **Nov 1, 2026** | Written progress report delivered, backed by: real-data threshold report (A), real-network Wi-Fi validation results (B), real-device test log (C), fixed dashboard test + evidence pack (D) |
-| **M2 — Presentation & demo** | **Jan 18, 2027** | Live end-to-end demo on a real phone + real Wi-Fi; pilot classroom test completed (Dec 2026); slides, demo script, and video ready; 2 dry runs done |
+| **M2 — Presentation & demo** | **Jan 18, 2027** | Live end-to-end demo on a real phone + real Wi-Fi; pilot classroom test completed (Dec 7–13, 2026); slides, demo script, and backup video ready; 2 dry runs done; demo scope locked Jan 8 |
 | **M3 — Final submission** | **Mar 18, 2027** | Code freeze Mar 2; release build v1.0 (APK + backend deployed on school machine); final report assembled from all chapters; repository cleaned up |
 
 ## 2. Phase plan
@@ -25,13 +26,239 @@
 | Oct 19–25 | Enroll ≥3 people × ≥3 selfies, run `evaluate_threshold.py`, fill `docs/threshold_report.md` with real FAR/FRR/EER, pick threshold | Validate `/wifi/scan` + `/wifi/check/{mac}` on a real router; test subnet auto-detect, 60 s dedupe, BSSID pinning; document results | Full flow on a REAL Android phone: settings → login → enroll → start → end → history; log issues | Fix the failing dashboard test; review + commit the uncommitted dashboard redesign; run tests, save evidence + screenshots |
 | Oct 26 – Nov 1 | Review members' results; integrate; verify 124/124 tests green | Consolidate network results into a summary doc for the report | Fix device-test bugs found; write device test summary | Collect each member's input **by Oct 29**; assemble and deliver progress report **Nov 1** |
 
-### Phase 2 — M2: Pilot & demo (Nov 2 → Jan 18, 2027)
+### Phase 2 — M2: Pilot & demo (Nov 2, 2026 → Jan 18, 2027)
 
-| Period | Work |
-|--------|------|
-| November | B: deploy backend on the school/demo machine (Docker or bare), seed demo data, write deployment guide. C: UX polish (loading/empty/error states, dark mode), release APK v0.9, test on a second phone. A: YOLO conf/img-size experiments, robustness tests (lighting/angle/glasses), finalize threshold config. D: finish dashboard polish (status colors, filters, print view), report template for M2. |
-| **December** | **Pilot classroom test with 5–10 real students** (A leads execution, B runs the server, C supports app users, D documents + records video + observes). Afterwards: triage all findings, fix the top issues. |
-| Jan 1–17 | D: slides, demo script, record demo video. A: dry-run integration test, freeze demo scope by Jan 15. B: stable demo environment + backup plan (offline demo data). C: demo phone prepared (charged, app installed, camera tested). Two full dry runs before the date. |
+> This phase is **not** a task list. Each member receives **one large work package**
+> (§2.2) with ordered stages, hard gates, a definition of done, and questions they must
+> answer themselves. Members allocate their own time; only the gates are fixed.
+
+#### 2.0 Language rule (binding for all members)
+
+**OUTPUT AND INPUT IN ALL SYSTEMS OF THIS PROJECT MUST BE IN ENGLISH BECAUSE THIS ASSIGNMENT USES ENGLISH (THE RESULT).**
+
+| Area | Language |
+|------|----------|
+| Work-package instructions for A, B, C (this section, `docs/A`, `docs/B`, `docs/C`) | Indonesian |
+| Work-package instructions for D (`docs/D`) | English |
+| App UI text, API responses and error `detail` strings, server logs, code comments, docstrings, commit messages | English |
+| Deliverables in `docs/**`, CSV headers, dashboard text, slides, video, final report, README | English |
+| Day-to-day group-chat conversation | free (Indonesian is fine) |
+
+#### 2.1 Flow and gates — the required order
+
+Each stage has a **gate**. A stage may not start before the previous gate is passed,
+unless the gate owner records an exception in their `DECISIONS.md`.
+
+| # | Gate | Date | Owner | Pass condition |
+|---|------|------|-------|----------------|
+| G1 | Demo environment alive on the real machine | Nov 8 | B | `/health` OK, data persists across restart, `TIMEZONE` and threshold env read correctly |
+| G2 | Mobile release validated on a second phone | Nov 8 | C | Core flow (login → start → end → history) passes on the second device |
+| G3 | ML configuration locked | Nov 15 | A | `docs/A/yolo_tuning.md` + final threshold written down, measured not assumed |
+| G4 | Pilot date + student roster confirmed by the teacher | Nov 22 | D | Written in `docs/D/teacher_requirements.md` |
+| G5 | Offline fallback proven | Nov 22 | B | Seed data + hotspot run with no internet |
+| G6 | Auto check-in finished on a real device | Nov 22 | C | Banner → camera → start/end without manual intervention |
+| G7 | Pilot students enrolled in the real classroom | Nov 29 | A | At least 5 students, embeddings captured in classroom lighting |
+| G8 | Pilot rehearsal passed | Dec 6 | All | Server, phones and forms ready; one full simulation done |
+| **G9** | **PILOT CLASSROOM TEST (Dec 7–13)** | **Dec 13** | A leads | 5–10 students, raw data stored |
+| G10 | Pilot analysis + fix list | Dec 20 | A | Real numbers, every finding has an owner |
+| G11 | All pilot fixes merged | Jan 3 | All | Tests green, G10 findings closed or dismissed with a written reason |
+| G12 | **DEMO SCOPE LOCKED** | **Jan 8** | A | No new features after this date |
+| G13 | Dry run #1 | Jan 9–10 | All | Full flow runs without help |
+| G14 | Backup video + final slides | Jan 10 | D | A 30–60 s recording ready to play |
+| G15 | Dry run #2 | Jan 14–15 | All | Timing and role split correct |
+| **G16** | **M2 DEMO** | **Jan 18** | All | Live demo passes, or the fallback is used deliberately |
+
+**Critical chain:** G4 → G7 → G9 → G10 → slides → G12 → G13 → G15 → G16. A one-week slip in
+G4 (teacher availability) moves every later gate. **D owns G4, not A** — the pilot date is a
+logistics problem, not an engineering one.
+
+**Holiday rule:** Dec 21, 2026 – Jan 3, 2027 is the academic break. Writing-only work
+(slides, docs, anti-spoofing write-up). No field tests, no mandatory meetings.
+
+#### 2.2 Work packages
+
+Each package is deliberately large: the owner decides how to slice it across the weeks, but
+the **order of the stages and the gate dates are fixed**. If a gate cannot be passed on
+time, the owner records why in `DECISIONS.md` and tells the group **before** the date.
+
+##### Package A — "System accuracy calibration and evidence" (lead technical)
+
+**Tujuan besar:** sistem punya angka akurasi yang bisa dipertanggungjawabkan di depan dosen,
+dan demo memakai konfigurasi yang sudah diuji — bukan nilai default.
+
+**Tahapan (urut, jangan diacak):**
+
+1. **Tutup M1 dan jaga baseline** (Nov 2–8) — merge semua branch tertunda, `pytest` dan
+   `smoke_test` hijau, tidak ada PR menggantung.
+2. **Kalibrasi deteksi → G3** (Nov 2–15) — bandingkan `YOLO_CONF_THRESHOLD` 0.25 / 0.30 /
+   0.35 dan `YOLO_IMG_SIZE` 640 vs 1280; tulis trade-off kecepatan vs recall di
+   `docs/A/yolo_tuning.md`; kunci nilai final.
+3. **Bukti ketahanan** (Nov 9–22) — minimal 5 orang, kondisi terang, redup, wajah miring,
+   berkacamata, masker → `docs/A/robustness_test.md`.
+4. **Siapkan pilot → G7** (Nov 16–29) — rencana pilot, metrik sukses, dan enroll 5–10 siswa
+   di kelas asli → `docs/A/pilot_plan.md`.
+5. **Pimpin pilot dan analisis → G9, G10** (Dec 7–20) — eksekusi lapangan, lalu
+   `docs/A/pilot_report.md`: persen start→end tersambung, persen `verified` vs `face_only`,
+   detik per check-in, daftar kegagalan.
+6. **Kunci scope dan jaga integrasi → G12–G16** (Dec 21–Jan 18) — satu halaman "apa yang
+   didemokan / apa yang tidak"; draft `docs/A/anti_spoofing.md` (kerja tulis, aman di minggu
+   libur); verifikasi konfigurasi akhir di mesin demo.
+
+**Selesai jika (DoD):** dokumen di atas berisi angka nyata; konfigurasi final tertulis
+sebagai env yang benar-benar dipakai di mesin demo; scope demo muat satu halaman; baseline
+tes hijau sepanjang periode.
+
+**Pertanyaan kritis wajib kamu jawab sendiri** (`docs/A/DECISIONS.md`):
+
+- Apakah threshold 0.5 masih benar untuk pencahayaan kelas asli, atau harus berbeda per
+  kamera/HP?
+- Berapa biaya (detik per check-in dan false reject) menaikkan `YOLO_IMG_SIZE` ke 1280 saat
+  demo?
+- Kalau akurasi jatuh saat pilot, apakah penyebabnya model, kualitas enrollment, atau
+  kamera HP? Buktikan dengan data, bukan dugaan.
+- Apa yang **tidak** akan kita klaim di laporan karena belum pernah diukur?
+
+**Peran kepemimpinan (berubah):** kamu **reviewer**, bukan tukang solusi. Anggota wajib
+datang dengan usulan + bukti; kamu memutuskan. Kalau ditanya "harus bagaimana", balas
+dengan pertanyaan yang memaksa mereka mengukur dulu.
+
+##### Package B — "System ready for the classroom and the demo" (backend / deployment)
+
+**Tujuan besar:** backend terbukti jalan di luar laptop pengembang — di mesin demo, di
+jaringan kelas, tanpa internet, dan bisa dipulihkan kalau rusak di hari demo.
+
+**Tahapan (urut):**
+
+1. **Lingkungan demo nyata → G1** (Nov 2–8) — deploy di mesin yang akan dipakai, verifikasi
+   persistensi, env, dan smoke test.
+2. **Peta batas jaringan dan fallback offline → G5** (Nov 9–22) — timebox investigasi AP
+   management plane (SSH/SNMP/controller) untuk presence per ruangan; tulis "layak / tidak
+   layak" beserta alasannya. **Tidak boleh menahan demo.** Sebelumnya siapkan
+   `seed_demo.py` + hotspot + prosedur "internet mati" satu halaman.
+3. **Uji panduan dari nol** (Nov 23–29) — ikuti `docs/B/deployment_guide.md` persis seperti
+   orang non-teknis; perbaiki setiap langkah yang membingungkan.
+4. **Operasi server pilot → G8, G9** (Dec 6–13) — DB bersih, `TIMEZONE`, `CORS`, threshold
+   dari A, backup sebelum dan sesudah; catat semua gangguan jaringan.
+5. **Analisis jaringan dan mulai hardening → G11** (Dec 14–Jan 3) — masukkan temuan pilot ke
+   `docs/B/network_validation.md`; mulai checklist produksi (CORS spesifik, backup rutin,
+   batas upload).
+6. **Latihan ketahanan dan runbook → G12–G16** (Jan 4–18) — uji restore backup, uji fallback
+   end-to-end, cetak runbook demo (port, `adb reverse`, urutan menyalakan, siapa menghubungi
+   siapa).
+
+**Selesai jika (DoD):** backend jalan di mesin demo; `deployment_guide.md` berhasil diikuti
+orang lain tanpa bantuan; fallback offline terbukti; runbook demo tercetak dan diuji di
+dry run #1.
+
+**Pertanyaan kritis wajib kamu jawab sendiri** (`docs/B/DECISIONS.md`):
+
+- Kalau `/wifi/scan` hanya melihat gateway (sudah terukur di kampus), apakah `face_only`
+  kita sebut kegagalan sistem atau perilaku yang dimengerti? Siapa yang memutuskan dan di
+  dokumen mana?
+- Masih tepatkah Docker untuk mesin demo, mengingat container tidak bisa melihat Wi-Fi LAN
+  host? Bandingkan dengan jalan native + bukti pengukuran.
+- Berapa lama waktu pemulihan kalau DB rusak di hari demo? Ukur, jangan tebak.
+- Fitur apa yang harus **dimatikan** saat demo supaya risiko turun?
+
+##### Package C — "The app in students' hands" (Flutter)
+
+**Tujuan besar:** aplikasi yang dipakai siswa asli di kelas asli tidak crash, tidak
+membingungkan, dan bisa dipasang ulang kapan saja oleh siapa pun di tim.
+
+**Tahapan (urut):**
+
+1. **Rilis teruji dua HP → G2** (Nov 2–8) — APK v0.9 di HP kedua, alur inti lulus, catat
+   perbedaan perilaku antar perangkat.
+2. **Ambil alih auto check-in → G6** (Nov 9–22) — review kode A (`7803d27`), jadikan
+   milikmu, selesaikan banner → kamera → start/end, uji di HP asli.
+3. **Polish UX** (Nov 9–22) — loading, empty, dan error state di semua layar, tombol retry,
+   tidak pernah crash karena jaringan. Dark mode hanya kalau masih ada waktu.
+4. **Siapkan pengalaman siswa** (Nov 23–Dec 6) — alur enroll yang jelas (3–5 selfie +
+   panduan wajah), instruksi satu halaman untuk siswa pilot, HP pilot ter-install dan URL
+   server tersetel.
+5. **Dukung pilot → G9** (Dec 7–13) — dampingi siswa, catat kebingungan UX secara real-time.
+6. **Perbaiki temuan dan bangun RC → G11** (Dec 14–Jan 3) — satu temuan satu commit kecil,
+   `flutter analyze` bersih, build release candidate.
+7. **Siapkan demo → G13–G16** (Jan 4–18) — APK final, HP demo (baterai, brightness, mode
+   pesawat mati, kamera diuji), rekam layar untuk video cadangan bersama D.
+
+**Selesai jika (DoD):** APK terpasang dan lulus di dua HP; auto check-in jalan tanpa
+intervensi; instruksi siswa ada; HP demo punya checklist yang bisa dijalankan orang lain
+dalam dua menit.
+
+**Pertanyaan kritis wajib kamu jawab sendiri** (`docs/C/DECISIONS.md`):
+
+- Kalau koneksi HP→PC diblokir Wi-Fi kampus (sudah terbukti), jalur mana yang kita bakukan
+  untuk demo: `adb reverse`, hotspot, atau server publik? Bandingkan risiko tiap opsi.
+- Berapa lama siswa butuh dari membuka app sampai check-in selesai? Ukur pada 3 orang.
+- Pada kondisi apa app sebaiknya **menolak** check-in daripada mencoba terus (misal kamera
+  gelap)? Siapa yang dirugikan oleh tiap pilihan?
+- Apa yang terjadi kalau siswa menutup app di antara dua tahap? Sudahkah diuji?
+
+##### Package D — "Evidence, communication and presentation" (dashboard, reports, demo)
+
+**Big goal:** the project must be defensible in front of a teacher or panel using real
+evidence, and the demo must run on a script that cannot fail silently.
+
+**Stages (in order):**
+
+1. **Finish the dashboard and refresh evidence** (Nov 2–15) — close the remaining polish
+   items (status colors, schedule/date filter, CSV button, print CSS, responsive); one small
+   change, one commit, one browser check. Refresh `docs/D/evidence/`.
+2. **Teacher requirements and pilot logistics → G4** (Nov 16–29) — write the teacher's
+   requirements into `docs/D/teacher_requirements.md` and **lock the pilot date and student
+   roster**. This is the project's critical path: treat it as your most important deadline.
+3. **Pilot pack and slide skeleton** (Nov 30–Dec 6) — observation sheet, metrics form,
+   recording plan, who stands where, slide outline.
+4. **Document the pilot → G9** (Dec 7–13) — photos, video, notes, timings into
+   `docs/D/pilot_evidence/`.
+5. **Slides v1 and pilot results** (Dec 14–27) — 10–12 slides: problem → three-condition
+   rule → architecture → live demo → real numbers → limitations → future work.
+6. **Demo script and backup video → G14** (Dec 28–Jan 10) — minute-by-minute roles (A runs
+   the backend, C runs the phone, B stands by with the fallback, D narrates and keeps time),
+   plus a 30–60 s recording of the full flow.
+7. **Dry runs and final materials → G13, G15, G16** (Jan 11–18) — run both dry runs, fix
+   what breaks, final slides, printed handout, timekeeper on the day.
+
+**Done when:** dashboard final; `teacher_requirements.md` and the pilot date locked early;
+pilot documented with photos, video and numbers; slides + script + backup video finished;
+two dry-run reports written; you can run the demo from paper without improvising.
+
+**Critical-thinking questions you must answer yourself** (`docs/D/DECISIONS.md`):
+
+- What exactly must the panel see in the first 60 seconds, and what can be cut without
+  weakening the claim?
+- Which evidence is a real measurement and which is only a screenshot? Label them
+  differently.
+- If the live demo fails on stage, what is the exact sentence you say and what do you show
+  next?
+- What would a skeptical examiner attack first (anti-spoofing, Wi-Fi reliability, small
+  sample size), and where in the slides is the honest answer?
+
+**Dependency note:** D's stage 2 is the only stage in the whole plan that can stop everyone
+else. Escalate to A the same day if the teacher has not answered by **Nov 20**.
+
+#### 2.3 Critical-thinking rules (all members — part of the grading)
+
+1. **`docs/<X>/DECISIONS.md` is mandatory.** Each entry: problem → at least 2 options →
+   evidence/measurement → decision → consequences → revisit trigger.
+2. **Never hand over a problem without a proposal.** A question in the group chat must look
+   like: "I tried A and B, here are the results, I pick B because this, do you agree?" —
+   never "this error, what do I do?".
+3. **Numbers before opinions.** Every performance claim (accuracy, speed, stability) must
+   come with how it was measured. If it was not measured, write "not measured yet".
+4. **A only reviews and decides.** If A ends up doing another member's work, the package
+   failed — record that in the progress log.
+5. **Retire old assumptions with evidence.** Example already found: "Npcap is required on
+   Windows" is wrong for the ping + ARP path. Every document you touch gets re-verified
+   against the actual code or behaviour.
+6. **Write down what failed.** A negative finding (e.g. the AP management plane is not
+   viable) is a result, not a failure, and it belongs in the report.
+
+#### 2.4 Weekly ritual
+
+Sunday review + one progress-log entry per member (in English) answering three things:
+what was measured, what was decided, what is blocked. Entries go at the top of §5.
 
 ### Phase 3 — M3: Polish & submission (Jan 19 → Mar 18, 2027)
 
@@ -39,17 +266,21 @@
 |--------|------|
 | Jan 19 – Feb 15 | Fix all pilot/demo findings. B: production hardening checklist (CORS origins, `TIMEZONE=Asia/Jakarta`, upload caps, DB backup). C: final app polish, app icon/splash/name, versioning. A: re-verify accuracy numbers on final hardware, anti-spoofing limitation write-up. D: start assembling the final report. |
 | Feb 16 – Mar 1 | Each member writes their final-report chapter (see TASK.md files) and hands it to D **by Mar 1**. D compiles, A reviews the whole report. |
-| Mar 2–15 | **Code freeze Mar 2.** Regression: 124/124 tests, smoke test, one more end-to-end pass on real device. Release build v1.0. Final repo cleanup (no stray logs/DBs). |
+| Mar 2–15 | **Code freeze Mar 2.** Regression: full test suite green, smoke test, one more end-to-end pass on real device. Release build v1.0. Final repo cleanup (no stray logs/DBs). |
 | Mar 16–18 | Buffer. Final submission. |
 
 ## 3. Deliverables per member per milestone
 
 | Member | M1 (Nov 1, 2026) | M2 (Jan 18, 2027) | M3 (Mar 18, 2027) |
 |--------|------------------|-------------------|-------------------|
-| A | `docs/threshold_report.md` filled with real numbers + chosen threshold | Demo pipeline stable; pilot test executed + analyzed | Final accuracy chapter; frozen ML config; AGENTS.md current |
-| B | Real-network Wi-Fi validation results | Backend deployed on demo machine + demo data seeded | Deployment guide; hardening done; backend chapter |
-| C | Real-device test log + quick fixes | Demo phone ready; APK v0.9 | Release APK v1.0; mobile app chapter |
-| D | Failing test fixed; dashboard redesign committed; evidence pack; progress report | Slides + demo script + video; dashboard final | Final report assembled; testing & conclusion chapter |
+| A | `docs/threshold_report.md` filled with real numbers + chosen threshold | G3 ML config locked; G7 enrollment; G9 pilot led; G10 `pilot_report.md`; G12 scope locked | Final accuracy chapter; frozen ML config; AGENTS.md current |
+| B | Real-network Wi-Fi validation results | G1 demo machine; G5 offline fallback; guide validated from scratch; runbook printed | Deployment guide; hardening done; backend chapter |
+| C | Real-device test log + quick fixes | G2 second phone; G6 auto check-in owned; pilot support; demo phones + final APK | Release APK v1.0; mobile app chapter |
+| D | Failing test fixed; dashboard redesign committed; evidence pack; progress report | G4 teacher date + roster; G14 slides + script + backup video; dry-run reports | Final report assembled; testing & conclusion chapter |
+
+M2 is executed as four **work packages** with fixed gates (§2.2). Each member plans their
+own weeks; nobody waits for A to hand out steps. Every member maintains
+`docs/<X>/DECISIONS.md` — that file is graded.
 
 ## 4. Risks & mitigations
 
@@ -60,8 +291,32 @@
 | Demo-day network failure | B prepares an offline fallback: pre-seeded demo data + phone hotspot |
 | D blocked on dashboard code | One tiny change at a time, with AI guidance (see `docs/D/PROMPT.md`); escalate to A/B if stuck >30 min |
 | Deadline drift | Progress Log review every Sunday; A pings members who go quiet |
+| Teacher unavailable in Dec / exam season delays G4 | Lock the date by **Nov 22**; keep Dec 14–20 as a pilot backup window; slides (W8–W9) do not depend on pilot data so they can proceed in parallel |
+| Campus client isolation keeps `/wifi/scan` to the gateway | Demo on a network we control; `face_only` documented as expected behaviour; the AP-management-plane spike is timeboxed and can be declared "not viable" without blocking the demo |
+| Academic break (Dec 21 – Jan 3) kills momentum | Writing-only work scheduled there (slides, docs, anti-spoofing); no field tests, no mandatory meetings |
+| January scope creep ("one more feature") | Hard scope lock **Jan 8** (G12); Jan 16–17 is polish-only buffer |
+| Live demo fails on stage | B's seeded offline fallback + D's 30–60 s backup video, both verified in dry run #1 (G13), not on the day |
 
 ## 5. Progress Log (append newest entry at the top)
+
+### 2026-11-01 — M2 plan published: 16 gates + four large work packages + critical-thinking rules
+- **M1 closed out.** Progress report delivered today; baseline suite green (140/140 after
+  the anti-cheat tests), threshold decision recorded at 0.5, Docker deployment verified,
+  real-device flow passed, release APK v0.9.0 built and install-verified.
+- **M2 replanned from "monthly themes" to a gate-based flow** (§2): Nov 2, 2026 →
+  Jan 18, 2027. Pilot locked for **Dec 7–13, 2026** with **Dec 14–20** as the backup
+  window; demo scope locked **Jan 8**; dry runs **Jan 9–10** and **Jan 14–15**.
+- **Four large work packages** replace the old micro-task list (§2.2). Owners allocate
+  their own time; only the gates are fixed. Critical chain: teacher date (G4) → classroom
+  enrollment (G7) → pilot (G9) → analysis (G10) → slides → scope lock (G12) → dry runs.
+- **Critical thinking is now graded.** Every member keeps `docs/<X>/DECISIONS.md`
+  (created today, each with a worked example from M1). A's role is explicitly reviewer,
+  not solver — "asked how" must be answered with "measure first".
+- **Language rule made explicit** (§2.0 and `AGENTS.md`): work-package instructions for
+  A/B/C are Indonesian, for D English; **all system output and input — UI, API, logs,
+  comments, docs, CSV, slides, report — is English.**
+- Next: each member reads their own package in `docs/<X>/TASK.md` and reports their
+  own week split in the group chat by **Nov 3**; G1/G2 are due **Nov 8**.
 
 ### 2026-10-26 — C: REAL-DEVICE TEST PASSED (C1 core) + edge-case evidence + v0.9 prep; A: 3-student threshold re-run
 - **C1 PASSED on the real phone** (Samsung Galaxy S24, Android 16): install,

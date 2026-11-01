@@ -11,9 +11,22 @@ pimpin integrasi dan uji coba kelas nyata.
 Yang sudah TIDAK perlu kamu kerjakan (sudah selesai & lolos tes): two-stage logic,
 schedule enforcement, hardening enrollment, NIM lookup, CSV export. Jangan dibangun ulang.
 
+> **ATURAN BAHASA:** OUTPUT DAN INPUT DI SEMUA SISTEM PROYEK INI HARUS DALAM BAHASA
+> INGGRIS, karena tugas besar ini berbahasa Inggris dan hasilnya juga dinilai dalam bahasa
+> Inggris. Artinya: UI aplikasi, response/error API, log server, komentar kode, commit
+> message, seluruh isi `docs/**`, header CSV, teks dashboard, slides, video, dan laporan —
+> semuanya Inggris. Yang boleh tetap Indonesia: arahan tugas ini dan obrolan di grup.
+
+> **M2:** paket kerjamu ada di bagian "PAKET KERJA M2" di bawah. Kamu yang membagi waktu
+> per minggu; yang tetap hanya urutan tahap + tanggal gate (`docs/PLAN_TIMELINE.md` §2.1).
+
 ---
 
-## PRIORITAS 0 — wajib sebelum laporan kemajuan (~1 Nov 2026)
+## PRIORITAS 0 — M1 (SELESAI 1 Nov 2026)
+
+> ✅ Threshold report terisi angka nyata, threshold 0.5 diputuskan dengan bukti, PR anggota
+> sudah direview, tes hijau. Bagian ini disimpan sebagai catatan; jangan dikerjakan ulang.
+
 
 ### A1. Evaluasi threshold dengan data wajah NYATA (paling penting)
 Sistem masih memakai nilai default `FACE_SIMILARITY_THRESHOLD = 0.5` yang belum pernah
@@ -47,38 +60,49 @@ threshold terpilih + alasannya (bukan placeholder).
 
 ---
 
-## PRIORITAS 1 — November–Desember 2026
+## PAKET KERJA M2 — "Kalibrasi akurasi & bukti" (2 Nov 2026 → 18 Jan 2027)
 
-### A3. Eksperimen YOLO (dokumentasikan trade-off, jangan asal ubah)
-- `YOLO_CONF_THRESHOLD`: bandingkan 0.25 vs 0.30 vs 0.35 → catat recall wajah vs false positive.
-- `YOLO_IMG_SIZE`: bandingkan 640 vs 1280 → catat kecepatan vs akurasi deteksi.
-- Tulis rekomendasi singkat (satu tabel cukup) di bagian baru `docs/threshold_report.md`
-  atau file `docs/A/yolo_tuning.md`.
+> Satu paket besar. Kamu yang membagi waktu per minggu; yang tetap adalah **urutan tahap**
+> dan **tanggal gate** di `docs/PLAN_TIMELINE.md` §2.1. Setiap keputusan tidak sepele wajib
+> ditulis di `docs/A/DECISIONS.md` — file itu bagian dari penilaian M2.
 
-### A4. Uji ketahanan wajah nyata (robustness)
-Minimal 5 orang, kondisi berbeda: terang, redup, wajah miring, berkacamata, pakai masker
-(setengah wajah). Catat: berhasil deteksi? embedding keluar? skor similarity berapa?
-Tulis hasilnya di `docs/A/robustness_test.md`.
+**Tujuan besar:** sistem punya angka akurasi yang bisa dipertanggungjawabkan di depan dosen,
+dan demo memakai konfigurasi yang sudah diuji, bukan nilai default.
 
-### A5. Integrasi end-to-end rutin
-Setiap kali ada merge: `pytest` + `python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000`
-(server harus jalan duluan). Catat hasil di progress log `docs/PLAN_TIMELINE.md`.
+| # | Tahap | Periode | Gate | Yang dikerjakan + bukti |
+|---|-------|---------|------|--------------------------|
+| 1 | Tutup M1, jaga baseline | 2–8 Nov | — | Merge semua branch tertunda; `pytest` + `smoke_test` hijau; tidak ada PR menggantung |
+| 2 | Kalibrasi deteksi | 2–15 Nov | **G3** | Bandingkan `YOLO_CONF_THRESHOLD` 0.25 / 0.30 / 0.35 dan `YOLO_IMG_SIZE` 640 vs 1280 → `docs/A/yolo_tuning.md` (tabel trade-off kecepatan vs recall) + nilai final dikunci |
+| 3 | Bukti ketahanan | 9–22 Nov | — | Minimal 5 orang: terang, redup, wajah miring, berkacamata, masker → `docs/A/robustness_test.md` |
+| 4 | Siapkan pilot | 16–29 Nov | **G7** | `docs/A/pilot_plan.md` (metrik sukses) + enroll 5–10 siswa di kelas asli |
+| 5 | Pimpin pilot + analisis | 7–20 Des | **G9, G10** | Eksekusi lapangan + `docs/A/pilot_report.md`: % start→end tersambung, % `verified` vs `face_only`, detik per check-in, daftar kegagalan |
+| 6 | Kunci scope + jaga integrasi | 21 Des–18 Jan | **G12–G16** | Satu halaman "apa yang didemokan / tidak"; draft `docs/A/anti_spoofing.md` (kerja tulis, aman di minggu libur); verifikasi config di mesin demo |
+
+**Selesai jika (DoD):** keempat dokumen berisi angka nyata; konfigurasi final tertulis
+sebagai env yang benar-benar dipakai di mesin demo; scope demo muat satu halaman; baseline
+tes hijau sepanjang periode.
+
+**Pertanyaan kritis wajib kamu jawab sendiri** (di `docs/A/DECISIONS.md`):
+
+- Apakah threshold 0.5 masih benar untuk pencahayaan kelas asli, atau harus berbeda per
+  kamera/HP?
+- Berapa biaya (detik per check-in dan false reject) menaikkan `YOLO_IMG_SIZE` ke 1280 saat
+  demo?
+- Kalau akurasi jatuh saat pilot, penyebabnya model, kualitas enrollment, atau kamera HP?
+  Buktikan dengan data.
+- Apa yang **tidak** akan kita klaim di laporan karena belum pernah diukur?
+
+**Peran kepemimpinan (berubah):** kamu **reviewer**, bukan tukang solusi. Anggota wajib
+datang dengan usulan + bukti; kamu memutuskan. Kalau ditanya "harus bagaimana", balas
+dengan pertanyaan yang memaksa mereka mengukur dulu. Kalau kamu sampai mengerjakan bagian
+orang lain, catat itu di progress log — itu tanda paketnya gagal.
+
+Rutin yang tetap berlaku: setiap merge → `pytest` + `smoke_test`, hasilnya masuk progress
+log `docs/PLAN_TIMELINE.md`. Review tiap Minggu.
 
 ---
 
-## PRIORITAS 2 — Januari–Maret 2027
-
-### A6. Dokumentasi anti-spoofing (kejujuran teknis untuk laporan)
-InsightFace `buffalo_l` TIDAK punya deteksi liveness. Tulis di file
-`docs/A/anti_spoofing.md`: keterbatasan ini + mitigasi yang sudah ada (two-stage selfie
-pada dua waktu berbeda, Wi-Fi AP check, suasana kelas terawasi). Ini jadi bahan bab
-"limitations" di laporan akhir.
-
-### A7. Pimpin uji coba kelas nyata (pilot, Desember 2026)
-- Rencanakan bersama B (server) dan D (dokumentasi + izin guru): 5–10 siswa, satu jadwal nyata.
-- Tentukan metrik sukses: berapa % check-in start→end tersambung, berapa % verified
-  vs face_only, berapa detik per check-in.
-- Setelah pilot: triage temuan, bagikan perbaikan ke pemilik modul.
+## M3 (19 Jan – 18 Mar 2027) — belum dimulai
 
 ### A8. Bab laporan akhir — "Metode & Evaluasi Akurasi"
 Serahkan ke D paling lambat **1 Mar 2027**. Isi: metodologi evaluasi, tabel FAR/FRR/EER,
@@ -94,11 +118,13 @@ threshold terpilih, hasil robustness, hasil pilot, keterbatasan.
   File anggota lain → koordinasi dulu.
 - Ubah konfigurasi lewat **env variable** saat running/deployment, bukan hardcode.
 - Jangan commit: `attendance.db`, `*.pkl`, `yolov8m-face.pt`, foto wajah, log.
-- Macet >30 menit → tanya di grup.
+- Macet >30 menit → tanya di grup **dengan usulan**, bukan dengan masalah mentah.
+- Setiap keputusan tidak sepele wajib masuk `docs/A/DECISIONS.md` (isi entri: problem →
+  minimal 2 opsi → bukti → keputusan → konsekuensi → kapan ditinjau ulang).
 
 ## Deliverable per milestone
 | Milestone | Yang harus ada dari kamu |
 |---|---|
-| M1 (~1 Nov 2026) | `threshold_report.md` terisi nyata + threshold terpilih + review PR anggota |
-| M2 (~18 Jan 2027) | Pipeline stabil untuk demo + pilot selesai & dianalisis + config final |
+| M1 (~1 Nov 2026) | ✅ `threshold_report.md` terisi nyata + threshold terpilih + review PR anggota |
+| M2 (~18 Jan 2027) | G3 config ML terkunci · G7 enrollment kelas asli · G9 pilot dipimpin · G10 `pilot_report.md` · G12 scope demo terkunci |
 | M3 (~18 Mar 2027) | Bab akurasi laporan + config ML terkunci + `AGENTS.md` mutakhir |

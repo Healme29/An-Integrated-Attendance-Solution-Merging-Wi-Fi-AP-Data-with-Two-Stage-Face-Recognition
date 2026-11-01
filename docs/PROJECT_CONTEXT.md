@@ -259,6 +259,10 @@ beginner-safe dashboard task (single HTML file, no build step, instant browser f
 | **M2 — Presentation & demo** | **~Jan 18, 2027** (3 months) | Working end-to-end demo on real phone + real Wi-Fi, pilot classroom test done, slides + demo script + video |
 | **M3 — Final submission** | **~Mar 18, 2027** (5 months) | Code freeze, regression-tested release build v1.0, deployment on school machine, complete final report |
 
+M2 is executed as **four large work packages with 16 fixed gates** (G1–G16), not as a task
+list: see `docs/PLAN_TIMELINE.md` §2. Each member plans their own weeks and keeps a
+`docs/<X>/DECISIONS.md` log (graded).
+
 ---
 
 ## 11. Development environment facts (the team's machine)

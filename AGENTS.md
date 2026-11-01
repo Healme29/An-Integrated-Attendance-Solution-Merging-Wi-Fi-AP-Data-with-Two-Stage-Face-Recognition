@@ -2,7 +2,20 @@
 
 ## Language Convention
 
-**Write everything in English** — code, comments, docstrings, docs, commit messages, UI text, log output. The only exception is conversation with the user (Indonesian is fine there).
+**OUTPUT AND INPUT IN ALL SYSTEMS OF THIS PROJECT MUST BE IN ENGLISH BECAUSE THIS ASSIGNMENT USES ENGLISH (THE RESULT).**
+
+This covers, without exception: app UI text, API response bodies and error `detail`
+strings, server logs, code comments, docstrings, identifier naming, commit messages, every
+file under `docs/`, CSV headers, teacher-dashboard text, slides, demo video, and the final
+report.
+
+Two deliberate exceptions:
+
+1. Conversation between team members (group chat) may be Indonesian.
+2. Work-package instructions addressed to A, B and C are written in Indonesian
+   (`docs/A/TASK.md`, `docs/B/TASK.md`, `docs/C/TASK.md`); instructions for D are in
+   English (`docs/D/TASK.md`). Whatever those instructions *produce* is still English,
+   per the rule above.
 
 ## Project
 
