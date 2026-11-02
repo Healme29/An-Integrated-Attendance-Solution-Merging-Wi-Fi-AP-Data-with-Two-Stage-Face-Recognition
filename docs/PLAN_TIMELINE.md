@@ -299,6 +299,34 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-02 — B: G1 environment verified, scanner bugs fixed (measured), offline fallback + runbook drafted
+- **G1 verification (native mode, isolated DB, `TIMEZONE=Asia/Shanghai`,
+  `FACE_SIMILARITY_THRESHOLD=0.5`, `YOLO_IMG_SIZE=640`, `CORS_ORIGINS` scoped):** cold start →
+  `/health` ok in **5.9 s**; `TIMEZONE` proven by an 8 h gap between schedule
+  `created_at` `17:46:30` (CST) and the SQLite UTC student timestamp; data persisted across
+  a full stop/start; smoke test **14/14** (15th check is Windows-only); seeded demo data
+  served by `/attendance/today` + CSV. Evidence: `docs/B/demo_environment.md`.
+- **Two scanner bugs found and fixed (`backend/services/wifi_scanner.py`, allowed file):**
+  (1) subnet detection ignored the real netmask — on the campus `/17` it reported
+  `10.163.235.0/24` while the host is `10.163.216.151/17`; it now reads the true netmask,
+  reports/sweeps **exactly the /24 that is pinged** (`10.163.216.0/24`) and logs a warning;
+  (2) Linux without `CAP_NET_RAW` raised `PermissionError`, and the ping sweep used Windows
+  flags on Linux (silent no-op) — now platform-correct ping + `ip neigh` fallback with a
+  warning. 19 new tests (`test_wifi_subnet.py`); suite **171 passed, 1 skipped** (two
+  previously Windows-only tests are now portable).
+- **Recovery measured, not guessed:** corrupted DB → startup fails with
+  `sqlite3.DatabaseError`; restore backup + start → healthy in **6.2 s** (D-006).
+- **Deliverables:** `demo_environment.md` (G1 table + open items), `offline_fallback.md`
+  (one-page fallback ladder + hotspot/`adb reverse` order + the honest sentence for
+  `face_only`), `demo_runbook.md` (draft, printed copy, dry-run log table),
+  `ap_management_plane.md` (**verdict: not viable** — no AP access/authorisation; demo on a
+  network we control), `seed_demo.py` hardened (1–99 students, id reset, scoped cleanup of
+  stale embeddings, honest MAC note), `deployment_guide.md` (§5b native run, §8 measured
+  restore, §11 seed data, §12 2026-11-02 verification), `network_validation.md` §6 (F1
+  fixed, Linux findings), decisions D-002…D-008.
+- **Still open for G1:** repeat the table on the physical Windows demo laptop, measure a scan
+  with 1–2 real phones on a flat hotspot (not measured yet), warm up `buffalo_l` there.
+
 ### 2026-11-01 — A: Package A evidence base — 640 default, clean profiles, robustness protocol, pilot plan
 - **Config default:** `YOLO_IMG_SIZE` in `backend/config.py` is now **640** (the owner approved
   the flip after G3, D-002 update note). Env override stays for the G7 classroom

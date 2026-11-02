@@ -1,10 +1,11 @@
 # Wi-Fi Network Validation — Real Network Results (Task B1)
 
-> **Date of tests:** 2026-10-25
+> **Date of tests:** 2026-10-25 (campus network, Windows) · **re-run:** 2026-11-02 (Linux, scanner fix)
 > **Tested by:** member A (on behalf of B) + member B's manual checks
 > **Server:** `python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000`,
 > `TIMEZONE=Asia/Shanghai`
-> **Scanner implementation:** ping sweep + `arp -a` parsing (Windows), **no Npcap required**
+> **Scanner implementation:** ping sweep + `arp -a` parsing (Windows) / scapy ARP with a
+> ping + `ip neigh` fallback (Linux) — **no Npcap required** on either platform
 
 ---
 
@@ -54,16 +55,21 @@ Two real two-stage check-ins were completed through the Flutter app on this netw
 
 ## 3. Findings (why results are what they are)
 
-### F1. Subnet auto-detection assumes /24 — interfaces can be wider (real bug class)
-`detect_local_subnet()` derives the subnet as `a.b.c.0/24` from the local IP and ignores
-the real netmask. On this campus the interface is **/17** (`10.163.128.0/17`), so other
-clients may live in neighbouring /24s (e.g. `10.163.207.x` observed earlier, now
-`10.163.235.x`) and are never pinged.
+### F1. Subnet auto-detection assumes /24 — interfaces can be wider (real bug class) — **FIXED 2026-11-02**
 
-Additionally `_ping_sweep()` is hard-limited to `.1–.254` of the /24 regardless of the
-prefix, so even an explicit wider `WI_FI_SUBNET` would not enlarge the sweep without a
-code change. Sweeping a /17 (32k hosts) from a laptop is not practical anyway (minutes
-per scan, heavy broadcast/ping load).
+`detect_local_subnet()` now derives the actual netmask from the interface (`ip -4 addr`
+on Linux, `ipconfig` on Windows). If the network is wider than /24 the code logs a
+warning and reports/sweeps **only the /24 containing this machine** (capped at 254
+hosts). An explicit `WI_FI_SUBNET` wider than /24 is reduced the same way. The `/wifi/scan`
+`subnet` field is now exactly the range that was pinged, so an operator can tell at a glance
+what was searched.
+
+On the 2026-10-25 campus network the interface was `/17` (`10.163.235.210/17`); the
+scanner now returns and sweeps `10.163.235.0/24` (or the /24 of the host IP). Devices in
+other /24s inside the /17 would still be missed unless `WI_FI_SUBNET` is set to their /24
+or the sweep is expanded — but a full /17 sweep (32k hosts) takes minutes and is not
+practical from a laptop, so the explicit-subnet + "scan the room's /24" guidance remains.
+Tests: `backend/tests/test_wifi_subnet.py` (19 tests).
 
 ### F2. Only the gateway was visible — campus segmentation / client isolation
 Inside `10.163.235.0/24` only the gateway answered. Two possible causes, both common on
@@ -103,7 +109,7 @@ ARP alone. Room-level presence needs the AP management plane (see Recommendation
 | **Pilot (M1)** | Set `WI_FI_SUBNET` explicitly to the classroom's /24 and register each student's **real phone MAC** (disable "private/random MAC" for the school SSID during enrollment) | makes the AP check meaningful and predictable |
 | **Pilot (M1)** | Run the demo/pilot on one access point where client isolation is **off** (or a dedicated router/hotspot) | ARP scanning then sees the phones |
 | **M2** | Read client↔AP association + RSSI from the AP management plane (SSH/SNMP/controller API); pin the room via `schedules.ap_bssid` | real room-level presence; enables the RSSI threshold idea (~ -72 dBm ≈ outside the room) |
-| **M2** | Optional: derive the true netmask in `detect_local_subnet()` and document the sweep cap | correct reporting if a /16–/23 is used |
+| **M2** | ✅ **DONE 2026-11-02:** derive the true netmask in `detect_local_subnet()`, cap the sweep, and report exactly what was swept | F1 is fixed; `/wifi/scan` no longer claims a range it did not search |
 | **M2** | 5-minute presence tracker using dedupe + cached scans; away episodes visible on the teacher dashboard | the "student left mid-lesson" feature requested by the school |
 
 ---
@@ -135,3 +141,65 @@ for the RSSI-based "outside the room" threshold.
 | BSSID read | ✅ `54:2b:de:fd:90:21` (stable) |
 | BSSID pinning mismatch | ✅ covered by automated tests (`face_only`) |
 | Real two-stage check-in on this network | ✅ ids 11 & 12, `verified`, 0.71/0.72 |
+
+---
+
+## 6. Re-run on 2026-11-02 — scanner fixes measured on a real /17 interface
+
+Second measurement session, on a Linux laptop on the same campus SSID
+(`NJUPT-CMCC`, interface `wlo1` **10.163.216.151/17**, AP `50:98:b8:c9:2b:e2`), to verify the
+F1 fix and to find out what the scanner does where raw sockets are not available.
+
+### 6.1 Subnet detection before/after
+
+| | Old code | New code |
+|---|---|---|
+| Detected network | `10.163.235.0/24` (hard-coded /24, real netmask ignored) | `10.163.128.0/17` (from `ip -4 addr`) |
+| Range reported by `/wifi/scan` | `10.163.235.0/24` — **not** what was reachable | `10.163.216.0/24` — the /24 of this host, i.e. exactly what is swept |
+| Hosts pinged | `.1`–`.254` of the last octet | 254 hosts of the reported /24 (a /25 would ping 126) |
+| Operator feedback | silent | log line: `Interface network 10.163.128.0/17 is wider than /24; sweeping only 10.163.216.0/24` |
+
+The reported subnet now matches the sweep, which removes the "it says /24 but the network is
+/17" ambiguity from the earlier report. Devices in other /24s of the /17 are still missed by
+design (a /17 sweep is not feasible); `WI_FI_SUBNET` must name the classroom /24.
+
+### 6.2 Linux without root: raw sockets fail, fallback works
+
+First attempt on Linux returned nothing because scapy needs `CAP_NET_RAW`:
+
+```
+PermissionError: [Errno 1] Operation not permitted   (socket(AF_PACKET, SOCK_RAW))
+```
+
+The same error made 4 pytest tests fail on Linux (3 prompt tests + the Wi-Fi cache test)
+while they passed on Windows — a portability bug nobody had noticed. The scanner now:
+
+1. tries scapy ARP as before;
+2. on `ImportError`, `PermissionError` or any scan error, logs
+   `scapy ARP scan failed (...); using ping + neighbour fallback` and
+3. runs a **ping sweep + `ip neigh show`** (falling back to `arp -a`), which needs no
+   privileges.
+
+Platform ping flags were also wrong for Linux/macOS (the sweep always used the Windows
+`-n 1 -w 200ms` form, so on Linux every ping failed silently). Fixed:
+`-n 1 -w <ms>` on Windows, `-c 1 -W <ms>` on macOS, `-c 1 -W <s>` on Linux.
+
+### 6.3 Results on the real network with the fix
+
+| # | Scenario | Result | Verdict |
+|---|---|---|---|
+| 1 | `GET /wifi/scan`, no privileges, no `WI_FI_SUBNET` | `{"devices":[{"ip":"10.163.255.254","mac":"70:c6:dd:09:b0:02"}],"subnet":"10.163.216.0/24","count":1,"bssid":"50:98:b8:c9:2b:e2"}` | ✅ endpoint answers, subnet honest |
+| 2 | Subnet auto-detect on /17 | interface `10.163.128.0/17` → sweeps `10.163.216.0/24` | ✅ F1 fixed |
+| 3 | BSSID read on Linux | `50:98:b8:c9:2b:e2` via `iwconfig`, stable across calls | ✅ |
+| 4 | Devices visible | only the gateway — same client-isolation/VLAN behaviour as 2026-10-25 | ⚠️ expected, F2 unchanged |
+| 5 | Smoke test (includes real `/wifi/scan`) | 14/14 checks passed | ✅ |
+| 6 | Unprivileged fallback path | used automatically, warning logged | ✅ |
+| 7 | Automated tests | 171 passed, 1 skipped (23.8 s) | ✅ |
+
+### 6.4 What this does **not** prove
+
+- It is still **not measured** whether the scan sees a real phone on a **flat** network
+  (home router / hotspot). That is the configuration the demo will use, so it is the next
+  measurement (G5): join two phones to a hotspot with isolation off and record
+  `devices`, `count`, seconds per scan. Expected: phones appear; not yet observed.
+- No measurement on the demo laptop (Windows) with the new code yet — only the Linux host.
