@@ -324,6 +324,12 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
   stale embeddings, honest MAC note), `deployment_guide.md` (§5b native run, §8 measured
   restore, §11 seed data, §12 2026-11-02 verification), `network_validation.md` §6 (F1
   fixed, Linux findings), decisions D-002…D-008.
+- **Deployment guide followed from scratch in a clean clone (`guide_review.md`):** one real
+  defect found — `backend/data/models/` does not exist after `git clone`, so the documented
+  weights download fails as written; also fixed PowerShell-incompatible `curl`/`-d` examples,
+  the vague model warm-up step, missing firewall/IP commands, and the missing stop/start
+  instructions. `pip install` (multi-GB) and Docker were **not** re-executed here and are
+  still open; "followed by another person without help" is not earned yet.
 - **Still open for G1:** repeat the table on the physical Windows demo laptop, measure a scan
   with 1–2 real phones on a flat hotspot (not measured yet), warm up `buffalo_l` there.
 

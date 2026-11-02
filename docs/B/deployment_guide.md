@@ -117,26 +117,37 @@ Then re-create the container: `docker compose up -d`.
 
 ## 5. Verify
 
+Run these in **PowerShell**. Two Windows traps are already handled below: `curl` is an alias
+for `Invoke-WebRequest` (always write `curl.exe`), and JSON bodies must be single-quoted.
+
 ```powershell
 # 1. health
-curl http://127.0.0.1:8000/health
+curl.exe http://127.0.0.1:8000/health
 # {"status":"ok","database":"ok"}
 
 # 2. teacher dashboard
-start http://127.0.0.1:8000/dashboard
+Start-Process http://127.0.0.1:8000/dashboard
 
 # 3. API docs
-start http://127.0.0.1:8000/docs
+Start-Process http://127.0.0.1:8000/docs
 
 # 4. persistence: create a student, restart, confirm it is still there
-curl -X POST http://127.0.0.1:8000/students/ -H "Content-Type: application/json" -d "{\"name\":\"Deploy Check\",\"nim\":\"DEPLOY01\",\"mac_address\":null}"
+Invoke-RestMethod -Uri http://127.0.0.1:8000/students/ -Method Post `
+  -ContentType 'application/json' -Body '{"name":"Deploy Check","nim":"DEPLOY01","mac_address":null}'
 docker compose restart backend
-curl "http://127.0.0.1:8000/students/?nim=DEPLOY01"
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/students/?nim=DEPLOY01"
 # the student must still be returned -> the named volume works
 
 # 5. smoke test (host Python, no face photo needed)
 python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000
+
+# 6. stop / start later
+docker compose stop          # stop; data stays in the volume
+docker compose up -d         # start again (no rebuild)
 ```
+
+**A fresh clone has no database file.** The server creates `backend/attendance.db` (or the
+container volume) on the first start — that is expected, not an error.
 
 **Phone access over Wi-Fi:** allow port 8000 in Windows Defender Firewall when prompted,
 then set the app's server URL to `http://<machine-ip>:8000`.
@@ -156,8 +167,12 @@ py -3.11 -m venv .venv
 pip install -r backend\requirements.txt
 
 # 1. once: YOLO weights (52 MB, not in git)
-#    expected path: backend\data\models\yolov8m-face.pt
+#    the folder does NOT exist in a fresh clone - create it first (measured: the
+#    download fails with "cannot find path" if backend\data\models is missing)
+New-Item -ItemType Directory -Force backend\data\models | Out-Null
 curl.exe -L -o backend\data\models\yolov8m-face.pt https://github.com/YapaLab/yolo-face/releases/download/1.0.0/yolov8m-face.pt
+# sanity check: the file must be ~52 MB
+Get-Item backend\data\models\yolov8m-face.pt | Select-Object Length
 
 # 2. every demo: set the environment (values locked at G1/G3)
 $env:TIMEZONE                 = "Asia/Shanghai"   # schedules follow this
@@ -165,13 +180,23 @@ $env:FACE_SIMILARITY_THRESHOLD = "0.5"            # final value from A
 $env:YOLO_IMG_SIZE            = "640"             # measured: 3.8x faster, same recall
 $env:CORS_ORIGINS             = "http://127.0.0.1:8000"
 
-# 3. start from the repository root
+# 3. start from the repository root (Ctrl+C stops it)
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# 4. verify (second terminal)
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/wifi/scan      # phones + BSSID must be visible
+# 4. verify (second terminal, same PowerShell window settings not needed)
+curl.exe http://127.0.0.1:8000/health
+curl.exe http://127.0.0.1:8000/wifi/scan      # phones + BSSID must be visible
 python backend\scripts\smoke_test.py --base-url http://127.0.0.1:8000
+```
+
+Opening the port for the phone (once, as administrator):
+
+```powershell
+New-NetFirewallRule -DisplayName "Attendance backend 8000" -Direction Inbound `
+  -Protocol TCP -LocalPort 8000 -Action Allow
+# find the machine IP the phone must use (the Wi-Fi adapter's IPv4 address)
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -like "*Wi-Fi*"} |
+  Select-Object IPAddress, PrefixLength
 ```
 
 Notes:
@@ -205,14 +230,20 @@ This is a property of container networking, not a bug in our code.
 ## 7. First attendance check downloads models (~330 MB)
 
 The ArcFace models land in the persistent volume on the first recognition call
-(`/app/data/dbdata/insightface`). Do one warm-up call before a live demo so the download
-does not happen in front of the audience:
+(`/app/data/dbdata/insightface`), or in `DATA_DIR` when running natively. Do one warm-up call
+before a live demo so the download does not happen in front of the audience:
 
 ```powershell
-# upload any photo to /faces/recognize once, wait for the download to finish
+# any JPEG works - the point is to trigger the model load/download, not a match
+curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\any\photo.jpg"
+# expect a JSON answer within seconds-to-a-minute the first time:
+#   {"recognized":false,...} or {"recognized":true,...}  -> models are warm
+# a second identical call must be fast (measured ~1 s per check-in afterwards)
 ```
 
-After the first download the volume keeps the models across restarts and rebuilds.
+After the first download the volume (or `DATA_DIR`) keeps the models across restarts and
+rebuilds. Verify the second call is fast — if it is slow, the models were not cached where
+you think they are.
 
 ---
 
