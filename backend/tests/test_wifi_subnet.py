@@ -154,3 +154,174 @@ class TestUnprivilegedFallback:
         monkeypatch.setattr(wifi_scanner, "_scan_linux_neigh", lambda *_: sentinel)
 
         assert wifi_scanner._scan_linux("192.168.1.0/24", 1) == sentinel
+
+
+class TestBssidParsers:
+    def test_iw_link_connected(self):
+        output = (
+            "Connected to 50:98:b8:c9:2b:e2 (on wlp3s0)\n"
+            "\tSSID: ClassroomAP\n"
+            "\tfreq: 5180.0\n"
+        )
+        assert wifi_scanner.parse_iw_link_bssid(output) == "50:98:b8:c9:2b:e2"
+
+    def test_iw_link_not_connected(self):
+        assert wifi_scanner.parse_iw_link_bssid("Not connected.\n") is None
+
+    def test_iw_link_ignores_neighbouring_ap_list(self):
+        # 'iw dev <iface> link' only reports the current link, but make sure a
+        # BSSID from an unrelated line is not picked up as the association.
+        output = (
+            "Not connected.\n"
+            "    bss aa:bb:cc:dd:ee:ff\n"
+        )
+        assert wifi_scanner.parse_iw_link_bssid(output) is None
+
+    def test_nmcli_active_row(self):
+        output = (
+            "no:11:22:33:44:55:66\n"
+            "yes:50:98:B8:C9:2B:E2\n"
+            "no:aa:bb:cc:dd:ee:01\n"
+        )
+        assert wifi_scanner.parse_nmcli_bssid(output) == "50:98:b8:c9:2b:e2"
+
+    def test_nmcli_real_terse_output_escapes_colons(self):
+        # Captured verbatim from `nmcli -t -f ACTIVE,BSSID device wifi` on
+        # Ubuntu 24.04: terse mode backslash-escapes ':' inside values.
+        output = (
+            "no:50\\:98\\:B8\\:C9\\:2B\\:F0\n"
+            "no:50\\:98\\:B8\\:C9\\:2B\\:F2\n"
+            "yes:50\\:98\\:B8\\:C9\\:2B\\:E2\n"
+            "no:F4\\:74\\:88\\:70\\:C2\\:F3\n"
+        )
+        assert wifi_scanner.parse_nmcli_bssid(output) == "50:98:b8:c9:2b:e2"
+
+    def test_nmcli_without_active_row(self):
+        output = "no:11:22:33:44:55:66\nno:aa:bb:cc:dd:ee:01\n"
+        assert wifi_scanner.parse_nmcli_bssid(output) is None
+
+    def test_nmcli_handles_empty_bssid_field(self):
+        # nmcli prints an empty BSSID for hidden/placeholder rows: 'no:'
+        assert wifi_scanner.parse_nmcli_bssid("no:\n") is None
+
+
+class TestLinuxBssidProbes:
+    """The BSSID must not depend on 'iwconfig', which current distros drop."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_state(self):
+        wifi_scanner._BSSID_CACHE.update({"value": None, "ok": False, "timestamp": 0.0})
+        wifi_scanner._BSSID_WARNED["value"] = False
+        yield
+        wifi_scanner._BSSID_CACHE.update({"value": None, "ok": False, "timestamp": 0.0})
+        wifi_scanner._BSSID_WARNED["value"] = False
+
+    @staticmethod
+    def _fake_run(handlers):
+        """Build a subprocess.run replacement from {'iw dev': output, ...}.
+
+        A key that maps to FileNotFoundError simulates a missing binary, which
+        is exactly the 'iwconfig is gone' case on a minimal install.
+        """
+        calls = []
+
+        def run(cmd, **_kwargs):
+            calls.append(cmd)
+            joined = " ".join(cmd)
+            # Longest prefix first so 'iw dev wlp3s0 link' wins over 'iw dev'.
+            for prefix in sorted(handlers, key=len, reverse=True):
+                if joined.startswith(prefix):
+                    response = handlers[prefix]
+                    if isinstance(response, Exception):
+                        raise response
+                    return type("R", (), {"stdout": response, "stderr": "", "returncode": 0})()
+            raise FileNotFoundError(f"No such file or directory: {cmd[0]}")
+
+        run.calls = calls
+        return run
+
+    def test_iw_preferred_over_iwconfig(self, monkeypatch):
+        run = self._fake_run({
+            "iw dev": "phy#0\n\tInterface wlp3s0\n",
+            "iw dev wlp3s0 link": "Connected to 50:98:b8:c9:2b:e2 (on wlp3s0)\n",
+            "iwconfig": "wlp3s0  Access Point: 11:22:33:44:55:66\n",
+        })
+        monkeypatch.setattr(wifi_scanner.subprocess, "run", run)
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+
+        assert wifi_scanner.get_current_bssid(use_cache=False) == "50:98:b8:c9:2b:e2"
+        assert "iw dev wlp3s0 link" in [" ".join(c) for c in run.calls]
+
+    def test_falls_back_to_nmcli_when_iw_missing(self, monkeypatch):
+        run = self._fake_run({
+            "iw dev": FileNotFoundError("iw"),
+            "nmcli": "yes:50:98:B8:C9:2B:E2\n",
+        })
+        monkeypatch.setattr(wifi_scanner.subprocess, "run", run)
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+
+        assert wifi_scanner.get_current_bssid(use_cache=False) == "50:98:b8:c9:2b:e2"
+
+    def test_falls_back_to_iwconfig_last(self, monkeypatch):
+        run = self._fake_run({
+            "iw dev": FileNotFoundError("iw"),
+            "nmcli": FileNotFoundError("nmcli"),
+            "iwconfig": (
+                'wlp3s0  IEEE 802.11  ESSID:"ClassroomAP"\n'
+                "          Mode:Managed  Access Point: A4:2B:B0:12:34:56\n"
+            ),
+        })
+        monkeypatch.setattr(wifi_scanner.subprocess, "run", run)
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+
+        assert wifi_scanner.get_current_bssid(use_cache=False) == "a4:2b:b0:12:34:56"
+
+    def test_not_associated_returns_none_without_warning(self, monkeypatch, caplog):
+        run = self._fake_run({
+            "iw dev": "\tInterface wlp3s0\n",
+            "iw dev wlp3s0 link": "Not connected.\n",
+            "nmcli": "no:11:22:33:44:55:66\n",
+            "iwconfig": "wlp3s0  ESSID:off/any  Access Point: Not-Associated\n",
+        })
+        monkeypatch.setattr(wifi_scanner.subprocess, "run", run)
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+
+        with caplog.at_level("WARNING"):
+            assert wifi_scanner.get_current_bssid(use_cache=False) is None
+        assert "Cannot read the current BSSID" not in caplog.text
+
+    def test_no_tool_available_warns_once(self, monkeypatch, caplog):
+        run = self._fake_run({
+            "iw dev": FileNotFoundError("iw"),
+            "nmcli": FileNotFoundError("nmcli"),
+            "iwconfig": FileNotFoundError("iwconfig"),
+        })
+        monkeypatch.setattr(wifi_scanner.subprocess, "run", run)
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+
+        with caplog.at_level("WARNING"):
+            assert wifi_scanner.get_current_bssid(use_cache=False) is None
+            assert wifi_scanner.get_current_bssid(use_cache=False) is None
+
+        # Degradation is visible in the log, but only once per process.
+        assert caplog.text.count("Cannot read the current BSSID") == 1
+        assert "face_only" in caplog.text
+
+
+class TestPingCommand:
+    def test_darwin_uses_bsd_compatible_flags(self, monkeypatch):
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Darwin")
+        cmd = wifi_scanner._ping_command("192.168.1.1", 200)
+        # BSD ping has no portable millisecond per-packet flag; -W must not
+        # be passed (it is the Linux-only seconds variant).
+        assert cmd == ["ping", "-c", "1", "192.168.1.1"]
+
+    def test_linux_uses_second_granularity_timeout(self, monkeypatch):
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Linux")
+        cmd = wifi_scanner._ping_command("192.168.1.1", 200)
+        assert cmd == ["ping", "-c", "1", "-W", "1", "192.168.1.1"]
+
+    def test_windows_uses_milliseconds(self, monkeypatch):
+        monkeypatch.setattr(wifi_scanner.platform, "system", lambda: "Windows")
+        cmd = wifi_scanner._ping_command("192.168.1.1", 200)
+        assert cmd == ["ping", "-n", "1", "-w", "200", "192.168.1.1"]

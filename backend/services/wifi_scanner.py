@@ -222,11 +222,17 @@ def sweep_hosts(subnet: str) -> list[str]:
 
 
 def _ping_command(ip: str, timeout_ms: int) -> list[str]:
-    """Platform-correct single-packet ping command."""
+    """Platform-correct single-packet ping command.
+
+    Windows uses '-n'/'-w' (milliseconds), Linux '-c'/'-W' (seconds). BSD
+    ping (macOS) has no portable millisecond per-packet flag across
+    releases, so it is left to the subprocess timeout in _ping_sweep: one
+    packet is still sent, which is all the ARP cache needs.
+    """
     if platform.system() == "Windows":
         return ["ping", "-n", "1", "-w", str(timeout_ms), ip]
     if platform.system() == "Darwin":
-        return ["ping", "-c", "1", "-W", str(timeout_ms), ip]
+        return ["ping", "-c", "1", ip]
     return ["ping", "-c", "1", "-W", str(max(1, timeout_ms // 1000)), ip]
 
 
@@ -379,6 +385,145 @@ def parse_iwconfig_bssid(output: str) -> str | None:
     return None
 
 
+def parse_iw_link_bssid(output: str) -> str | None:
+    """Parse the BSSID from 'iw dev <iface> link' output.
+
+    The associated line looks like 'Connected to 50:98:b8:c9:2b:e2 (on
+    wlp3s0)'; when the link is down the output is 'Not connected.' and no
+    MAC is present. 'iw' is what replaced 'iwconfig' on current distros.
+    """
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("connected to"):
+            match = _MAC_PATTERN.search(stripped)
+            if match:
+                return normalize_mac(match.group(0))
+    return None
+
+
+def parse_nmcli_bssid(output: str) -> str | None:
+    """Parse the active BSSID from `nmcli -t -f ACTIVE,BSSID device wifi`.
+
+    Terse mode is colon-separated and escapes every colon inside a value, so
+    the real output is 'yes:50\\:98\\:B8\\:C9\\:2B\\:E2' (verified on Ubuntu
+    24.04 / NetworkManager 1.46). Rows starting with 'no:' belong to
+    neighbouring APs, not to this machine's link, and are skipped.
+    """
+    for line in output.splitlines():
+        active, sep, rest = line.replace("\\:", ":").partition(":")
+        if not sep:
+            continue
+        if active.strip().lower() not in {"yes", "*"}:
+            continue
+        match = _MAC_PATTERN.search(rest)
+        if match:
+            return normalize_mac(match.group(0))
+    return None
+
+
+def _wireless_interfaces() -> list[str] | None:
+    """Wireless interface names reported by 'iw dev', or None if 'iw' is absent.
+
+    None (tool missing) is distinct from [] (tool ran, no wireless
+    interface), because only the first case means BSSID checking is
+    impossible on this machine.
+    """
+    try:
+        result = subprocess.run(
+            ["iw", "dev"], capture_output=True, text=True, timeout=5
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    return re.findall(r"^\s*Interface\s+(\S+)\s*$", result.stdout or "", re.MULTILINE)
+
+
+def _bssid_via_iw() -> tuple[str | None, bool]:
+    """BSSID from 'iw dev <iface> link'. Returns (bssid, tool_was_available)."""
+    interfaces = _wireless_interfaces()
+    if interfaces is None:
+        return None, False
+    for iface in interfaces:
+        try:
+            result = subprocess.run(
+                ["iw", "dev", iface, "link"],
+                capture_output=True, text=True, timeout=5
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            continue
+        bssid = parse_iw_link_bssid(result.stdout or "")
+        if bssid:
+            return bssid, True
+    return None, True
+
+
+def _bssid_via_nmcli() -> tuple[str | None, bool]:
+    """BSSID from NetworkManager. Returns (bssid, tool_was_available)."""
+    try:
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "ACTIVE,BSSID", "device", "wifi"],
+            capture_output=True, text=True, timeout=5
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None, False
+    return parse_nmcli_bssid(result.stdout or ""), True
+
+
+def _bssid_via_iwconfig() -> tuple[str | None, bool]:
+    """BSSID from the deprecated 'iwconfig'. Returns (bssid, tool_was_available)."""
+    try:
+        result = subprocess.run(
+            ["iwconfig"], capture_output=True, text=True, timeout=5
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None, False
+    return parse_iwconfig_bssid(result.stdout or ""), True
+
+
+# Ordered newest-tool-first: 'iwconfig' was dropped from many current distros
+# and server images, so it must not be the only way to read the BSSID.
+_LINUX_BSSID_PROBES = (
+    ("iw", _bssid_via_iw),
+    ("nmcli", _bssid_via_nmcli),
+    ("iwconfig", _bssid_via_iwconfig),
+)
+
+_BSSID_WARNED = {"value": False}
+
+
+def _warn_no_bssid_tool() -> None:
+    """Log the "BSSID unreadable" warning once per process.
+
+    Without a working probe the server cannot tell which AP it is on, so
+    schedules.ap_bssid can never match and every check-in silently
+    degrades to face_only (see docs/B/network_validation.md F6).
+    """
+    if _BSSID_WARNED["value"]:
+        return
+    _BSSID_WARNED["value"] = True
+    logger.warning(
+        "Cannot read the current BSSID: none of 'iw', 'nmcli' or 'iwconfig' "
+        "is available on this Linux host. AP pinning (schedules.ap_bssid) "
+        "can never verify, so check-ins will be recorded as face_only. "
+        "Install 'iw' (package: iw) or set the schedule ap_bssid to NULL."
+    )
+
+
+def _resolve_linux_bssid() -> tuple[str | None, str | None, bool]:
+    """Try each Linux BSSID probe in order.
+
+    Returns (bssid, tool_that_worked, at_least_one_tool_ran). A None BSSID
+    with at_least_one_tool_ran=True means "not associated", which is normal
+    and must not warn.
+    """
+    any_tool = False
+    for name, probe in _LINUX_BSSID_PROBES:
+        bssid, available = probe()
+        any_tool = any_tool or available
+        if bssid:
+            return bssid, name, True
+    return None, None, any_tool
+
+
 def get_current_bssid(use_cache: bool = True) -> str | None:
     """BSSID of the AP this machine is currently associated with.
 
@@ -401,10 +546,11 @@ def get_current_bssid(use_cache: bool = True) -> str | None:
             )
             bssid = parse_netsh_bssid(result.stdout or "")
         elif system == "Linux":
-            result = subprocess.run(
-                ["iwconfig"], capture_output=True, text=True, timeout=5
-            )
-            bssid = parse_iwconfig_bssid(result.stdout or "")
+            bssid, method, any_tool = _resolve_linux_bssid()
+            if bssid:
+                logger.debug("Current BSSID %s read via %s", bssid, method)
+            elif not any_tool:
+                _warn_no_bssid_tool()
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         bssid = None
 
