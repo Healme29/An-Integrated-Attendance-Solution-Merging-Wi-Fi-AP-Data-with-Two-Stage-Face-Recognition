@@ -21,6 +21,11 @@ your machine
             └── insightface/                   (ArcFace models, ~330 MB, downloaded on first use)
 ```
 
+> **Demo rule (measured):** Wi-Fi presence scanning only works from the **host's**
+> network stack. On Docker Desktop (Windows/macOS) the container cannot see the
+> host Wi-Fi LAN — for any demo/pilot that must show `/wifi/scan` finding real
+> phones or BSSID pinning working, **run natively** with `uvicorn`. See §6.
+
 ---
 
 ## 1. Prerequisites
@@ -112,29 +117,97 @@ Then re-create the container: `docker compose up -d`.
 
 ## 5. Verify
 
+Run these in **PowerShell**. Two Windows traps are already handled below: `curl` is an alias
+for `Invoke-WebRequest` (always write `curl.exe`), and JSON bodies must be single-quoted.
+
 ```powershell
 # 1. health
-curl http://127.0.0.1:8000/health
+curl.exe http://127.0.0.1:8000/health
 # {"status":"ok","database":"ok"}
 
 # 2. teacher dashboard
-start http://127.0.0.1:8000/dashboard
+Start-Process http://127.0.0.1:8000/dashboard
 
 # 3. API docs
-start http://127.0.0.1:8000/docs
+Start-Process http://127.0.0.1:8000/docs
 
 # 4. persistence: create a student, restart, confirm it is still there
-curl -X POST http://127.0.0.1:8000/students/ -H "Content-Type: application/json" -d "{\"name\":\"Deploy Check\",\"nim\":\"DEPLOY01\",\"mac_address\":null}"
+Invoke-RestMethod -Uri http://127.0.0.1:8000/students/ -Method Post `
+  -ContentType 'application/json' -Body '{"name":"Deploy Check","nim":"DEPLOY01","mac_address":null}'
 docker compose restart backend
-curl "http://127.0.0.1:8000/students/?nim=DEPLOY01"
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/students/?nim=DEPLOY01"
 # the student must still be returned -> the named volume works
 
 # 5. smoke test (host Python, no face photo needed)
 python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000
+
+# 6. stop / start later
+docker compose stop          # stop; data stays in the volume
+docker compose up -d         # start again (no rebuild)
 ```
+
+**A fresh clone has no database file.** The server creates `backend/attendance.db` (or the
+container volume) on the first start — that is expected, not an error.
 
 **Phone access over Wi-Fi:** allow port 8000 in Windows Defender Firewall when prompted,
 then set the app's server URL to `http://<machine-ip>:8000`.
+
+---
+
+## 5b. Native run (required when the demo must show Wi-Fi presence)
+
+Use this mode on the demo/pilot machine. Measured on 2026-11-02: a cold start is
+**~5.9 s** to `{"status":"ok","database":"ok"}` and `/wifi/scan` finds devices that
+Docker cannot see (details in `docs/B/demo_environment.md`).
+
+```powershell
+# 0. once: Python 3.11+ and the dependencies
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+
+# 1. once: YOLO weights (52 MB, not in git)
+#    the folder does NOT exist in a fresh clone - create it first (measured: the
+#    download fails with "cannot find path" if backend\data\models is missing)
+New-Item -ItemType Directory -Force backend\data\models | Out-Null
+curl.exe -L -o backend\data\models\yolov8m-face.pt https://github.com/YapaLab/yolo-face/releases/download/1.0.0/yolov8m-face.pt
+# sanity check: the file must be ~52 MB
+Get-Item backend\data\models\yolov8m-face.pt | Select-Object Length
+
+# 2. every demo: set the environment (values locked at G1/G3)
+$env:TIMEZONE                 = "Asia/Shanghai"   # schedules follow this
+$env:FACE_SIMILARITY_THRESHOLD = "0.5"            # final value from A
+$env:YOLO_IMG_SIZE            = "640"             # measured: 3.8x faster, same recall
+$env:CORS_ORIGINS             = "http://127.0.0.1:8000"
+
+# 3. start from the repository root (Ctrl+C stops it)
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# 4. verify (second terminal, same PowerShell window settings not needed)
+curl.exe http://127.0.0.1:8000/health
+curl.exe http://127.0.0.1:8000/wifi/scan      # phones + BSSID must be visible
+python backend\scripts\smoke_test.py --base-url http://127.0.0.1:8000
+```
+
+Opening the port for the phone (once, as administrator):
+
+```powershell
+New-NetFirewallRule -DisplayName "Attendance backend 8000" -Direction Inbound `
+  -Protocol TCP -LocalPort 8000 -Action Allow
+# find the machine IP the phone must use (the Wi-Fi adapter's IPv4 address)
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -like "*Wi-Fi*"} |
+  Select-Object IPAddress, PrefixLength
+```
+
+Notes:
+
+- `TIMEZONE` is what makes schedule windows and stored timestamps correct. If check-ins
+  fail with `outside_class_time` on a machine whose clock "looks right", compare
+  `GET /attendance/today` timestamps with your watch before touching the schedule.
+- `WI_FI_SUBNET` is optional. Unset → auto-detected from the interface; the value shown by
+  `/wifi/scan` is **exactly the /24 that was swept**. On a network wider than /24 set the
+  classroom /24 explicitly.
+- Windows does **not** need Npcap for the scan path (ping sweep + `arp -a`).
 
 ---
 
@@ -157,18 +230,28 @@ This is a property of container networking, not a bug in our code.
 ## 7. First attendance check downloads models (~330 MB)
 
 The ArcFace models land in the persistent volume on the first recognition call
-(`/app/data/dbdata/insightface`). Do one warm-up call before a live demo so the download
-does not happen in front of the audience:
+(`/app/data/dbdata/insightface`), or in `DATA_DIR` when running natively. Do one warm-up call
+before a live demo so the download does not happen in front of the audience:
 
 ```powershell
-# upload any photo to /faces/recognize once, wait for the download to finish
+# any JPEG works - the point is to trigger the model load/download, not a match
+curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\any\photo.jpg"
+# expect a JSON answer within seconds-to-a-minute the first time:
+#   {"recognized":false,...} or {"recognized":true,...}  -> models are warm
+# a second identical call must be fast (measured ~1 s per check-in afterwards)
 ```
 
-After the first download the volume keeps the models across restarts and rebuilds.
+After the first download the volume (or `DATA_DIR`) keeps the models across restarts and
+rebuilds. Verify the second call is fast — if it is slow, the models were not cached where
+you think they are.
 
 ---
 
 ## 8. Backup and restore the database
+
+Two modes, pick the one matching how the backend runs.
+
+**Docker:**
 
 ```powershell
 # backup (runs inside the container, writes into the current folder)
@@ -180,6 +263,25 @@ docker compose cp ./attendance-backup.db backend:/app/data/dbdata/attendance.db
 docker compose restart backend
 ```
 
+**Native (recommended for the demo machine):**
+
+```powershell
+# backup: stop the server first (SQLite locks the file on Windows), then copy
+Copy-Item backend\attendance.db "backups\attendance-$(Get-Date -Format yyyyMMdd-HHmm).db"
+
+# restore: copy the backup over the live file and start the server again
+Copy-Item backups\attendance-20270118-0900.db backend\attendance.db -Force
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+**Measured recovery time (2026-11-02, seeded DB, this repo):** a corrupted database makes
+startup fail immediately (`sqlite3.DatabaseError: file is not a database`, connection
+refused). Copying the backup over it and starting the server reached
+`{"status":"ok","database":"ok"}` in **6.2 s** — 5.9 s of that is the interpreter +
+FastAPI startup, 0.3 s the file copy. So the honest demo-day number is **under 10 s plus
+the time to notice**, provided a backup file exists. Make a backup right before the demo
+and keep it on a USB stick/phone as well.
+
 ---
 
 ## 9. Troubleshooting
@@ -188,8 +290,11 @@ docker compose restart backend
 |---|---|
 | `failed to fetch anonymous token` / registry timeout | configure mirrors (§2) |
 | `port is already allocated` | another process uses 8000; set `BACKEND_PORT=8001` or stop the local server |
-| Dashboard opens but all data empty | fresh volume — seed demo data (script planned under `backend/scripts/`) |
+| Dashboard opens but all data empty | run `python backend\scripts\seed_demo.py --students 5` (§11) |
 | `/wifi/scan` returns Docker-internal addresses | expected in Docker Desktop; see §6 |
+| `/wifi/scan` shows a /24 although the network is wider | expected: only one /24 is swept; set `WI_FI_SUBNET` to the classroom /24 |
+| `/wifi/scan` returns `devices: []` on Linux as a normal user | raw sockets are unavailable; the scanner falls back to ping + `ip neigh` automatically (log line `scapy ARP scan failed`) |
+| Server refuses connections and the log ends with `sqlite3.DatabaseError: file is not a database` | the DB file is damaged: restore a backup (§8) |
 | Phone cannot connect | firewall port 8000; same Wi-Fi; use the machine's LAN IP, or USB `adb reverse` for a phone |
 
 ---
@@ -216,4 +321,61 @@ registry mirrors `docker.m.daocloud.io` + `dockerproxy.com`, host port `8001`.
 **Conclusion for the team:** Docker is the right vehicle for the dashboard/API demo and for
 seeded offline data, but the **Wi-Fi presence feature must run natively** (or on a Linux
 host with `network_mode: host`) for the classroom pilot.
+
+---
+
+## 11. Demo data (offline fallback)
+
+`backend/scripts/seed_demo.py` writes demo students, a class that is **open right now**
+(start = now − 5 min, end = now + 55 min, never crossing midnight) and sample attendance
+rows directly into the SQLite file. Run it with the server **stopped** on Windows.
+
+```powershell
+# clean slate, 5 demo students, dashboard immediately has something to show
+python backend\scripts\seed_demo.py --reset --students 5
+
+# more students (max 99), or a different database file
+python backend\scripts\seed_demo.py --students 8 --db C:\demo\attendance.db
+```
+
+What it produces (measured 2026-11-02, `TIMEZONE=Asia/Shanghai`):
+
+| Item | Result |
+|---|---|
+| Students | `Demo Student 1..N`, NIM `DEMO0001..`, MAC `02:00:00:00:00:01..` |
+| Schedule | `Demo Class`, today's weekday, active window around "now" |
+| Attendance | 5 rows for 3+ students: two complete `verified` pairs and one `face_only` start |
+| Dashboard | `/attendance/today` and `/attendance/export/csv` serve the seeded rows immediately |
+
+`--reset` also deletes the embedding pickles and stored face crops **of the deleted
+students only** (so a reused student id cannot match an old face) and restarts the id
+sequences at 1. Real enrolled profiles are left untouched.
+
+The fake MACs mean the Wi-Fi prompt stays `false` for demo students — correct, because no
+phone has that address. For a live Wi-Fi demo register a real phone MAC with
+`PUT /students/{id}/mac`, or demo with the real students.
+
+---
+
+## 12. Verified on 2026-11-02 — native run (G1 evidence)
+
+Setup: Linux 6.x laptop, Python 3.12.3 in `venv`, `python -m uvicorn backend.main:app
+--host 0.0.0.0 --port 8011`, isolated `DATABASE_PATH`, `TIMEZONE=Asia/Shanghai`,
+`FACE_SIMILARITY_THRESHOLD=0.5`, `YOLO_IMG_SIZE=640`, `CORS_ORIGINS=http://127.0.0.1:8011`.
+
+| Check | Result |
+|---|---|
+| Cold start → `/health` ok | ✅ **5.9 s** |
+| `TIMEZONE` applied | ✅ schedule `created_at` 17:46:30 (CST) vs SQLite UTC 09:46:30 → +8 h |
+| Data persists across stop/start | ✅ student `G1CHECK01` returned after restart |
+| `/wifi/scan` native | ✅ 1 device (gateway `10.163.255.254`), BSSID `50:98:b8:c9:2b:e2` |
+| Subnet auto-detect on a /17 interface | ✅ interface `10.163.128.0/17` → sweeps and reports `10.163.216.0/24` |
+| Smoke test | ✅ **14/14** (the 15th check is Windows-only: it reads the host MAC with `getmac`) |
+| `seed_demo.py --reset` | ✅ 5 students, 1 open class, 5 attendance rows, served by the dashboard |
+| Recovery from a corrupted DB | ✅ restore + start = **6.2 s** to healthy (see §8) |
+| Docker in this environment | ⏸ not measured — no Docker daemon on this machine; last Docker run 2026-10-25 (§10) |
+
+G1 on the **actual demo laptop** (Windows) is still open: install, run §5b, repeat this
+table there and paste the numbers into `docs/B/demo_environment.md`.
+
 

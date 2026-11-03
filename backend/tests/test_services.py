@@ -127,7 +127,10 @@ class TestWifiScannerService:
         assert check_mac_on_network("aa:bb:cc:dd:ee:ff", []) is False
 
     def test_scan_cache_reuses_result(self):
-        with patch("services.wifi_scanner._scan_windows") as mock_scan:
+        # Pin the platform so the Windows scan path (and the mock target below)
+        # is exercised on every OS, including Linux CI.
+        with patch("services.wifi_scanner._scan_windows") as mock_scan, \
+                patch("services.wifi_scanner.platform.system", return_value="Windows"):
             mock_scan.return_value = [{"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"}]
             wifi_scanner._scan_cache["devices"] = None
 
