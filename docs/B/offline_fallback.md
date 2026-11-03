@@ -82,6 +82,29 @@ answers on port 8000.
 Why this is honest, not an excuse: `face_only` is a real row in the database with
 `wifi_verified = 0` (`docs/B/network_validation.md` §3 F2, `docs/PROJECT_CONTEXT.md` §2).
 
+### 4b. If the server cannot read its own BSSID
+
+A second, different reason for `face_only`: the laptop cannot tell which AP it is on, so a
+pinned `schedules.ap_bssid` can never match. Since 2026-11-03 this is **visible**, not
+silent — the server log shows one line:
+
+```
+WARNING services.wifi_scanner: Cannot read the current BSSID: none of 'iw', 'nmcli' or
+'iwconfig' is available on this Linux host. ... Install 'iw' (package: iw) or set the
+schedule ap_bssid to NULL.
+```
+
+What to do, in order:
+
+1. `curl http://127.0.0.1:8000/wifi/scan` — if `"bssid": null`, the check cannot pass.
+2. Quick fix on stage: set that schedule's `ap_bssid` to NULL (`PUT /schedules/{id}`), which
+   means "do not pin the AP" — the Wi-Fi presence check still runs, only the room check is
+   skipped. Say that out loud, do not hide it.
+3. Do **not** hand-type a BSSID you copied from a phone. A wrong pin is worse than no pin.
+
+Measured on this laptop: reading the BSSID works through `nmcli` even though `iw` is not
+installed (`docs/B/network_validation.md` §7).
+
 ---
 
 ## 5. Pre-demo checklist (10 minutes, offline)
@@ -94,7 +117,7 @@ Why this is honest, not an excuse: `face_only` is a real row in the database wit
 | 4 | Data present | `curl http://127.0.0.1:8000/attendance/today` | rows (seeded or real) |
 | 5 | Dashboard | open `/dashboard` | table + status colours render |
 | 6 | CSV | `/attendance/export/csv` | downloads, header `id,timestamp,...` |
-| 7 | Wi-Fi | `/wifi/scan` | phone MAC visible (or the §4 sentence ready) |
+| 7 | Wi-Fi | `/wifi/scan` | phone MAC visible (or the §4 sentence ready) **and** `"bssid"` is not null (§4b) |
 | 8 | Backup | copy `attendance.db` to `backups\` + USB | file exists |
 | 9 | Clock | compare `/attendance/today` timestamps to the wall clock | same timezone (`Asia/Shanghai`) |
 

@@ -299,6 +299,31 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-03 — B: review findings 1/6 fixed (BSSID probe chain, macOS ping), 2/3/4/5 scoped
+- **Review of `task-b` (8.5/10, 2026-11-02) answered finding by finding in
+  `docs/B/review_response.md`:** 3 closed with re-runnable evidence, 4 left open with the
+  exact person who unblocks them. Nothing is claimed done without a test or a measurement.
+- **Finding 1 (High) closed — `iwconfig` was the only BSSID probe.** Reproduced the risk on
+  this laptop: `iw` is **not installed**, `nmcli`/`iwconfig` are. `get_current_bssid()` now
+  runs `iw dev <iface> link` → `nmcli -t -f ACTIVE,BSSID device wifi` → `iwconfig`, returns
+  the same BSSID (`50:98:b8:c9:2b:e2`, now via `nmcli`), stays silent when merely not
+  associated, and logs **one** actionable `WARNING` per process when no probe exists
+  (`PATH=/nonexistent` reproduced). The live run also exposed that `nmcli -t` escapes colons
+  (`yes:50\:98\:B8\:...`), so the first fallback parser silently failed — unescape + pinned
+  test. 15 new tests; suite **187 passed**.
+- **Finding 6 (Low) closed:** Darwin gets `ping -c 1` (no `-W`); each call is already bounded
+  by the subprocess timeout. macOS has no BSSID probe and now says so (D-010).
+- **Finding 2 (High) prepared, not executed:** verified `origin/main` is an ancestor of
+  `task-b` and `git merge-tree` is clean → ff-merge, no conflicts; merge command handed to
+  **A** per the review's reviewer rule.
+- **Findings 3/4/5 kept open on purpose:** the timed `pip install` was **not** run here — the
+  root filesystem has 6.2 GB free and torch + CUDA wheels would fill it (`demo_environment.md`
+  §6.1); the demo laptop run, the two-phone hotspot session and the outsider guide run need
+  hardware and people, so they are scheduled with owners, not faked.
+- **Docs:** `network_validation.md` §7 (before/after, the escaped-`nmcli` bug, F6),
+  `DECISIONS.md` D-009/D-010 with **Evidence files:** cross-links, `offline_fallback.md` §4b
+  (what to do when `bssid` is null) and checklist row 7, `demo_environment.md` §6/§6.1/§6.2.
+
 ### 2026-11-02 — B: G1 environment verified, scanner bugs fixed (measured), offline fallback + runbook drafted
 - **G1 verification (native mode, isolated DB, `TIMEZONE=Asia/Shanghai`,
   `FACE_SIMILARITY_THRESHOLD=0.5`, `YOLO_IMG_SIZE=640`, `CORS_ORIGINS` scoped):** cold start →

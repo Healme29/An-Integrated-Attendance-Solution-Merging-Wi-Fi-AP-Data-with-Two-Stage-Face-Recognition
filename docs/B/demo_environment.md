@@ -172,3 +172,20 @@ team baseline looked green while a Linux machine was red):
 | 2 | Re-measure a scan with **1–2 real phones** on the demo network (hotspot with isolation off) | `GET /wifi/scan` must list the phone MACs; record seconds per scan |
 | 3 | Confirm model warm-up on the demo laptop (first recognition downloads `buffalo_l`, ~330 MB) | one `/faces/recognize` call before the demo, then time a real check-in |
 | 4 | Docker on the demo laptop | optional — only needed if the dashboard is demoed while native Wi-Fi is not |
+| 5 | **Timed, full `pip install -r backend/requirements.txt` on a clean machine** | `time pip install -r backend/requirements.txt` in a fresh venv, paste the wall time |
+
+### 6.1 Why item 5 is not already done here
+
+The install was **not** run end-to-end on this machine: the root filesystem has 6.2 GB free
+(`df -h /`), and `ultralytics` pulls `torch` plus the `nvidia-*` CUDA wheels, which is
+2–3 GB of downloads and more than that unpacked. Filling the disk to measure the timer would
+destroy the working environment, so the step is left to the demo laptop, where the disk is
+empty and the measurement is the one that actually matters. Recorded honestly rather than
+estimated: `pip install` time is **not measured yet**.
+
+### 6.2 Closed on 2026-11-03 (was a risk, not an open measurement)
+
+| Item | Status |
+|---|---|
+| BSSID unreadable because only `iwconfig` was supported | ✅ fixed — probe chain `iw` → `nmcli` → `iwconfig`, warning when none work; proven on a host **without** `iw` (`network_validation.md` §7, D-009) |
+| macOS `ping` flags wrong | ✅ fixed — plain `-c 1` on Darwin (`network_validation.md` §6.2, D-010) |

@@ -182,7 +182,9 @@ while they passed on Windows — a portability bug nobody had noticed. The scann
 
 Platform ping flags were also wrong for Linux/macOS (the sweep always used the Windows
 `-n 1 -w 200ms` form, so on Linux every ping failed silently). Fixed:
-`-n 1 -w <ms>` on Windows, `-c 1 -W <ms>` on macOS, `-c 1 -W <s>` on Linux.
+`-n 1 -w <ms>` on Windows, `-c 1 -W <s>` on Linux, and plain `-c 1` on macOS — BSD `ping`
+has no per-packet millisecond flag that is portable across macOS releases, and the sweep
+already bounds each call with a subprocess timeout (§7.3).
 
 ### 6.3 Results on the real network with the fix
 
@@ -190,7 +192,7 @@ Platform ping flags were also wrong for Linux/macOS (the sweep always used the W
 |---|---|---|---|
 | 1 | `GET /wifi/scan`, no privileges, no `WI_FI_SUBNET` | `{"devices":[{"ip":"10.163.255.254","mac":"70:c6:dd:09:b0:02"}],"subnet":"10.163.216.0/24","count":1,"bssid":"50:98:b8:c9:2b:e2"}` | ✅ endpoint answers, subnet honest |
 | 2 | Subnet auto-detect on /17 | interface `10.163.128.0/17` → sweeps `10.163.216.0/24` | ✅ F1 fixed |
-| 3 | BSSID read on Linux | `50:98:b8:c9:2b:e2` via `iwconfig`, stable across calls | ✅ |
+| 3 | BSSID read on Linux | `50:98:b8:c9:2b:e2` via `iwconfig`, stable across calls | ✅ (single-tool version; hardened in §7) |
 | 4 | Devices visible | only the gateway — same client-isolation/VLAN behaviour as 2026-10-25 | ⚠️ expected, F2 unchanged |
 | 5 | Smoke test (includes real `/wifi/scan`) | 14/14 checks passed | ✅ |
 | 6 | Unprivileged fallback path | used automatically, warning logged | ✅ |
@@ -203,3 +205,88 @@ Platform ping flags were also wrong for Linux/macOS (the sweep always used the W
   measurement (G5): join two phones to a hotspot with isolation off and record
   `devices`, `count`, seconds per scan. Expected: phones appear; not yet observed.
 - No measurement on the demo laptop (Windows) with the new code yet — only the Linux host.
+
+---
+
+## 7. Re-run on 2026-11-03 — BSSID probe chain (review finding 1)
+
+Triggered by the review of `task-b`: `get_current_bssid()` read the BSSID with **only**
+`iwconfig`, a tool that current distros and minimal/server images no longer ship. If it is
+missing, the function returned `None` with no log line, so `schedules.ap_bssid` could never
+match and every check-in silently degraded to `face_only`.
+
+### 7.1 What the machine actually has
+
+```
+$ command -v iw; command -v nmcli; command -v iwconfig
+(nothing)                    # iw is NOT installed on this laptop
+/usr/bin/nmcli               # NetworkManager 1.46
+/usr/sbin/iwconfig           # legacy wireless-tools
+```
+
+So the pre-fix code worked **by luck**: it depended on the one tool that is on its way out.
+This is exactly the failure mode the review predicted, and it was reproducible on the very
+machine that produced the original evidence.
+
+### 7.2 Before / after on the same link (AP `50:98:b8:c9:2b:e2`)
+
+| | Before (`iwconfig` only) | After (probe chain) |
+|---|---|---|
+| Probe order | `iwconfig` | `iw dev <iface> link` → `nmcli -t -f ACTIVE,BSSID device wifi` → `iwconfig` |
+| Result on this laptop | `50:98:b8:c9:2b:e2` (via `iwconfig`) | `50:98:b8:c9:2b:e2` (via **`nmcli`**, `iw` absent) |
+| Tool missing | silent `None` → every check-in becomes `face_only` | one `WARNING` naming all three probes and the fix (`install iw`, or set `ap_bssid` to NULL) |
+| Not associated with any AP | silent `None` | `None`, **no** warning (normal state, not a fault) |
+
+Measured:
+
+```
+$ python -c "from services import wifi_scanner as w; print(w._resolve_linux_bssid())"
+('50:98:b8:c9:2b:e2', 'nmcli', True)
+
+$ PATH=/nonexistent python -c "..."          # simulate "no tool at all"
+WARNING services.wifi_scanner: Cannot read the current BSSID: none of 'iw', 'nmcli' or
+'iwconfig' is available on this Linux host. AP pinning (schedules.ap_bssid) can never
+verify, so check-ins will be recorded as face_only. Install 'iw' (package: iw) or set the
+schedule ap_bssid to NULL.
+BSSID : None          # second call: no duplicate warning (once per process)
+```
+
+### 7.3 A bug the live run caught in the new code
+
+The first version of the `nmcli` parser matched a plain `AA:BB:..:FF`. Real terse output
+**backslash-escapes every colon inside a value**:
+
+```
+$ nmcli -t -f ACTIVE,BSSID device wifi | grep '^yes'
+yes:50\:98\:B8\:C9\:2B\:E2
+```
+
+With the naive regex the fallback silently returned `None` and only `iwconfig` saved the
+run — i.e. the new code was as fragile as the old one until it was executed against a real
+NetworkManager. The parser now unescapes `\:` first, and
+`test_nmcli_real_terse_output_escapes_colons` pins the verbatim captured output.
+
+### 7.4 F6 — tool dependency is now a documented failure mode
+
+| Scenario | Behaviour after the fix |
+|---|---|
+| `iw` present (current default on many distros) | BSSID read from `iw dev <iface> link` |
+| `iw` absent, NetworkManager present | BSSID read from `nmcli` |
+| Only legacy `iwconfig` | BSSID read from `iwconfig`, as before |
+| None of the three | `None` + **one** `WARNING` per process, naming the consequence and the fix |
+| Wireless interface down / not associated | `None`, no warning |
+
+Tests added in `backend/tests/test_wifi_subnet.py` (`TestBssidParsers`,
+`TestLinuxBssidProbes`, `TestPingCommand`): parser cases for `iw`/`nmcli` including the
+escaped real output, probe order (iw wins over iwconfig), each fallback step, the
+"not associated → no warning" case, the "no tool → warning exactly once" case, and the
+three platform ping command shapes. Suite: `187 passed` (34 of them in the scanner file).
+
+### 7.5 Still not proven
+
+- The chain has **not** been exercised on Windows: `netsh` remains the only Windows probe.
+  Nothing about that path changed, but the demo laptop run (§6 of
+  `demo_environment.md`) is still the place to confirm it.
+- macOS still has no BSSID probe (no macOS host in the project). `get_current_bssid()`
+  returns `None` there and the same warning is *not* emitted, because the warning is
+  Linux-specific; anyone running macOS must set `ap_bssid` to NULL. Recorded in D-010.

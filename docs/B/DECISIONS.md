@@ -213,3 +213,52 @@
   (documented in the runbook shutdown section as an optional cleanup).
 - **Revisit by:** dry run #1 — if projector time is short, prefer the seeded dashboard and
   one live check-in with the real student.
+
+### D-009 — How to read the AP BSSID without depending on a deprecated tool (review finding 1)
+- **Date:** 2026-11-03 · **Stage:** M2 / post-review fix on `task-b`
+- **Problem:** `get_current_bssid()` used `iwconfig` only. That tool is no longer installed by
+  default on current distros, and this laptop is the proof: `iw` is absent, `iwconfig` is
+  present (`evidence: §7.1 of network_validation.md`). On a machine where the opposite is
+  true, the BSSID is `None`, `schedules.ap_bssid` can never match, and every check-in
+  silently becomes `face_only` — a Wi-Fi feature switched off with no error anywhere.
+- **Options:** (1) keep `iwconfig` and document it as a requirement; (2) probe a chain
+  `iw` → `nmcli` → `iwconfig` and warn once when none of them work; (3) add a Python
+  netlink/`libnm` binding and avoid shelling out entirely.
+- **Evidence:** measured 2026-11-03 on `NJUPT-CMCC` (`network_validation.md` §7.2):
+  `_resolve_linux_bssid()` → `('50:98:b8:c9:2b:e2', 'nmcli', True)` on a host without `iw`;
+  `PATH=/nonexistent` → one `WARNING` + `None`; not-associated → `None` with no warning.
+  The live run also exposed that `nmcli -t` escapes colons (`yes:50\:98\:B8\:...`), so a
+  naive parser silently failed — fixed and pinned by
+  `test_nmcli_real_terse_output_escapes_colons`.
+- **Decision:** option 2. Order is newest-tool-first, degraded state is a **warning that
+  names the consequence and the fix** (`install iw`, or set `ap_bssid` to NULL), and the
+  warning fires once per process so it cannot flood `/wifi/scan` logs.
+- **Consequences:** zero new dependencies (all three probes are optional; absence is handled);
+  three subprocess calls per 10 s cache window worst case; operators get one actionable line
+  instead of a silent downgrade. Shelling out remains (option 3 rejected: no `libnm` in
+  `requirements.txt`, and the three CLI tools cover every distro the team can meet).
+- **Revisit by:** demo laptop run (`demo_environment.md` §6) — confirm `netsh` still works
+  there; if the team standardises on NetworkManager, `nmcli` can be promoted to first.
+- **Evidence files:** `backend/services/wifi_scanner.py` (`_LINUX_BSSID_PROBES`),
+  `backend/tests/test_wifi_subnet.py` (`TestLinuxBssidProbes`),
+  `docs/B/network_validation.md` §7.
+
+### D-010 — macOS support: fix the ping flags, do not pretend BSSID works (review finding 6)
+- **Date:** 2026-11-03 · **Stage:** M2 / post-review fix on `task-b`
+- **Problem:** `_ping_command()` passed `-W <ms>` on Darwin, and `get_current_bssid()` has no
+  macOS probe at all. No macOS host exists in the project, so both issues are invisible.
+- **Options:** (1) drop macOS from the supported set and say so; (2) fix what is provably
+  wrong (ping flags) and document the BSSID gap; (3) implement airport/networksetup probes
+  and test them — impossible to verify without hardware.
+- **Evidence:** `ping(8)` on macOS exposes no per-packet millisecond flag that is stable
+  across releases, while the sweep already bounds every call with
+  `subprocess.run(timeout=timeout_ms/1000 + 1)`; a single packet is enough to populate the
+  ARP cache. Measured shape now asserted by `TestPingCommand::test_darwin_uses_bsd_compatible_flags`
+  (`network_validation.md` §6.2, §7.5).
+- **Decision:** option 2. Darwin gets `ping -c 1 <ip>`; the BSSID gap is stated in
+  `network_validation.md` §7.5 and in the deployment guide instead of being papered over.
+- **Consequences:** no false confidence on an untested platform. If a macOS host ever joins
+  the demo, `ap_bssid` must be NULL (no pinning) and the ping sweep still works.
+- **Revisit by:** only if a macOS machine becomes a demo target; otherwise closed.
+- **Evidence files:** `backend/services/wifi_scanner.py` (`_ping_command`),
+  `backend/tests/test_wifi_subnet.py` (`TestPingCommand`).
