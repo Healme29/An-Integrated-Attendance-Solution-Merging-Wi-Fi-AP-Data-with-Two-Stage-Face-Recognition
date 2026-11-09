@@ -1,5 +1,16 @@
 # TUGAS C — Aplikasi Flutter, Pengujian Device Nyata & Rilis
 
+> **PERUBAHAN PERAN (9 Nov 2026 — lihat `docs/C/DECISIONS.md` C-001..C-003):** (1)
+> kepemilikan `backend/static/dashboard.html` dan artefak slides/video cadangan pindah
+> dari D ke C (satu perubahan kecil = satu commit = satu cek browser; `pytest` tetap
+> hijau); (2) **G6 exception** — pekerjaan auto check-in DITANGGUHKAN sampai setelah
+> presentasi akhir November; demo memakai APK v0.9.0 dengan check-in manual (kriteria
+> G6 asli tetap terbuka); (3) **G4 (konfirmasi dosen: tanggal/jadwal/ruang/roster) kini
+> milik C**, tenggat 22 Nov, eskalasi ke A paling lambat 20 Nov. Flutter dev tooling
+> tidak tersedia di mesin C bulan ini; pengujian perangkat tetap bisa memakai APK.
+> Timeline dipercepat: presentasi ~23 Nov, demo/pengumpulan akhir November; detail di
+> `docs/PLAN_TIMELINE.md` progress log 2026-11-09 dan `docs/A/DECISIONS.md` D-005.
+
 > **SERAH-TERIMA (24 Okt 2026):** integrasi auto check-in prompt sudah
 > **diprototipekan oleh A** atas permintaan team lead — kode draft ada di branch
 > `a`, commit `7803d27` (`mobile/lib/services/prompt_service.dart` + banner di

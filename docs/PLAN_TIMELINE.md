@@ -299,6 +299,33 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
+- **Replanning (drives this entry):** the team will be assessed at a presentation in about
+  two weeks (≈ **Nov 23**) and a collection/demonstration at the end of November. The
+  accelerated scope is recorded by A in `docs/A/DECISIONS.md` (D-005): the demo set is the
+  feature-complete core (NIM login, enrollment, two-stage check-in, dashboard, CSV export,
+  400/403/409 protection demos); the classroom pilot chain (**G7 → G9 → G10**) is re-planned
+  for **December after the presentation**; the robustness study is cut to a mini version
+  (3 people × bright/dim/angled) for presentation evidence, full 5×5 study resumes later.
+  Config stays frozen at D-002 values (`conf 0.25`, `imgsz 640`, threshold 0.5).
+- **Ownership transfer D → C (recorded as C-001 / D-002):** `backend/static/dashboard.html`
+  and the slides / backup-video artefacts are now owned by **C**; only C edits the dashboard.
+  D keeps written/evidence tasks; **A commits on D's behalf** when needed (D has no git
+  access). Every dashboard commit must keep `pytest` green (title assertion).
+- **G6 exception (C-002):** C has no Flutter dev environment this month, so auto check-in
+  work is paused until after the presentation; the demo uses the device-tested APK v0.9.0
+  with manual start/end check-in. Original G6 criteria remain open, not dismissed.
+- **G4 reassigned (C-003):** teacher confirmation of pilot date/roster (due **Nov 22**,
+  unchanged) is now owned by **C**, with escalation to A by **Nov 20** if the teacher has
+  not replied. This is the critical chain — no silent slip.
+- **Roles otherwise unchanged**, per the original work packages: A = accuracy/evidence
+  (robustness, re-measurement, DECISIONS, review) and lead; **B = server/network** (demo
+  machine G1, hotspot/offline fallback **G5 due Nov 22**, deployment guide, and the
+  timeboxed AP management-plane spike for room-level presence in stage 2 Nov 9–22 — the
+  spike must not block the demo); C = dashboard + presentation artefacts + G4.
+- **Weekly ritual unchanged:** Sunday review entries in this log; `DECISIONS.md` entries
+  before the work is committed.
+
 ### 2026-11-03 — B: review findings 1/6 fixed (BSSID probe chain, macOS ping), 2/3/4/5 scoped
 - **Review of `task-b` (8.5/10, 2026-11-02) answered finding by finding in
   `docs/B/review_response.md`:** 3 closed with re-runnable evidence, 4 left open with the

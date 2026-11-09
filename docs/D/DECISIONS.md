@@ -49,4 +49,22 @@
 
 ## M2 entries (add below this line)
 
-<!-- First expected entry: which dashboard polish items survive the demo scope cut (G12). -->
+### D-002 — Reassignment: dashboard + presentation artefacts move to C
+- **Date:** 2026-11-09 · **Stage:** M2 restructuring (team reassignment)
+- **Problem:** D cannot commit (no git access), yet D-owned deliverables (dashboard polish,
+  slides, backup video) sit on the demo's critical path.
+- **Options:** (1) A commits on D's behalf for every change — viable but serialises D's
+  work behind A; (2) transfer the artefact ownership to C and record it; (3) keep waiting —
+  the demo presentation ships without final slides or a polished dashboard.
+- **Evidence:** `docs/D/TASK.md` stage 1 (dashboard polish) and stage 5–6 (slides, backup
+  video) are open; `docs/D/evidence/` shows D's M1 materials were already collected
+  successfully, so the written/evidence workflow still works through chat.
+- **Decision:** Transfer `backend/static/dashboard.html` and the slides / backup-video
+  artefacts to C (recorded from C's side as C-001). D retains written and evidence tasks
+  (teacher communication drafting, forms, observation sheets, transcriptions); A commits on
+  D's behalf when needed. G4 execution itself moves to C (C-003) but the teacher-facing
+  drafting can still come from D.
+- **Consequences:** D's code surface becomes zero for the presentation period; D's graded
+  contribution shifts to written/logistics evidence; the handover must be announced in the
+  group chat so nobody edits `backend/static/dashboard.html` except C.
+- **Revisit by:** after the end-of-November presentation.

@@ -1,5 +1,14 @@
 # TASK D — Teacher Dashboard (guided), Test Evidence, Reports, Presentation & Coordination
 
+> **ROLE CHANGE (Nov 9, 2026 — see `docs/D/DECISIONS.md` D-002):** ownership of
+> `backend/static/dashboard.html`, the slides and the backup video moves to C (C-001) on
+> 2026-11-09, and G4 (teacher confirmation) execution moves to C (C-003). D keeps written
+> and evidence work: drafting teacher messages and forms, observation sheets, evidence
+> transcriptions. Anything D produces is delivered in the group chat; A commits it into
+> `docs/**` on D's behalf (D has no git access). Do not edit `backend/static/dashboard.html`
+> yourself from now on. Timeline: presentation ~Nov 23, submission & demo end of November —
+> see `docs/A/DECISIONS.md` D-005 and the 2026-11-09 progress-log entry.
+
 > **Read first:** `docs/PROJECT_CONTEXT.md` (project picture) and `docs/PLAN_TIMELINE.md`
 > (deadlines). Your AI guide: `docs/D/PROMPT.md`.
 > Estimated total workload: **20–24 hours** — balanced with B and C; A still carries the

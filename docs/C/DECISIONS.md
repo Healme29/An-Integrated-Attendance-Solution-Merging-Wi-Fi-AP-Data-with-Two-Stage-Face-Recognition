@@ -50,4 +50,62 @@
 
 ## Entri M2 (tambahkan di bawah ini)
 
-<!-- Entri pertama yang diharapkan: pilihan jalur koneksi untuk hari demo (gate G2). -->
+### C-001 — Ownership transfer: dashboard + presentation artefacts from D to C
+- **Date:** 2026-11-09 · **Stage:** M2 restructuring (team reassignment)
+- **Problem:** Member D cannot commit (no git access) and the remaining D tasks sit on the
+  demo's critical path, so the dashboard polish and the presentation materials have no one
+  to execute them.
+- **Options:** (1) keep the files with D and have A commit D's materials — every remote
+  change waits for A; (2) transfer ownership explicitly to C and record it; (3) leave the
+  tasks unassigned — blocks G14-class deliverables and the demo.
+- **Evidence:** `docs/D/TASK.md` stage-1 polish items (status colors, schedule/date filter,
+  CSV button, print CSS, responsive) are still open; the C dev-environment report
+  (OS-based, no Flutter tooling) was recorded in the group chat on 2026-11-09.
+- **Decision:** Ownership of `backend/static/dashboard.html` and of the slides / backup-video
+  artefacts moves from D to C, effective 2026-11-09. D keeps written/evidence tasks, with A
+  committing on D's behalf for anything that must land in `docs/**`. The "one small change =
+  one commit = one browser check" rule still applies to every dashboard edit.
+- **Consequences:** `docs/C/TASK.md`, `docs/D/TASK.md` and `PROJECT_CONTEXT.md §9` role
+  boundaries are outdated until the M3 cleanup; every C dashboard commit must keep `pytest`
+  green (the dashboard-title assertion is the guard).
+- **Revisit by:** after the end-of-November presentation — confirm the transfer still fits
+  the actual workload, or partially hand the dashboard back.
+
+### C-002 — G6 exception: auto check-in paused until after the end-of-Nov presentation
+- **Date:** 2026-11-09 · **Stage:** M2 / gate G6 (exception recorded per `PLAN_TIMELINE §2.1`)
+- **Problem:** G6 (auto check-in finished on a real device, due Nov 22) is C's gate, but C
+  has no Flutter dev environment this month, and the demo was moved up to end-of-November.
+- **Options:** (1) keep G6 as a hard Nov 22 gate — not executable without Flutter tooling;
+  (2) A finishes the auto-prompt work — violates the standing rule that A only reviews and
+  decides (`PLAN_TIMELINE §2.3 #4`); (3) record an exception: defer G6, demo with the
+  device-tested APK v0.9.0 using manual start/end check-in.
+- **Evidence:** `docs/C/review_7803d27.md` (A's auto-prompt draft reviewed and accepted by
+  C); progress log 2026-10-26 (real-device full flow passed on the Galaxy S24; APK v0.9.0
+  built and install-verified). Flutter tooling unavailable on C's machine — recorded in
+  chat, 2026-11-09.
+- **Decision:** Option 3. G6 is deferred until after the end-of-November presentation; the
+  demo flow uses APK v0.9.0 with manual check-in (already device-tested). The original G6
+  pass criteria (banner → camera → start/end without manual intervention) stay unchanged
+  and remain an open, graded item — not dismissed.
+- **Consequences:** C's M2 package order changes (G6 falls behind the presentation); the
+  auto check-in feature must not be promised in the demo narrative.
+- **Revisit by:** first week of December 2026.
+
+### C-003 — G4 (teacher confirmation) reassigned from D to C
+- **Date:** 2026-11-09 · **Stage:** M2 / gate G4 (critical chain)
+- **Problem:** G4 (pilot date + student roster confirmed by the teacher, due Nov 22) was
+  D-owned; with the package redistribution it lost its owner while the whole gate chain
+  (G4 → G7 → G9 → G10) depends on it.
+- **Options:** (1) reassign to A — A already carries the largest package and leading a
+  member's task violates §2.3 #4; (2) assign to C alongside the dashboard — it is a
+  communication task, no code involved; (3) leave it unassigned until after presentation
+  — pushes G7 and everything downstream.
+- **Evidence:** `docs/PLAN_TIMELINE.md §2.1` critical chain; `docs/D/TASK.md` escalation
+  note ("escalate to A the same day if the teacher has not answered by Nov 20").
+- **Decision:** C owns G4: sends the teacher-confirmation message (approved draft), records
+  the confirmed date / class / room / roster into `docs/D/teacher_requirements.md` (handed
+  to the group chat; A commits the file if C cannot), and escalates to A in-chat by
+  **Nov 20** if the teacher has not replied. The gate date (Nov 22) is unchanged.
+- **Consequences:** C gains one non-code logistics task; the demo narrative must carry the
+  honest status of the pilot date.
+- **Revisit by:** Nov 22, or the day the teacher replies.

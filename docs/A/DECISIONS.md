@@ -164,3 +164,40 @@
 
 ---
 
+## Entri M2 — perencanaan demo (Nov 2026)
+
+### D-005 — Accelerated demo: presentation ~Nov 23, submission & demonstration end of November
+- **Date:** 2026-11-09 · **Stage:** M2 / affects G7–G16 ordering and the demo scope (former G12)
+- **Problem:** The team will be assessed at a collection and demonstration at the end of
+  November (~2 weeks after this decision), roughly two months earlier than the planned
+  G16 demo on Jan 18. The gate schedule must be re-cut without weakening the claims.
+- **Options:** (1) keep the Jan 18 plan and demo an untested subset live — risk of
+  overclaiming and a failed live demo; (2) compress: lock the feature-complete core for
+  the end-of-Nov demo, shift the classroom-pilot chain to December, cut the robustness
+  study to a mini version for presentation evidence, and write the scope honestly;
+  (3) request that the assessment move to January — not in the team's control.
+- **Evidence:** Already measured and available for the slides today: `docs/threshold_report.md`
+  (15 samples / 30 genuine / 75 impostor pairs, FAR = FRR = 0.00 in the 0.25–0.65 band,
+  threshold 0.5 per D-001), `docs/A/yolo_tuning.md` (52/52 detection in all six combinations;
+  640 median 481 ms vs 1280 median 1816 ms; D-002), robustness sanity run (46/46 usable
+  accepted, 0 false accepts, p50 1069 ms, `docs/A/robustness_test.md`), 153/153 tests.
+  **Not measured yet:** full 5×5 robustness (P4/P5 missing), classroom enrollment
+  (blocked on the former D-owned G4), and the real-classroom pilot.
+- **Decision:** Option 2. The end-of-November demo set is: NIM login → face enrollment
+  (including the two-person rejection) → two-stage check-in (start/partial → end/verified)
+  → teacher dashboard with live rows → CSV export → protection demos (400 "multiple faces",
+  403 "identity mismatch", 409 duplicate). Evidence slides use only the measured numbers
+  above plus a mini robustness study (3 people × 3 conditions: bright, dim, angled) that
+  must be labelled "measured on N samples". The full 5×5 robustness study and the classroom
+  pilot (G7 → G9 → G10) move to December after the presentation; config stays as locked in
+  D-002 (`conf 0.25`, `imgsz 640`, threshold 0.5) — **no tuning before the demo without a new
+  decision entry**. G4 (teacher confirmation) is reassigned per C-003 and keeps its Nov 22 date.
+- **Consequences:** gates G7–G16 are re-sequenced around the presentation and recorded in
+  `docs/PLAN_TIMELINE.md`; the December plans (pilot runbook, G7 checklist in
+  `docs/A/pilot_plan.md`) remain the target after the demo, so no pilot-preparation work
+  done so far is wasted; the honest-limitations slide must list what was NOT measured.
+- **Revisit by:** after the presentation — restore the original M2 order for the December
+  pilot; re-verify at the January submission that the scope text still matches reality.
+
+---
+
