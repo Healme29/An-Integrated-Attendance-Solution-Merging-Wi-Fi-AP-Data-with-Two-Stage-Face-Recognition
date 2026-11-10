@@ -46,7 +46,7 @@ verification") stays honest: we never fake a `verified` row during a live demo.
 5. Verify the scanner sees the phone **before** the demo:
 
 ```powershell
-curl http://127.0.0.1:8000/wifi/scan
+curl.exe http://127.0.0.1:8000/wifi/scan
 # the phone's MAC must appear; the phone must have "Private/random MAC" turned OFF
 # for this network, otherwise the MAC changes on every join and the check fails
 ```
@@ -62,7 +62,7 @@ curl http://127.0.0.1:8000/wifi/scan
 
 | Option | When | Notes |
 |---|---|---|
-| Same hotspot / same LAN, `http://<laptop-ip>:8000` | demo room, network we control | needs firewall port 8000 open |
+| Same hotspot / same LAN, `http://<laptop-ip>:8000` (on the Windows hotspot that is `http://192.168.137.1:8000`, the app's built-in default) | demo room, network we control | needs firewall port 8000 open |
 | `adb reverse tcp:8000 tcp:8000` + app URL `http://127.0.0.1:8000` | campus Wi-Fi blocks phone→PC (already observed) | proven path from C's device testing; requires USB debugging |
 | Phone hotspot + laptop as client | no other network | laptop IP differs each time; check with `ipconfig` |
 
@@ -82,6 +82,12 @@ answers on port 8000.
 Why this is honest, not an excuse: `face_only` is a real row in the database with
 `wifi_verified = 0` (`docs/B/network_validation.md` §3 F2, `docs/PROJECT_CONTEXT.md` §2).
 
+> **Only valid with `REQUIRE_CLASSROOM_WIFI=false`.** With strict mode on (the demo setting,
+> D-006) the same failure is refused before the camera opens, so no `face_only` row exists.
+> In that case say instead: *"The system refused the check-in because the phone is not
+> visible on the classroom network — that is the gate working, not a failure. We can repeat
+> the same check on a flat network to show the accepted path."*
+
 ### 4b. If the server cannot read its own BSSID
 
 A second, different reason for `face_only`: the laptop cannot tell which AP it is on, so a
@@ -96,7 +102,7 @@ schedule ap_bssid to NULL.
 
 What to do, in order:
 
-1. `curl http://127.0.0.1:8000/wifi/scan` — if `"bssid": null`, the check cannot pass.
+1. `curl.exe http://127.0.0.1:8000/wifi/scan` — if `"bssid": null`, the check cannot pass.
 2. Quick fix on stage: set that schedule's `ap_bssid` to NULL (`PUT /schedules/{id}`), which
    means "do not pin the AP" — the Wi-Fi presence check still runs, only the room check is
    skipped. Say that out loud, do not hide it.

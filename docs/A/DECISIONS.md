@@ -227,7 +227,7 @@
   modified client cannot bypass it. The mobile app now lists only `/schedules/active`, which
   removes the "pick an old schedule and take a photo" dead end.
 - **Consequences:** the demo machine must be the classroom network host (laptop hotspot
-  `AttendanceDemo` or a laptop inside the classroom LAN); enrolment MAC addresses must be
+  `Attendance-Demo` or a laptop inside the classroom LAN); enrolment MAC addresses must be
   real, because a placeholder MAC can never verify. `face_only` rows remain possible only
   when the flag is off.
 - **Revisit by:** before the G7 classroom enrolment — confirm the flag and the hotspot
