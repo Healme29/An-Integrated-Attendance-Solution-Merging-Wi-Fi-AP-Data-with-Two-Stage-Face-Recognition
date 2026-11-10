@@ -81,6 +81,13 @@ async def create_schedule(data: ScheduleCreate):
     return dict(schedule)
 
 
+@router.get("/active", response_model=list[ScheduleResponse])
+async def list_active_schedules():
+    """Schedules whose attendance window includes right now (grace applied)."""
+    from services.attendance import get_active_schedules
+    return await get_active_schedules()
+
+
 @router.get("/{schedule_id}", response_model=ScheduleResponse)
 async def get_schedule(schedule_id: int):
     db = await get_db()

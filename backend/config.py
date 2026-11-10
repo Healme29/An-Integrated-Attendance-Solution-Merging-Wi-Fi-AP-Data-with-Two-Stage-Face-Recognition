@@ -33,6 +33,14 @@ WI_FI_SUBNET = os.getenv("WI_FI_SUBNET")  # None -> auto-detect local subnet at 
 
 ATTENDANCE_CHECK_WINDOW_MINUTES = int(os.getenv("ATTENDANCE_CHECK_WINDOW_MINUTES", "15"))
 
+# Strict classroom mode: when true, a check-in is refused (403) unless the
+# student's device MAC is visible on the classroom network and the server is
+# associated with the schedule's AP (when one is pinned). Off by default so
+# existing deployments keep the historical "face_only" fallback.
+REQUIRE_CLASSROOM_WIFI = os.getenv("REQUIRE_CLASSROOM_WIFI", "false").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+
 # None -> use the server's system local time. Set to an IANA name
 # (e.g. "Asia/Jakarta") so schedule windows stay consistent regardless
 # of the server machine's locale. Requires the 'tzdata' package on Windows.

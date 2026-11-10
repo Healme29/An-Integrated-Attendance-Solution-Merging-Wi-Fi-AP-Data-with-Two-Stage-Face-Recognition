@@ -2,9 +2,18 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from models.schemas import AttendanceRequest, AttendanceResponse
 from models.database import get_db
-from services.attendance import recognize_face, mark_attendance, validate_schedule_time
+from services.attendance import (
+    recognize_face,
+    mark_attendance,
+    validate_schedule_time,
+    classroom_wifi_verified,
+    get_existing_check,
+    is_within_window,
+    schedule_window,
+)
 from services.photo_guard import fingerprint, assert_not_replayed, record as record_photo
-from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
+from services.wifi_scanner import get_current_bssid
+from config import ATTENDANCE_CHECK_WINDOW_MINUTES, REQUIRE_CLASSROOM_WIFI, now_local
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
@@ -83,6 +92,11 @@ async def check_attendance(
                 status_code=403,
                 detail=f"Attendance only allowed within class time (+/- {ATTENDANCE_CHECK_WINDOW_MINUTES} minutes)"
             )
+        if reason == "not_on_classroom_network":
+            raise HTTPException(
+                status_code=403,
+                detail="You are not connected to the classroom network.",
+            )
         raise
 
     try:
@@ -99,9 +113,73 @@ async def check_attendance(
             raise HTTPException(status_code=409, detail=f"Already checked in ({check_type}) for this schedule")
         if reason == "missing_start_check":
             raise HTTPException(status_code=409, detail="End check-in requires a prior start check-in")
+        if reason == "not_on_classroom_network":
+            raise HTTPException(
+                status_code=403,
+                detail="You are not connected to the classroom network.",
+            )
         raise
     record_photo(sha, result["student_id"], schedule_id, check_type)
     return result
+
+
+@router.get("/preflight")
+async def attendance_preflight(student_id: int, schedule_id: int, check_type: str = "start"):
+    """Report whether a check-in could succeed *before* the app opens the camera.
+
+    Mirrors the enforcement in POST /attendance/check so the mobile app can
+    grey out the camera instead of letting the student take a selfie that is
+    guaranteed to be rejected. It never writes anything.
+    """
+    if check_type not in ("start", "end"):
+        raise HTTPException(status_code=400, detail="check_type must be 'start' or 'end'")
+
+    db = await get_db()
+    cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
+    student = await cursor.fetchone()
+    cursor = await db.execute("SELECT * FROM schedules WHERE id = ?", (schedule_id,))
+    schedule = await cursor.fetchone()
+    await db.close()
+
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    schedule = dict(schedule)
+
+    now = now_local()
+    in_window = is_within_window(schedule, now)
+    window_start, window_end = schedule_window(schedule, now)
+    wifi_verified = await classroom_wifi_verified(student_id, schedule_id)
+
+    allowed, reason = True, None
+    if schedule["day_of_week"] != now.weekday():
+        allowed, reason = False, "wrong_day"
+    elif not in_window:
+        allowed, reason = False, "outside_class_time"
+    elif REQUIRE_CLASSROOM_WIFI and not wifi_verified:
+        allowed, reason = False, "not_on_classroom_network"
+    elif await get_existing_check(student_id, schedule_id, check_type):
+        allowed, reason = False, "duplicate_check_in"
+    elif check_type == "end" and not await get_existing_check(student_id, schedule_id, "start"):
+        allowed, reason = False, "missing_start_check"
+
+    return {
+        "allowed": allowed,
+        "reason": reason,
+        "check_type": check_type,
+        "class_name": schedule["class_name"],
+        "room": schedule["room"],
+        "start_time": schedule["start_time"],
+        "end_time": schedule["end_time"],
+        "window_start": window_start.strftime("%H:%M"),
+        "window_end": window_end.strftime("%H:%M"),
+        "in_window": in_window,
+        "wifi_verified": wifi_verified,
+        "wifi_required": REQUIRE_CLASSROOM_WIFI,
+        "schedule_bssid": schedule["ap_bssid"],
+        "server_bssid": get_current_bssid(),
+    }
 
 
 @router.get("/today", response_model=list[AttendanceResponse])
