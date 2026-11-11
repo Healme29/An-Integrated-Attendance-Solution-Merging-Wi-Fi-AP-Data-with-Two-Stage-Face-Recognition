@@ -15,15 +15,15 @@
 | # | Finding | Status | Where the proof is |
 |---|---|---|---|
 | 1 | BSSID read depends on deprecated `iwconfig` (High) | ✅ **closed** | `network_validation.md` §7, D-009, `test_wifi_subnet.py` |
-| 2 | Fixes live only on `task-b`, `main` still broken (High) | ⏳ **ready, owner A** | §3 below: fast-forward, zero conflicts |
+| 2 | Fixes live only on `task-b`, `main` still broken (High) | ✅ **closed** — PR #14 merged into `main` as `0541294` on 2026-11-03 (merge by `hocsilens`, zero file changes vs `task-b`) | §3 below, kept as the record of how it was verified |
 | 3 | G1 + `pip install` not run on the demo laptop (Medium) | ⏸ **open** — blocked by hardware and by disk on this machine | `demo_environment.md` §6 item 5, §6.1 |
 | 4 | Hotspot rung 1 unmeasured (Medium) | ⏸ **open** — needs a second phone | `offline_fallback.md` §2 |
 | 5 | "Guide followed by another person unaided" (Medium) | ⏸ **open** — needs D or an outsider | §6 below: observer checklist |
 | 6 | macOS `ping -W` is not a BSD flag (Low) | ✅ **closed** | D-010, `TestPingCommand` |
 | 7 | Mixed commit contents, decisions without file links (Low) | ✅ **closed** (forward-looking part) | every new decision entry ends with **Evidence files:** |
 
-Closed: 3 of 7 (both High ones that were code, plus the Low flag bug).
-Open: 4 (all four need a physical demo laptop, a second phone, or another person — no amount
+Closed: 4 of 7 (both High ones that were code, the merge, plus the Low flag bug).
+Open: 3 (all three need a physical demo laptop, a second phone, or another person — no amount
 of code on this machine can close them).
 
 ---
@@ -110,7 +110,7 @@ checklist — never silent.
 
 ---
 
-## 3. Finding 2 (High) — merge is safe, but it needs A, not B
+## 3. Finding 2 (High) — merge is safe, but it needs A, not B — **closed by PR #14**
 
 Verified on 2026-11-03 against the real base:
 
@@ -232,10 +232,31 @@ macOS still has **no BSSID probe**. That gap is now stated (D-010, `network_vali
 
 | # | Open item | Blocked by | Owner | Target |
 |---|---|---|---|---|
-| 1 | Merge `task-b` → `main` | reviewer availability | **A** | before the next dry run |
-| 2 | G1 table + timed `pip install` on the demo laptop | the laptop | B | before dry run #1 |
-| 3 | Hotspot rung 1 with two phones | a second phone | B | before dry run #1 |
-| 4 | Guide followed unaided by an outsider | another person | D (B observes) | before dry run #2 |
+| 1 | ~~Merge `task-b` → `main`~~ | — | ~~A~~ | **closed 2026-11-03, PR #14 → `0541294`** |
+| 2 | G1 table + timed `pip install` on the demo laptop | the laptop | B | before dry run #1 (now before 2026-11-23) |
+| 3 | Hotspot rung 1 with two phones | a second phone | B | before dry run #1 (G5, 2026-11-22) |
+| 4 | Guide followed unaided by an outsider | another person | D (B observes) | before the December pilot |
 
 Nothing on this list is claimed as done anywhere in the docs. Wherever it is referenced, it
 carries the words **not measured yet** and the reason.
+
+---
+
+## 10. Update 2026-11-11 — the replan added work, and it is done
+
+A's accelerated-timeline commit `fa93864` (2026-11-09) gave B one new deliverable and moved
+every date forward. Status against it:
+
+| New item from `PLAN_TIMELINE.md` §5 | Status | Evidence |
+|---|---|---|
+| Timeboxed AP management-plane spike for room-level presence, 9–22 Nov, must not block the demo | ✅ **closed 2026-11-11** | `room_presence_spike.md` (options A–G, measurements, verdict, stop rule), D-011 |
+| The subnet-collision weakness must be documented, not hidden | ✅ **written** | `threat_model.md` (assets, trust boundaries, T1–T6, residual risk, fix order), `network_validation.md` §8 |
+| Lecturer's written answers must be reflected in the claims | ✅ **done** | D-013, `threat_model.md` §3.1–3.2, `offline_fallback.md` §4c |
+| Log written to a file on demo day ("CCTV") | ✅ **procedure + measured output** | D-012, `demo_runbook.md` §2b |
+
+Still open from §9: G1 (demo laptop), hotspot with two phones, outsider guide run. All three
+need hardware or another person, and all three are still recorded as **not measured yet**.
+
+The finding 2 process note is kept above unchanged: the review's rule was that B must not
+merge its own branch, and B did not — A merged it after the two High findings were answered.
+

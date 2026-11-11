@@ -37,6 +37,10 @@ verification") stays honest: we never fake a `verified` row during a live demo.
 
 ## 2. Hotspot setup (no internet required)
 
+> **Approved by the lecturer (2026-11-11, D-013):** demonstrating on a network we control is
+> acceptable ("Either should be fine"). That is what this section builds, and it is why the
+> room check is exact here: one AP, one room.
+
 1. Windows → Settings → Network & Internet → **Mobile hotspot** → share the Wi-Fi adapter,
    band 2.4 GHz, name `Attendance-Demo`, password given in the runbook.
 2. Turn **off** "Private network / client isolation" if the hotspot offers it (Windows
@@ -107,6 +111,27 @@ installed (`docs/B/network_validation.md` §7).
 
 ---
 
+## 4c. The sentence to say when the Wi-Fi check **passes**
+
+The failure case in §4 is one half. The success case has its own approved wording, because
+saying more than this is overclaiming:
+
+> "The check-in was made within the coverage area of the scheduled AP: the student's device
+> was reachable on the classroom network, and this machine was associated with the AP pinned
+> to the room. We do not claim to know which AP a phone is attached to, and on a shared
+> campus network that is the limit of what the Wi-Fi condition proves."
+
+The lecturer accepted this claim on 2026-11-11 provided the limitation is stated honestly,
+and noted that in practice an AP covers one classroom and cannot hold all the students
+anyway (`DECISIONS.md` D-013, `threat_model.md` §3.1). On the demo network the claim is
+stronger than on campus — one AP, one room — but the sentence stays the same; the report
+explains why.
+
+Do **not** say "the system proves the student was in the room" or "the system cannot be
+gamed". Both are false and both are contradicted by `threat_model.md` T1–T6.
+
+---
+
 ## 5. Pre-demo checklist (10 minutes, offline)
 
 | # | Check | Command / action | Expected |
@@ -120,5 +145,6 @@ installed (`docs/B/network_validation.md` §7).
 | 7 | Wi-Fi | `/wifi/scan` | phone MAC visible (or the §4 sentence ready) **and** `"bssid"` is not null (§4b) |
 | 8 | Backup | copy `attendance.db` to `backups\` + USB | file exists |
 | 9 | Clock | compare `/attendance/today` timestamps to the wall clock | same timezone (`Asia/Shanghai`) |
+| 10 | Log file | server started through `cmd /c ... > backend\server_<timestamp>.log 2>&1`; `Get-Content -Wait` in a second window | file grows on every request; shutdown ends with `Finished server process` |
 
 Print this page. Do not rely on reading it from the laptop that is running the demo.

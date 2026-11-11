@@ -262,3 +262,103 @@
 - **Revisit by:** only if a macOS machine becomes a demo target; otherwise closed.
 - **Evidence files:** `backend/services/wifi_scanner.py` (`_ping_command`),
   `backend/tests/test_wifi_subnet.py` (`TestPingCommand`).
+
+---
+
+## Entri M2 — demo preparation, accelerated timeline (Nov 2026)
+
+### D-011 — Room-level presence: spike closed with a documented verdict, demo must not depend on it
+- **Date:** 2026-11-11 · **Stage:** M2 / stage 2, gate G5 (spike window 2026-11-09 → 2026-11-11)
+- **Problem:** The captain's 2026-11-09 replan (`PLAN_TIMELINE.md` §5) added a timeboxed spike:
+  can the system prove a phone is **inside the scheduled room**, not merely on the same
+  subnet? The answer decides whether the Wi-Fi condition is strengthened or documented as
+  AP-level and left alone.
+- **Options:** (A) SSH into the classroom AP and parse its client table; (B) SNMP poll
+  (`dot11StationTable`); (C) vendor controller API; (D) the app reports its own BSSID
+  (`NEHotspotNetwork`, needs an iOS entitlement); (E) per-room SSID/VLAN from campus IT;
+  (F) rotating classroom token on the dashboard; (G) run on a router **we** control and read
+  its client table.
+- **Evidence (measured 2026-11-11, passive only — no probe was sent to campus equipment):**
+  from one seat, **10 distinct BSSIDs** of `NJUPT-CMCC` were visible (10 for `eduroam`, 9 for
+  `NJUPT`, 8 for `NJUPT-CHINANET`; 39 beacon rows, 6 SSIDs), so one SSID carries no room
+  information. The host's own AP changed between sessions at the same desk
+  (`50:98:b8:c9:2b:e2` on 2026-11-03 → `f4:74:88:70:c2:f1` today). `scan_network_arp()`
+  returned **1** device (the gateway) in **6.15 s** — client isolation unchanged, so the
+  server cannot observe another device's AP even with a perfect room map. No credentials, SNMP
+  community or controller access were ever provided (`ap_management_plane.md` §3).
+- **Decision:** options A/B/C are not viable (authorisation, not code); E is campus IT's
+  decision; D is plausible but cannot be built or tested this month (C has no Flutter tooling,
+  C-002); F is the strongest non-network mitigation but belongs to A/C and is outside the
+  frozen demo scope (D-007); **G is adopted for the assessment** — one AP, one room, so
+  room-level presence is effectively exact there. On the campus network the claim stays at
+  AP-coverage level and is stated as a limitation. **Stop rule: the spike ended 2026-11-11
+  and reopens only on a trigger** (credentials/SNMP/controller access, school-bought AP, C
+  regains tooling, or a pilot with > 50 % `face_only`).
+- **Consequences:** no new dependency, no unverifiable claim, and no demo dependency — the
+  remaining candidate mechanisms are recorded as post-assessment work. The team must not
+  describe the Wi-Fi condition as room-exact on campus; the approved sentence is in
+  `threat_model.md` §3.2 and `offline_fallback.md` §4c.
+- **Revisit by:** after the November assessment, or immediately if a trigger fires.
+- **Evidence files:** `docs/B/room_presence_spike.md` (options, measurement table, verdict,
+  timebox accounting), `docs/B/ap_management_plane.md` §3 (access evidence),
+  `docs/B/network_validation.md` §8.3 (re-run), `backend/services/wifi_scanner.py`
+  (`resolve_subnet`, `get_current_bssid`, `scan_network_arp`).
+
+### D-012 — Demo log capture: the "CCTV" record is produced by the shell, not by application code
+- **Date:** 2026-11-11 · **Stage:** M2 / stage 2, gate G5 (demo readiness)
+- **Problem:** On demo day the backend writes only to the terminal. If the window is closed,
+  scrolled, or the laptop reboots, there is no record that a check-in was served — and no
+  evidence to settle a disputed result after the demo.
+- **Options:** (1) add a `RotatingFileHandler` / `--log-config` to the backend — needs edits to
+  `backend/main.py`, which is not in B's allowed-file list, and changes code on the critical
+  path days before the demo; (2) redirect the existing uvicorn output into a timestamped file
+  from the shell (PowerShell `cmd /c "... > file 2>&1"` plus `Get-Content -Wait`), zero code
+  change; (3) rely on terminal scrollback / copy-paste — not a record.
+- **Evidence:** measured 2026-11-11 on ports 8098/8099 with `DATABASE_PATH` pointed at a
+  throwaway DB: the redirected file contained the startup banner, every access line
+  (`"GET /wifi/scan HTTP/1.1" 200 OK`), the scanner's own warnings (subnet cap, scapy
+  denial), and the shutdown banner `Application shutdown complete.` +
+  `Finished server process`. A PowerShell-only `2>&1 | Tee-Object` was rejected because PS 5.1
+  wraps native stderr in `ErrorRecord`s and writes formatting noise; `cmd /c` writes raw lines.
+  `git check-ignore backend/server_20261111-0900.log` → matched by `.gitignore:28`.
+- **Decision:** option 2. The demo start command is `cmd /c "python -m uvicorn backend.main:app
+  --host 0.0.0.0 --port 8000 > backend\server_<timestamp>.log 2>&1"`, with a second window
+  tailing the file. After the demo the log is copied to `backups\server-demo.log` beside the
+  database backup.
+- **Consequences:** one extra command in the runbook and one more file to clear before a run;
+  no code path changes, so `pytest` cannot regress. Logs contain request paths (thus
+  `student_id`) but no images or embeddings — they stay on the demo laptop/USB and are deleted
+  after the report. Uncaught tracebacks are now recoverable after the fact.
+- **Revisit by:** dry run #1 (`demo_runbook.md` §6 row "Log file written + clean shutdown").
+- **Evidence files:** `docs/B/demo_runbook.md` §2/§2b/§5/§6,
+  `docs/B/offline_fallback.md` §5 row 10, `.gitignore` (lines 26–28).
+
+### D-013 — Assessment runs on a network we control; "AP coverage area" is the accepted claim; BSSID is pinned live
+- **Date:** 2026-11-11 · **Stage:** M2 / demo scope, revises the operational part of D-007
+- **Problem:** Two questions had to be settled before the runbook could be finalised: may the
+  assessment demo run on our own router/hotspot instead of the campus SSID, and is
+  "within the coverage area of the scheduled AP" an acceptable claim? The answer also
+  determines whether a pinned BSSID may be reused between runs.
+- **Options:** (1) insist on the campus SSID to look realistic, accepting client isolation and
+  a shared multi-AP SSID; (2) run the demo on a network we control, state the AP-coverage
+  limitation honestly, and keep the campus network as a pilot environment; (3) claim
+  room-level precision everywhere — contradicted by the measurements in D-011.
+- **Evidence:** lecturer reply, Zhe Zhang, 2026-11-11: "For the assessment, may we demonstrate
+  the system on a network we control … Either should be fine." and, on the coverage-area
+  claim, "In practice, an AP only covers one classroom. Even an AP can cover multiple
+  classrooms, the capacity is not enough to hold all students." Measured support:
+  D-011's beacon scan (10 BSSIDs per SSID) and `network_validation.md` §8.3 (the host's AP
+  changed between sessions at the same desk).
+- **Decision:** option 2. The assessment demo runs on a router/hotspot we control with client
+  isolation off; `schedules.ap_bssid` is captured **live at setup on that network** and never
+  copied from a previous session or hand-typed from a phone; the report and narration use the
+  approved "coverage area" wording with the limitation stated.
+- **Consequences:** the demo claim is strong but bounded (one AP, one room); a future campus
+  pilot must not inherit the demo's BSSID, and must be described as AP-level only. D-007's
+  scope lock is unchanged; this entry only fixes *where* the demo runs and *how* the pin is
+  obtained.
+- **Revisit by:** G4/C-003 room confirmation (C, due 2026-11-22) — the pinned BSSID and the
+  room must be recorded together on the day.
+- **Evidence files:** `docs/B/offline_fallback.md` §2/§4c, `docs/B/demo_runbook.md` §2,
+  `docs/B/room_presence_spike.md` §2/§4, `docs/B/threat_model.md` §3.1–§3.2,
+  `backend/services/wifi_scanner.py` (`get_current_bssid`, `is_same_bssid`).

@@ -290,3 +290,71 @@ three platform ping command shapes. Suite: `187 passed` (34 of them in the scann
 - macOS still has no BSSID probe (no macOS host in the project). `get_current_bssid()`
   returns `None` there and the same warning is *not* emitted, because the warning is
   Linux-specific; anyone running macOS must set `ap_bssid` to NULL. Recorded in D-010.
+
+---
+
+## 8. What `wifi_verified` actually means (2026-11-11)
+
+Reviewers and the lecturer both asked the same question in different words: what does the
+Wi-Fi condition *prove*? This section is the single place where that is defined, because
+three other documents quote it.
+
+### 8.1 The code path
+
+`backend/services/attendance.py` lines 186–198 (owner: A — quoted, not modified by B):
+
+```python
+wifi_verified = False
+if student and student["mac_address"]:
+    wifi_verified = check_mac_on_network(student["mac_address"])
+    if wifi_verified and schedule_row and schedule_row["ap_bssid"]:
+        wifi_verified = is_same_bssid(get_current_bssid(), schedule_row["ap_bssid"])
+```
+
+So `wifi_verified = true` means **both** of these hold:
+
+1. the student's `mac_address` is reachable on the server's L2 segment
+   (`check_mac_on_network()` → `scan_network_arp()`, which does an ARP scan or a
+   ping + neighbour-table fallback and matches the MAC), **and**
+2. the **server** is associated with the AP pinned in `schedules.ap_bssid`
+   (`get_current_bssid()` reads the server's own association).
+
+### 8.2 The precise claim, and the three things it does not say
+
+| Claim | Supported? |
+|---|---|
+| The student's device was on the classroom network at check-in time | ✅ yes |
+| The check-in machine was associated with the scheduled AP | ✅ yes |
+| The phone is inside room 201 | ❌ no |
+| The server knows which AP the phone is attached to | ❌ no — it cannot; ARP has no AP dimension |
+| The MAC belongs to that physical handset | ❌ no — MACs are spoofable and randomised |
+
+The accepted wording is "the check-in was made **within the coverage area of the scheduled
+AP**" (lecturer reply 2026-11-11, D-013). The failure modes are threats T1–T6 in
+`threat_model.md`; the answer to "can this be gamed?" is "not fully, and here is exactly
+where it can".
+
+### 8.3 Measured re-run, 2026-11-11 (same laptop, campus network)
+
+| # | Call | Result |
+|---|---|---|
+| 1 | `resolve_subnet()` | `10.163.167.0/24` (host is `10.163.167.58/17`; sweep capped to /24 and says so) |
+| 2 | `get_current_bssid()` | `f4:74:88:70:c2:f1` — **different from the 2026-11-03 value** `50:98:b8:c9:2b:e2` at the same desk |
+| 3 | `scan_network_arp()` | 1 device (gateway `70:c6:dd:09:b0:02`) in **6.15 s**; scapy denied (`Operation not permitted`), unprivileged fallback used |
+| 4 | Passive beacon scan | 10 distinct BSSIDs of `NJUPT-CMCC` from one seat (39 beacon rows, 6 SSIDs) |
+
+Two conclusions that belong in the report, not only in the log:
+
+- **A pinned BSSID must be captured live at the venue.** Fact 2 above shows the host's AP
+  changes between sessions without moving desks; a value copied from an earlier run would
+  make every check-in `face_only`.
+- **"On the campus SSID" is much weaker than "in the room"** because one SSID is served by
+  at least ten APs (fact 4). This is the measured basis for the limitation in
+  `room_presence_spike.md` §2 and `threat_model.md` §3.1.
+
+### 8.4 What the `start` / `end` pair adds
+
+`start` is written as `partial`, and `end` becomes `verified` only if **both** rows had
+`wifi_verified = true` (`attendance.py` 194–205). That proves the device was on the
+classroom network at **two separate moments**, not that it stayed. It is the strongest
+statement the current design supports without a liveness check or a rotating token.

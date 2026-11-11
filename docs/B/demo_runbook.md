@@ -1,7 +1,8 @@
 # Demo Runbook — printed copy (draft for G12–G16)
 
 > **Status:** draft. Numbers marked *(measured)* were measured; everything else is a
-> procedure to be executed and timed at dry run #1 (2027-01-09/10).
+> procedure to be timed at dry run #1, now **before the assessment (presentation ≈
+> 2026-11-23)**; the former 2027-01-09/10 slots were superseded by A's D-005 (2026-11-09).
 > **Owner:** B · **Used by:** A (backend), C (phone), D (narration), B (fallback).
 
 ---
@@ -35,14 +36,23 @@ B and A sit next to each other: only B touches the database, only A touches the 
 
 1. **Laptop network first.** Join the demo network or start the Mobile hotspot. Write the
    laptop IP on the printed sheet.
-2. **Backend** (native — Docker cannot see the Wi-Fi LAN, decision D-002):
+2. **Backend** (native — Docker cannot see the Wi-Fi LAN, decision D-002) **with the log
+   captured to a file** (the "CCTV" record — see §2b):
    ```powershell
    $env:TIMEZONE="Asia/Shanghai"; $env:FACE_SIMILARITY_THRESHOLD="0.5"; $env:YOLO_IMG_SIZE="640"
    $env:CORS_ORIGINS="http://127.0.0.1:8000"
-   python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+   $log = "backend\server_$(Get-Date -Format 'yyyyMMdd-HHmm').log"
+   cmd /c "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > `"$log`" 2>&1"
    ```
-   Cold start to healthy: **5.9 s** *(measured 2026-11-02)*.
-3. **Health + Wi-Fi** in a second terminal:
+   In a **second** PowerShell window, follow the file live (use the filename printed above;
+   the `$log` variable only exists in the first window):
+   ```powershell
+   Get-Content backend\server-20261123-0900.log -Wait -Tail 20
+   ```
+   Cold start to healthy: **5.9 s** *(measured 2026-11-02)*; **9.1 s** *(measured 2026-11-11
+   on the same host with a cold page cache — the reason the runbook starts at T−30 min, not
+   T−5)*.
+3. **Health + Wi-Fi** in another terminal:
    ```powershell
    curl http://127.0.0.1:8000/health      # {"status":"ok","database":"ok"}
    curl http://127.0.0.1:8000/wifi/scan   # phone MAC must appear
@@ -57,6 +67,54 @@ B and A sit next to each other: only B touches the database, only A touches the 
    Test Connection is green.
 7. **Dashboard** open in a browser tab, zoomed for the projector. Refresh once after the
    first check-in so the audience sees new rows appear.
+
+---
+
+## 2b. Log capture — the "CCTV" file (decision D-012)
+
+Why: if the terminal is closed, scrolled away, or the laptop reboots, a demo whose output
+only ever existed on screen has no record. The log file is the evidence that a disputed
+check-in was (or was not) served, and when.
+
+**One command, no code change.** The backend has no file-handler configuration and B does not
+own `backend/main.py`, so capture is done by the shell. `cmd /c` is used instead of
+PowerShell's `2>&1 | Tee-Object` because PowerShell 5.1 wraps native stderr in
+`ErrorRecord`s and writes formatting noise into the file; `cmd /c` writes the raw lines.
+
+What the file contains *(measured 2026-11-11 on port 8098)*:
+
+```
+INFO:     Started server process [11320]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8098 (Press CTRL+C to quit)
+INFO:     127.0.0.1:34112 - "GET /health HTTP/1.1" 200 OK
+Interface network 10.163.128.0/17 is wider than /24; sweeping only 10.163.167.0/24. ...
+scapy ARP scan failed ([Errno 1] Operation not permitted); using ping + neighbour fallback
+INFO:     127.0.0.1:34128 - "GET /wifi/scan HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [11320]
+```
+
+So the log proves: start time, every HTTP request with status code, scanner warnings (why a
+scan degraded), tracebacks, and clean versus unclean shutdown. It does **not** contain face
+images, embeddings, or similarity scores — those are not logged anywhere.
+
+Housekeeping for the demo day:
+
+| When | Action |
+|---|---|
+| Before the demo | `Remove-Item backend\server_*.log -ErrorAction SilentlyContinue` so the file of the day is unambiguous |
+| During | Leave the tail window open; the file is the authority if the screen is scrolled |
+| After | `Copy-Item $log "backups\server-demo.log"` next to `attendance-after-demo.db` |
+| Never | `git add` the log — `backend/server_*.log` is already in `.gitignore` (verified with `git check-ignore`) |
+
+Privacy: access lines include the request path, so a check-in line contains
+`student_id=…`. That is a student number, not biometric data, but it is still personal — keep
+the logs on the demo laptop and the USB backup only, and delete them once the report is
+written.
 
 ---
 
@@ -91,9 +149,13 @@ B and A sit next to each other: only B touches the database, only A touches the 
 ## 5. Shutdown / reset after the demo
 
 ```powershell
-# copy the demo database somewhere for the report's evidence
+# copy the demo database and the day's log somewhere for the report's evidence
+# (use the actual filename; $log only exists in the window that started the server)
 Copy-Item backend\attendance.db "backups\attendance-after-demo.db"
-# stop the server with Ctrl+C in its terminal; then:
+Copy-Item backend\server-20261123-0900.log "backups\server-demo.log"
+# stop the server with Ctrl+C in its terminal; the log ends with
+#   "Application shutdown complete." + "Finished server process"  ← confirms a clean stop
+# then:
 adb reverse --remove tcp:8000
 ```
 
@@ -104,12 +166,13 @@ if the previous run left a half-finished class.
 
 ## 6. Dry-run log (fill in at G13/G15)
 
-| Item | Dry run #1 (Jan 9–10) | Dry run #2 (Jan 14–15) |
+| Item | Dry run #1 (before 2026-11-23) | Dry run #2 (December pilot) |
 |---|---|---|
 | Cold start → healthy (s) | | |
 | `/wifi/scan` sees the phone (Y/N) | | |
 | Start → `partial` (s) | | |
 | End → `verified` (s) | | |
 | Full run wall time (min) | | |
+| Log file written + clean shutdown line (Y/N) | | |
 | Fallback used (which rung) | | |
 | Surprises | | |

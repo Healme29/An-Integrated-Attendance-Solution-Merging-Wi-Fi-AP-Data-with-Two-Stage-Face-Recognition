@@ -299,6 +299,41 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-11 — B: AP management-plane spike closed, threat model written, demo log capture specified
+- **New stage-2 deliverable from the 2026-11-09 replan is closed, inside its window.** The
+  timeboxed spike asked one question: can the system prove a phone is **inside the scheduled
+  room**? Verdict: not on the campus network this month, exact on the network we control
+  (`docs/B/room_presence_spike.md`, D-011). Stop rule recorded: the spike ended 2026-11-11
+  and reopens only on a named trigger, so it cannot drift into G1/G5 time.
+- **Measured, passive only (no probe to campus gear):** 10 distinct BSSIDs of `NJUPT-CMCC`
+  visible from one seat (39 beacon rows, 6 SSIDs) → one SSID carries no room information; the
+  host's own AP changed between sessions at the same desk (`50:98:b8:c9:2b:e2` on 2026-11-03
+  → `f4:74:88:70:c2:f1` today); `scan_network_arp()` returned only the gateway in **6.15 s**
+  (client isolation unchanged). Re-run table in `network_validation.md` §8.3.
+- **The subnet-collision weakness is now documented instead of implied.** `threat_model.md`
+  defines what each condition proves, T1–T6 with severity, residual risk, and the fix order
+  (auth + token before any new network mechanism). `network_validation.md` §8 defines
+  `wifi_verified` precisely: MAC reachable on the server's L2 **and** server associated with
+  the pinned AP — never "which AP the phone is on".
+- **Lecturer answers recorded (D-013).** Zhe Zhang, 2026-11-11: a network we control is
+  acceptable for the assessment ("Either should be fine"), and the claim "within the coverage
+  area of the scheduled AP" is acceptable if the limitation is stated; he adds that an AP
+  covers one classroom and cannot hold all students anyway. Consequence: the demo pins the
+  BSSID **live** on the demo network — a BSSID copied from an earlier session is stale
+  (measured above).
+- **Demo log capture ("CCTV") specified and its output verified (D-012).** No application
+  code change (B does not own `backend/main.py`): the runbook starts uvicorn through
+  `cmd /c "... > backend\server_<timestamp>.log 2>&1"` and tails the file. Measured capture
+  contains startup banner, every access line, scanner warnings, and the clean-shutdown line;
+  `backend/server_*.log` is already gitignored. `demo_runbook.md` §2b.
+- **Still open, unchanged and honestly labelled not measured:** G1 on the demo laptop
+  (timed `pip install`, warm-up, smoke), G5 hotspot rung with two phones, and the guide run by
+  an outsider. All three need hardware or a second person; none is blocked by code. Due
+  **2026-11-22**.
+- **Review status:** the task-b review now stands at **4 of 7 findings closed** — finding 2
+  closed via PR #14 (`0541294`); `docs/B/review_response.md` §9–§10 records the rest with
+  owners.
+
 ### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
 - **Replanning (drives this entry):** the team will be assessed at a presentation in about
   two weeks (≈ **Nov 23**) and a collection/demonstration at the end of November. The
