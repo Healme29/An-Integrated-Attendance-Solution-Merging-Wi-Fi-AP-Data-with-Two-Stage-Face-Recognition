@@ -106,7 +106,7 @@ ARP alone. Room-level presence needs the AP management plane (see Recommendation
 
 | Priority | Action | Why |
 |---|---|---|
-| **Pilot (M1)** | Set `WI_FI_SUBNET` explicitly to the classroom's /24 and register each student's **real phone MAC** (disable "private/random MAC" for the school SSID during enrollment) | makes the AP check meaningful and predictable |
+| **Pilot (M1)** | Set `WI_FI_SUBNET` explicitly to the classroom's /24 and register each student's **real phone MAC** (disable "private/random MAC" for the school SSID during enrollment; collection procedure and template in `mac_inventory.md`) | makes the AP check meaningful and predictable |
 | **Pilot (M1)** | Run the demo/pilot on one access point where client isolation is **off** (or a dedicated router/hotspot) | ARP scanning then sees the phones |
 | **M2** | Read client↔AP association + RSSI from the AP management plane (SSH/SNMP/controller API); pin the room via `schedules.ap_bssid` | real room-level presence; enables the RSSI threshold idea (~ -72 dBm ≈ outside the room) |
 | **M2** | ✅ **DONE 2026-11-02:** derive the true netmask in `detect_local_subnet()`, cap the sweep, and report exactly what was swept | F1 is fixed; `/wifi/scan` no longer claims a range it did not search |

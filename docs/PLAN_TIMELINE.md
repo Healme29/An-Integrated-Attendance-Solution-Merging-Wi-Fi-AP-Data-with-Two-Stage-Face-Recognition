@@ -299,6 +299,30 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-12 — B: seeded demo path executed end-to-end (dry run #0); MAC inventory procedure written
+- **Dry run #0 (measured, documented):** seeded 5 students into an isolated DB, started the
+  server with log capture, ran the smoke test, and exercised the fallback path the demo
+  relies on. Results: cold start **8.2 s**, smoke **14/14**, `/attendance/today` 5 rows with
+  both `verified` and `face_only`, CSV header (13 columns) + filename + `charset=utf-8`
+  correct, dashboard title correct, log file contains startup + access lines + warnings +
+  clean shutdown, restore drill **6.2 s and 6.1 s** with all 5 rows intact. The 6.2 s figure
+  in `deployment_guide.md` §8 is re-confirmed. Table: `docs/B/dry_run_2026-11-12.md`.
+- **Scope honesty:** dry run #0 does **not** cover a real face check-in, a real phone on the
+  network, Windows, the hotspot, or the projector. Those stay with G1/G5 and dry run #1.
+- **New fact, twice now:** the host's subnet changed between sessions
+  (`10.163.167.0/24` on 11 Nov → `10.163.208.0/24` on 12 Nov, same laptop, same SSID).
+  Consequence already required by D-013, now measured: set `WI_FI_SUBNET` explicitly on the
+  demo network and pin the BSSID **live**, never from an earlier session.
+- **Original duty 4 (phone MAC inventory) had no artefact in the repo.** Procedure and
+  template written (`docs/B/mac_inventory.md`): disable private/random MAC per SSID, read the
+  MAC from the phone or `/wifi/scan`, confirm it survives a rejoin, register with
+  `PUT /students/{id}/mac`, verify `wifi_verified` on the pilot network. The table is
+  deliberately **empty** — collecting it needs the real phones, and inventing values would
+  produce exactly the false negatives the page is meant to prevent.
+- **Still open and unchanged:** G1 on the demo laptop (this disk has **1.1 GB free**, down
+  from 6.2 GB, so the timed `pip install` cannot run here), G5 hotspot with two phones, and
+  the outsider guide run. All three need hardware or another person; due 2026-11-22.
+
 ### 2026-11-11 — B: AP management-plane spike closed, threat model written, demo log capture specified
 - **New stage-2 deliverable from the 2026-11-09 replan is closed, inside its window.** The
   timeboxed spike asked one question: can the system prove a phone is **inside the scheduled

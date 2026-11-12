@@ -176,9 +176,9 @@ team baseline looked green while a Linux machine was red):
 
 ### 6.1 Why item 5 is not already done here
 
-The install was **not** run end-to-end on this machine: the root filesystem has 6.2 GB free
-(`df -h /`), and `ultralytics` pulls `torch` plus the `nvidia-*` CUDA wheels, which is
-2–3 GB of downloads and more than that unpacked. Filling the disk to measure the timer would
+The install was **not** run end-to-end on this machine: the root filesystem had 6.2 GB free on
+2026-11-02 and only **1.1 GB free on 2026-11-12** (`df -h /`); `ultralytics` pulls `torch`
+plus the `nvidia-*` CUDA wheels, which is 2–3 GB of downloads and more than that unpacked. Filling the disk to measure the timer would
 destroy the working environment, so the step is left to the demo laptop, where the disk is
 empty and the measurement is the one that actually matters. Recorded honestly rather than
 estimated: `pip install` time is **not measured yet**.

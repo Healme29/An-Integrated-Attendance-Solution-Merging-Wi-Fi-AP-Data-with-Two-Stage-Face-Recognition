@@ -1,6 +1,7 @@
 # Change Note for the Team Lead — 2026-11-11 (`task-b`)
 
-> **From:** B · **To:** A (team lead / reviewer) · **Commit:** `c5f30eb` on `task-b`
+> **From:** B · **To:** A (team lead / reviewer) · **Commits:** `c5f30eb`, `c45d637`,
+> plus the 2026-11-12 follow-up in §7 · **Branch:** `task-b`
 > **Scope:** documentation only — zero code changes, zero behaviour changes.
 > **What this note is for:** so the lead can review and merge without reading 600 added
 > lines first, and so nobody re-opens the room-presence question during the demo weeks.
@@ -79,3 +80,24 @@ Use the sentence in `threat_model.md` §3.2. Do not say "the system proves the s
 the room" and do not say "the system cannot be gamed". On the assessment network (one AP, one
 room) the claim is strong; on the campus network it is AP-coverage level, and that limitation
 is documented rather than hidden.
+
+---
+
+## 7. Follow-up, 2026-11-12 (second commit on `task-b`)
+
+| File | Change | Status |
+|---|---|---|
+| `docs/B/dry_run_2026-11-12.md` | **new** — seeded demo path executed end-to-end and measured: cold start 8.2 s, smoke 14/14, `/attendance/today` 5 rows, CSV correct, dashboard correct, log capture verified, restore 6.2 s + 6.1 s (re-confirms the figure in `deployment_guide.md` §8) | evidence, not a plan |
+| `docs/B/mac_inventory.md` | **new** — phone-MAC collection procedure, private-MAC disable steps per platform, fill-in template, privacy/retention rules | procedure ready; table intentionally empty (needs the real phones) |
+| `threat_model.md`, `network_validation.md`, `demo_environment.md`, `demo_runbook.md`, `review_response.md`, `PLAN_TIMELINE.md` | cross-links fixed, dry-run #0 recorded, disk figure updated (1.1 GB free), restore timing re-confirmed | ✅ |
+
+Two things the follow-up changed in the operational picture:
+
+1. **The host's subnet drifts between sessions** (`10.163.167.0/24` → `10.163.208.0/24` in
+   two days). Set `WI_FI_SUBNET` explicitly on the demo network and keep the BSSID live-pinned
+   (D-013).
+2. **G1 cannot be measured on the B machine at all now** — 1.1 GB free, down from 6.2 GB. It
+   must happen on the demo laptop.
+
+Still open, unchanged: G1 (demo laptop), G5 hotspot with two phones, outsider guide run.
+

@@ -253,6 +253,8 @@ every date forward. Status against it:
 | The subnet-collision weakness must be documented, not hidden | ✅ **written** | `threat_model.md` (assets, trust boundaries, T1–T6, residual risk, fix order), `network_validation.md` §8 |
 | Lecturer's written answers must be reflected in the claims | ✅ **done** | D-013, `threat_model.md` §3.1–3.2, `offline_fallback.md` §4c |
 | Log written to a file on demo day ("CCTV") | ✅ **procedure + measured output** | D-012, `demo_runbook.md` §2b |
+| Seeded demo path executed end-to-end (fallback rung 3 + rung 4) | ✅ **dry run #0, 2026-11-12** | `dry_run_2026-11-12.md` (cold start 8.2 s, smoke 14/14, CSV/dashboard correct, restore 6.2/6.1 s) |
+| Phone MAC inventory procedure + template (original duty 4, never written) | ✅ **procedure ready; table deliberately empty** | `mac_inventory.md` |
 
 Still open from §9: G1 (demo laptop), hotspot with two phones, outsider guide run. All three
 need hardware or another person, and all three are still recorded as **not measured yet**.

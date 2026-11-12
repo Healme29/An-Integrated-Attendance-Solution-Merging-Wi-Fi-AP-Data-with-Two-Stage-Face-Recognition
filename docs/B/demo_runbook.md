@@ -49,9 +49,8 @@ B and A sit next to each other: only B touches the database, only A touches the 
    ```powershell
    Get-Content backend\server-20261123-0900.log -Wait -Tail 20
    ```
-   Cold start to healthy: **5.9 s** *(measured 2026-11-02)*; **9.1 s** *(measured 2026-11-11
-   on the same host with a cold page cache — the reason the runbook starts at T−30 min, not
-   T−5)*.
+   Cold start to healthy: **5.9 s** *(2026-11-02)*, **6.1–9.1 s** *(2026-11-11/12, same
+   host, cold page cache — the reason the runbook starts at T−30 min, not T−5)*.
 3. **Health + Wi-Fi** in another terminal:
    ```powershell
    curl http://127.0.0.1:8000/health      # {"status":"ok","database":"ok"}
@@ -137,7 +136,7 @@ written.
 
 | Trigger | Threshold | Action |
 |---|---|---|
-| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: restore backup (`deployment_guide.md` §8, 6.2 s measured) or `seed_demo.py --reset` |
+| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: restore backup (`deployment_guide.md` §8, 6.1–6.2 s re-measured 2026-11-12) or `seed_demo.py --reset` |
 | Check-in returns 403 `outside_class_time` | once | check clock/timezone first (`TIMEZONE` must be `Asia/Shanghai`), then fix the schedule window |
 | Check-in returns 403 `identity mismatch` | once | wrong student logged in — C fixes the login, do not re-run blindly |
 | `/wifi/scan` lists no phone | 1 scan | rung 2: continue, say the §4 sentence from `offline_fallback.md` |
@@ -165,6 +164,12 @@ if the previous run left a half-finished class.
 ---
 
 ## 6. Dry-run log (fill in at G13/G15)
+
+**Run #0 — 2026-11-12, seeded path only, on the Linux host.** Executed and measured:
+seed 5 students → 5 attendance rows, cold start 8.2 s, smoke test 14/14, `/attendance/today`
+and CSV correct, dashboard title correct, log capture verified, restore 6.2 s + 6.1 s with
+data intact. Full table in `dry_run_2026-11-12.md`. It does **not** cover a real face
+check-in, a real phone, Windows, or the hotspot — those are the rows below.
 
 | Item | Dry run #1 (before 2026-11-23) | Dry run #2 (December pilot) |
 |---|---|---|
