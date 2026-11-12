@@ -227,23 +227,48 @@ This is a property of container networking, not a bug in our code.
 
 ---
 
-## 7. First attendance check downloads models (~330 MB)
+## 7. First attendance check downloads models (~326 MB)
 
-The ArcFace models land in the persistent volume on the first recognition call
-(`/app/data/dbdata/insightface`), or in `DATA_DIR` when running natively. Do one warm-up call
-before a live demo so the download does not happen in front of the audience:
+The ArcFace models are **not** in this repository. InsightFace downloads `buffalo_l`
+(five `.onnx` files, ~326 MB) on the first recognition that reaches the embedding step.
+
+**Where they are cached**
+
+| Run mode | Cache directory | Why |
+|---|---|---|
+| Native, Windows | `%USERPROFILE%\.insightface\models\buffalo_l` | the installed insightface 2.1 hardcodes `~/.insightface`; `INSIGHTFACE_HOME` is **ignored** by this version |
+| Native, Linux/macOS | `~/.insightface/models/buffalo_l` | same |
+| Docker | `/app/data/dbdata/.insightface/models/buffalo_l` | the image sets `HOME=/app/data/dbdata`, which is the mounted volume |
+
+`DATA_DIR` (`backend/data`) holds the YOLO weights, face crops and embeddings — **not**
+`buffalo_l`. The old `INSIGHTFACE_HOME` setting did nothing on the installed version and was
+removed (D-014).
+
+**A photo without a detectable face does not warm the model.** The request runs YOLO first;
+if no face is found it returns `{"recognized": false, ...}` and never initialises ArcFace.
+Measured on 2026-11-12: a faceless JPEG returned in 4.8 s with ArcFace still unloaded
+(`_app is None`). So use a real selfie:
 
 ```powershell
-# any JPEG works - the point is to trigger the model load/download, not a match
-curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\any\photo.jpg"
-# expect a JSON answer within seconds-to-a-minute the first time:
-#   {"recognized":false,...} or {"recognized":true,...}  -> models are warm
-# a second identical call must be fast (measured ~1 s per check-in afterwards)
+# a photo WITH A FACE; a landscape or an empty wall only warms YOLO
+curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\my-selfie.jpg"
+# expect {"recognized": ...} once the model load finishes; the download time depends on the link
 ```
 
-After the first download the volume (or `DATA_DIR`) keeps the models across restarts and
-rebuilds. Verify the second call is fast — if it is slow, the models were not cached where
-you think they are.
+Then prove the cache is where the table says, before relying on it offline:
+
+```powershell
+# Windows native: must list five .onnx files totalling ~326 MB
+Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l"
+# Docker
+docker compose exec backend ls -lh /app/data/dbdata/.insightface/models/buffalo_l
+```
+
+A second identical call must be fast (measured ~1 s per check-in afterwards). If it is slow,
+or the folder is missing, the download did not land where you think it did — and at the venue
+your first real check-in will try to reach GitHub. Offline that fails rather than falling back:
+measured 2026-11-12, a missing cache with no network raised a `ProxyError` for
+`buffalo_l.zip` after 3.2 s, so the check-in errors instead of becoming `face_only`.
 
 ---
 

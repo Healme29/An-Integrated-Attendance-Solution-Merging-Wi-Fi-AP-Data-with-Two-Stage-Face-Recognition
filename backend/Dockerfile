@@ -1,8 +1,12 @@
 FROM python:3.11-slim
 
+# insightface 2.1 (what requirements.txt resolves to) caches models in
+# ~/.insightface and does not read INSIGHTFACE_HOME, so HOME is pointed at the
+# mounted volume instead: the ~326 MB buffalo_l set then survives rebuilds and
+# is available offline. See docs/B/DECISIONS.md D-014.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    INSIGHTFACE_HOME=/app/data/dbdata/insightface
+    HOME=/app/data/dbdata
 
 WORKDIR /app
 

@@ -9,8 +9,10 @@ services:
       # Persisted state (database + InsightFace models) lives in the named
       # volume mounted at /app/data/dbdata. Keeping it OUT of /app/data means
       # the YOLO weights baked into the image at /app/data/models stay visible.
+      # The image also sets HOME=/app/data/dbdata: insightface 2.x caches the
+      # ArcFace models under ~/.insightface and ignores INSIGHTFACE_HOME
+      # (D-014), so this is what keeps the ~326 MB model set on the volume.
       DATABASE_PATH: /app/data/dbdata/attendance.db
-      INSIGHTFACE_HOME: /app/data/dbdata/insightface
       # Server timezone: schedule windows and stored timestamps follow this.
       TIMEZONE: ${TIMEZONE:-Asia/Shanghai}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}

@@ -101,3 +101,26 @@ Two things the follow-up changed in the operational picture:
 
 Still open, unchanged: G1 (demo laptop), G5 hotspot with two phones, outsider guide run.
 
+
+---
+
+## 8. Follow-up 2, 2026-11-12 (third commit on `task-b`) — a demo trap removed
+
+Checking the G1 "model warm-up" row against the installed library found three of my own
+statements were wrong. This is the only part of the November work so far that touches code
+outside `docs/`, and it is small on purpose.
+
+| File | Change | Why the lead should care |
+|---|---|---|
+| `backend/Dockerfile` | `INSIGHTFACE_HOME=…` → `HOME=/app/data/dbdata` | insightface 2.x ignores `INSIGHTFACE_HOME`; without this, the ~326 MB model set lands in the container's ephemeral layer, so a rebuild or an offline venue means no recognition |
+| `docker-compose.yml` | removed the dead `INSIGHTFACE_HOME` entry, comment explains `HOME` | the compose file no longer promises something the library does not do |
+| `docs/B/model_cache_2026-11-12.md` | **new** — measurements: 326 MB cache, faceless photo → 0 boxes and ArcFace **not** loaded (4.83 s), warm cache load 4.21 s / 3.06 s, empty cache → `AssertionError`, missing cache + no network → `ProxyError` after 3.21 s | this is the evidence behind D-014 |
+| `docs/B/deployment_guide.md` §7, `offline_fallback.md` §0/§5, `demo_runbook.md` §2, `demo_environment.md` §6 | warm-up now requires a photo **with a face** and a cache-folder check; real paths per run mode | the previous "any JPEG works" advice would have left ArcFace cold while looking successful |
+| `backend/tests/test_services.py` | new test `test_no_face_request_never_touches_arcface` | locks the order the warm-up advice depends on |
+| `docs/B/DECISIONS.md` | **D-014** | problem → 4 options → measurements → decision → consequences → revisit |
+| `review_response.md` §11, `PLAN_TIMELINE.md` | self-found note, progress entry | so the old wording is not inherited by a reviewer |
+
+What is **not** claimed: the Docker image was **not** rebuilt (no daemon on this machine). The
+`HOME` mechanism was verified outside Docker; the build itself is still unverified.
+
+Suite after the change: **188 passed**.

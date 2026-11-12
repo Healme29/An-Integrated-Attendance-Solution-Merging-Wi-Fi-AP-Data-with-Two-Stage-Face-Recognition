@@ -362,3 +362,55 @@
 - **Evidence files:** `docs/B/offline_fallback.md` §2/§4c, `docs/B/demo_runbook.md` §2,
   `docs/B/room_presence_spike.md` §2/§4, `docs/B/threat_model.md` §3.1–§3.2,
   `backend/services/wifi_scanner.py` (`get_current_bssid`, `is_same_bssid`).
+
+### D-014 — ArcFace cache path: correct the docs, warm up with a face, persist it in Docker through `HOME`
+- **Date:** 2026-11-12 · **Stage:** M2 / G1 + G5 (offline readiness); operational correction to D-001
+- **Problem:** Three statements in B's own documents did not match the pinned library
+  (`backend/requirements.txt`: `insightface>=2.0`; installed here: 2.1).
+  1. `offline_fallback.md` said `buffalo_l` is cached in `DATA_DIR`.
+  2. `deployment_guide.md` §7 said "any JPEG works" to warm the models.
+  3. `backend/Dockerfile` and `docker-compose.yml` set `INSIGHTFACE_HOME`, which this
+     library version never reads — inside a container the models would download to
+     `/root/.insightface`, i.e. the ephemeral image layer, not the mounted volume.
+
+  Consequence if uncorrected: an operator copies/caches the wrong folder, the warm-up call
+  "succeeds" without loading ArcFace, and the first real check-in at an offline venue tries
+  to reach GitHub and fails.
+- **Options:** (1) leave the documents alone and rely on the native demo only — the claim
+  would still be false and the Docker fallback silently broken; (2) correct the documents and
+  declare Docker recognition unsupported without internet; (3) correct the documents **and**
+  make the container cache under the mounted volume with a one-line `HOME` change to
+  `backend/Dockerfile` (B-owned; no change to A-owned `face_recognition.py`); (4) ask A to
+  pass `root=...` into `FaceAnalysis` — cleanest long-term, but it is A's file and not needed
+  for the November scope.
+- **Evidence:** measured 2026-11-12 on this host, `insightface` 2.1:
+  - cache is `~/.insightface/models/buffalo_l`, **326 MB**, five `.onnx` files
+    (`w600k_r50.onnx` 167 MB, `1k3d68.onnx` 137 MB, `det_10g.onnx` 17 MB, …);
+  - a 480×640 faceless JPEG: **0** YOLO boxes in **4.83 s**, and
+    `services.face_recognition._app is None` afterwards — ArcFace was **not** loaded;
+  - explicit `get_face_analyzer()` with the cache present: **4.21 s** (a second run under a
+    simulated `HOME`: **3.06 s**), five models loaded;
+  - an existing but empty `buffalo_l` directory fails immediately with
+    `AssertionError` at `assert "detection" in self.models` — no useful message;
+  - missing cache with the network unreachable: `requests.exceptions.ProxyError` for
+    `…/model-zoo/buffalo_l.zip` after **3.21 s**;
+  - library source: `FaceAnalysis.__init__(root="~/.insightface")`; no `INSIGHTFACE_HOME`
+    lookup anywhere in the installed package; `HOME` override moved `model_dir` under the new
+    `HOME` (`…/home_sim/home/.insightface/models/buffalo_l`).
+- **Decision:** option 3. `backend/Dockerfile` replaces `INSIGHTFACE_HOME` with
+  `HOME=/app/data/dbdata` (the named volume); `docker-compose.yml` drops the ineffective
+  variable; every B document names the real cache path and states that the warm-up photo must
+  contain a face. Native remains the demo path (D-001/D-002 unchanged).
+- **Consequences:** the Docker image was **not rebuilt here** (no daemon on this machine) —
+  the `HOME` mechanism is verified outside Docker, the build itself is not. A Docker run on a
+  clean volume still downloads 326 MB once, now into the volume, so it survives
+  `docker compose down` and is available offline. If a future insightface honours
+  `INSIGHTFACE_HOME`, the path table must be revisited. Recommendation to A (not applied,
+  file is A-owned): pass `root=os.getenv("INSIGHTFACE_HOME", "~/.insightface")` to
+  `FaceAnalysis` so the environment variable becomes meaningful.
+- **Revisit by:** dry run #1 (G1, the "model warm-up" row) and the first Docker build on a
+  machine that has a daemon.
+- **Evidence files:** `docs/B/model_cache_2026-11-12.md`, `docs/B/deployment_guide.md` §7,
+  `docs/B/offline_fallback.md` §0/§5, `docs/B/demo_runbook.md` §2,
+  `docs/B/demo_environment.md` §6, `backend/Dockerfile`, `docker-compose.yml`,
+  `backend/tests/test_services.py`.

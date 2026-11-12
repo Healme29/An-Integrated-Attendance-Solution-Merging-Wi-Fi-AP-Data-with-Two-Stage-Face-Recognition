@@ -147,10 +147,11 @@ merging B's own branch would defeat that.
 Two halves, and they are not the same risk.
 
 **4.1 The timed `pip install` was not run here, on purpose.** This machine's root filesystem
-has **6.2 GB free** (90 % used). `ultralytics` pulls `torch` plus the `nvidia-*` CUDA wheels —
-2–3 GB of downloads and more unpacked. Running the measurement here would fill the disk and
-destroy the working environment, so the number would cost more than it is worth. It is
-recorded as **not measured yet** rather than estimated (`demo_environment.md` §6.1).
+had **6.2 GB free** when this was written and has **1.1 GB free on 2026-11-12** (99 % used).
+`ultralytics` pulls `torch` plus the `nvidia-*` CUDA wheels — 2–3 GB of downloads and more
+unpacked. Running the measurement here would fill the disk and destroy the working
+environment, so the number would cost more than it is worth. It is recorded as **not measured
+yet** rather than estimated (`demo_environment.md` §6.1).
 
 **4.2 G1 on the physical laptop is the measurement that matters**, and it needs the laptop.
 The table to fill in is already written; the steps are §5b and §12 of
@@ -160,7 +161,7 @@ The table to fill in is already written; the steps are §5b and §12 of
 |---|---|---|
 | full install | `time pip install -r backend/requirements.txt` (fresh venv) | minutes |
 | cold start → health | start server, poll `/health` until ok | seconds |
-| model warm-up | first `/faces/recognize` (downloads `buffalo_l`) | minutes + MB |
+| model warm-up | first `/faces/recognize` **with a photo containing a face** (downloads `buffalo_l`); confirm `%USERPROFILE%\.insightface\models\buffalo_l` | minutes + MB |
 | first check-in after warm-up | `/attendance/check` | seconds |
 | `/wifi/scan` on the demo network | includes `bssid` and `subnet` | seconds, device count |
 
@@ -262,3 +263,23 @@ need hardware or another person, and all three are still recorded as **not measu
 The finding 2 process note is kept above unchanged: the review's rule was that B must not
 merge its own branch, and B did not — A merged it after the two High findings were answered.
 
+
+---
+
+## 11. Self-found on 2026-11-12 — the model-warm-up advice was false (not a review finding)
+
+While preparing the G1 table, three of B's own statements were found to contradict the
+library that `requirements.txt` installs (insightface 2.1). This is not one of the seven
+review findings; it is recorded here because §4.2 refers to the warm-up, and a reviewer
+reading only this file should not inherit the old wording.
+
+| Claim | Reality | Evidence |
+|---|---|---|
+| `buffalo_l` is cached in `DATA_DIR` | It is in `~/.insightface/models/buffalo_l` (`%USERPROFILE%\.insightface\…`); `DATA_DIR` holds YOLO weights, faces, embeddings | `model_cache_2026-11-12.md` §2, D-014 |
+| "any JPEG works" to warm the models | A faceless image stops at YOLO and never initialises ArcFace — measured 0 boxes, `_app is None` | `model_cache_2026-11-12.md` §3 row 2 |
+| `INSIGHTFACE_HOME` puts the cache on the Docker volume | insightface 2.x never reads it; the cache would land in `/root/.insightface` inside the image layer | `model_cache_2026-11-12.md` §2–§3; fix in `backend/Dockerfile` + `docker-compose.yml` |
+
+Corrected in `deployment_guide.md` §7, `offline_fallback.md` §0/§5, `demo_runbook.md` §2,
+`demo_environment.md` §6, with a regression test in `backend/tests/test_services.py`
+(`test_no_face_request_never_touches_arcface`). The Docker image was **not** rebuilt here (no
+daemon); that remains an open verification item, not a claim.

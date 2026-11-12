@@ -12,8 +12,13 @@
 | Needs internet | Do this once, while online | Proof it is local afterwards |
 |---|---|---|
 | YOLO weights (52 MB) | `backend/data/models/yolov8m-face.pt` exists | `ls -lh` shows the file; `/faces/recognize` does not hit the network |
-| InsightFace `buffalo_l` (~330 MB) | one warm-up `/faces/recognize` call, models cached in `DATA_DIR` | second call works with the Wi-Fi adapter disabled |
+| InsightFace `buffalo_l` (~326 MB) | one warm-up `/faces/recognize` call **with a photo that contains a face** (a faceless image stops at YOLO and never loads ArcFace), then confirm the folder: `%USERPROFILE%\.insightface\models\buffalo_l` natively, `/app/data/dbdata/.insightface/models/buffalo_l` in Docker | the folder lists five `.onnx` files (~326 MB) and a second call is fast; loading from a warm disk took 3.1–4.2 s here (D-014) |
 | Python packages / APK | `pip install -r backend/requirements.txt`, APK already installed on the phone | `python -m uvicorn` starts, app opens |
+
+`DATA_DIR` is **not** where `buffalo_l` lives: it holds the YOLO weights, faces and
+embeddings. The installed insightface 2.1 ignores `INSIGHTFACE_HOME` and always uses `~/.insightface`
+(D-014). With no cache and no internet, the first real check-in fails with a `ProxyError` for
+`buffalo_l.zip` (measured, 3.2 s) — it does **not** degrade to `face_only`.
 
 Nothing else in the backend calls the internet. `TIMEZONE` needs the `tzdata` package
 (installed by requirements), not a network lookup.
@@ -138,7 +143,7 @@ gamed". Both are false and both are contradicted by `threat_model.md` T1–T6.
 |---|---|---|---|
 | 1 | Backend starts | `python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000` | `Uvicorn running on http://0.0.0.0:8000` |
 | 2 | Health | `curl http://127.0.0.1:8000/health` | `{"status":"ok","database":"ok"}` |
-| 3 | Models local | `/faces/recognize` with any photo | answer arrives in seconds, no download log |
+| 3 | Models local | `/faces/recognize` with a photo **that contains a face** (a faceless image only warms YOLO), then `dir %USERPROFILE%\.insightface\models\buffalo_l` | five `.onnx` files (~326 MB); answer in seconds, no download log; a second call is fast |
 | 4 | Data present | `curl http://127.0.0.1:8000/attendance/today` | rows (seeded or real) |
 | 5 | Dashboard | open `/dashboard` | table + status colours render |
 | 6 | CSV | `/attendance/export/csv` | downloads, header `id,timestamp,...` |

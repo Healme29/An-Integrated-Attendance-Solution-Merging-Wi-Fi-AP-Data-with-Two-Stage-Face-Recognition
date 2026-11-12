@@ -60,8 +60,12 @@ B and A sit next to each other: only B touches the database, only A touches the 
    ```powershell
    Copy-Item backend\attendance.db "backups\attendance-prerun.db"
    ```
-5. **Warm the models** with one throwaway `/faces/recognize` call (first call may load
-   YOLO + ArcFace; measured ~1 s per check-in afterwards).
+5. **Warm the models** with one `/faces/recognize` call **using a photo that contains a
+   face** — a faceless image stops after YOLO and leaves ArcFace cold, so it warms nothing.
+   Then confirm the cache exists: `dir %USERPROFILE%\.insightface\models\buffalo_l` must list
+   five `.onnx` files (~326 MB). With the cache present, loading took 3.1–4.2 s here (D-014);
+   afterwards a check-in is ~1 s. Missing cache + no internet = a failed check-in
+   (`ProxyError`), **not** `face_only`.
 6. **Phone**: `adb reverse tcp:8000 tcp:8000`, open the app, log in, confirm Settings →
    Test Connection is green.
 7. **Dashboard** open in a browser tab, zoomed for the projector. Refresh once after the

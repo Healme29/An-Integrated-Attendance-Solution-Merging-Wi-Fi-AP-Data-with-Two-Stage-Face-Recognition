@@ -170,7 +170,7 @@ team baseline looked green while a Linux machine was red):
 |---|---|---|
 | 1 | Run this table on the **physical demo laptop** (Windows) | §5b of the deployment guide, paste the numbers here |
 | 2 | Re-measure a scan with **1–2 real phones** on the demo network (hotspot with isolation off) | `GET /wifi/scan` must list the phone MACs; record seconds per scan |
-| 3 | Confirm model warm-up on the demo laptop (first recognition downloads `buffalo_l`, ~330 MB) | one `/faces/recognize` call before the demo, then time a real check-in |
+| 3 | Confirm model warm-up on the demo laptop: `buffalo_l` must be **on the laptop** (~326 MB) and the warm-up call must use a photo **with a face** | `dir %USERPROFILE%\.insightface\models\buffalo_l` (five `.onnx`); one `/faces/recognize` call with a selfie, then time a real check-in. Measured here 2026-11-12: faceless image does **not** load ArcFace; warm cache loads in 3.1–4.2 s (D-014) |
 | 4 | Docker on the demo laptop | optional — only needed if the dashboard is demoed while native Wi-Fi is not |
 | 5 | **Timed, full `pip install -r backend/requirements.txt` on a clean machine** | `time pip install -r backend/requirements.txt` in a fresh venv, paste the wall time |
 

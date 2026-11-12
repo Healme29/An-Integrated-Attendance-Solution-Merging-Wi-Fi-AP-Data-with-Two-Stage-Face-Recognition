@@ -299,6 +299,24 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-12 (2) — B: ArcFace cache path corrected; the "any JPEG warms the models" trap removed
+- While preparing the G1 warm-up row, three B claims were checked against the pinned library
+  (`insightface` 2.1) and were wrong: the cache is `~/.insightface/models/buffalo_l`, not
+  `DATA_DIR`; a photo without a detectable face never initialises ArcFace, so it does not warm
+  anything; and `INSIGHTFACE_HOME` is not read by this version, so the Docker cache would land
+  in the ephemeral image layer instead of the mounted volume.
+- Measured: cache **326 MB** / five `.onnx`; faceless 480×640 JPEG → **0** boxes in **4.83 s**
+  with `_app is None`; explicit load **4.21 s** (**3.06 s** under a simulated `HOME`); empty
+  cache → `AssertionError`; missing cache + no network → `ProxyError` for `buffalo_l.zip` after
+  **3.21 s**. Evidence: `docs/B/model_cache_2026-11-12.md`, D-014.
+- Fixed: `backend/Dockerfile` now sets `HOME=/app/data/dbdata` (volume) instead of the ignored
+  `INSIGHTFACE_HOME`; `docker-compose.yml` drops the dead variable; the deployment guide,
+  offline fallback, runbook and G1 table now require a warm-up photo **with a face** and a
+  cache-folder check; regression test added. Docker build not re-run (no daemon) — stated as
+  unverified, not claimed.
+- Suite: see the commit; the new test is
+  `test_no_face_request_never_touches_arcface`.
+
 ### 2026-11-12 — B: seeded demo path executed end-to-end (dry run #0); MAC inventory procedure written
 - **Dry run #0 (measured, documented):** seeded 5 students into an isolated DB, started the
   server with log capture, ran the smoke test, and exercised the fallback path the demo
