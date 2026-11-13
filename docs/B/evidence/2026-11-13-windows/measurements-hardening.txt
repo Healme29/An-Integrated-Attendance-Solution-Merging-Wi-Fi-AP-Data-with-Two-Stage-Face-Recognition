@@ -1,0 +1,48 @@
+=== environment ===
+python 3.12.10 | cwd D:\NJUPT ( NANJING UNIVERSITY OF POSTS AND TELECOMMUNICATIONS )\STITP\An-Integrated-Attendance-Solution-Merging-Wi-Fi-AP-Data-with-Two-Stage-Face-Recognition
+database C:\Users\nonia\AppData\Local\Temp\opencode\g1win\run2\attendance.db
+data_dir C:\Users\nonia\AppData\Local\Temp\opencode\g1win\run2\data
+
+=== 0. model files ===
+yolo_model_bytes 52028566 copy_ms 55
+yolo_model_sha256 219f490a97d5722972e1660725fa7cfab54e46c944b833debc28c2302aa1be93
+insightface_home C:\Users\nonia\.insightface buffalo_l_present False
+
+=== 1. cold start ===
+cold_start_to_healthy_ms 16697
+
+=== 2. recognition error paths (YOLO model present) ===
+no_face_png_bytes 11154
+recognize_no_face_attempt1 status=500 ms=10740 "Internal Server Error"
+recognize_no_face_attempt2 status=500 ms=4018 "Internal Server Error"
+recognize_corrupt_png status 200 {"recognized": false, "student_id": null, "student_name": null, "confidence": 0.0}
+
+=== 3. upload cap gap on /faces/recognize and /attendance/check ===
+oversized_11MB_recognize status 200 ms 140 body {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+oversized_11MB_enroll status 413 ms 83 body {"detail":"Image too large (max 10 MB)"}
+oversized_11MB_attendance_check status 404 body {"detail":"Student not found"}
+
+=== 4. face path without a face image ===
+attendance_check_no_face status 404 body {"detail":"Student not found"}
+
+=== 5. SQLite concurrency: parallel writes and reads ===
+concurrent_write_n=24 wall_ms=823 codes={"200": 24} p50_ms=337 max_ms=769
+concurrent_read_n=24 wall_ms=68 codes={"200": 24} p50_ms=41 max_ms=50
+students_rows_after_concurrency 24
+log_lines_with_database_is_locked 0
+
+=== 6. clean shutdown time ===
+shutdown_exit_code 1 shutdown_s 0.00
+
+=== 7. backup and restore ===
+backup_copy_ms 1.2 size_bytes 40960
+start_without_db_healthy_ms 14715 exit None
+students_after_fresh_db 0
+restore_copy_ms 2.9 start_to_healthy_ms 13912
+restored_row_nim_CONC000 status 200 rows 1
+
+=== 8. corrupt database at startup ===
+corrupt_exit_after_ms none poll None
+still_alive_after_20s True -> killing
+killed_exit_code 1
+corrupt_log_tail "sqlite3.DatabaseError: file is not a database\n\nERROR:    Application startup failed. Exiting."

@@ -16,10 +16,12 @@ class ApiException implements Exception {
 class ApiService {
   static const String _urlKey = "backend_base_url";
 
-  /// Works on a real phone AND an emulator when the device is attached over
-  /// USB (`adb reverse tcp:8000 tcp:8000` maps this to the laptop's backend).
-  /// For LAN access, override it in Settings with the laptop's IP.
-  static const String _defaultBaseUrl = "http://127.0.0.1:8000";
+  /// Default points at the laptop's Mobile Hotspot address (Windows always
+  /// assigns 192.168.137.1 to the hotspot host). This is the canonical demo
+  /// path because campus Wi-Fi blocks device-to-device traffic. For USB
+  /// (`adb reverse tcp:8000 tcp:8000`) override in Settings with
+  /// http://127.0.0.1:8000 instead.
+  static const String _defaultBaseUrl = "http://192.168.137.1:8000";
   static const Duration _timeout = Duration(seconds: 15);
 
   static String baseUrl = _defaultBaseUrl;
@@ -171,6 +173,23 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getSchedules() async {
     final data = await _get("/schedules/") as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
+  }
+
+  /// Schedules whose attendance window includes right now (grace applied).
+  static Future<List<Map<String, dynamic>>> getActiveSchedules() async {
+    final data = await _get("/schedules/active") as List<dynamic>;
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  /// Ask the server whether a check-in could succeed before opening the camera.
+  static Future<Map<String, dynamic>> preflight({
+    required int studentId,
+    required int scheduleId,
+    required String checkType,
+  }) async {
+    return await _get(
+        "/attendance/preflight?student_id=$studentId&schedule_id=$scheduleId&check_type=$checkType")
+        as Map<String, dynamic>;
   }
 
   /// Quick connectivity probe for the Settings screen.

@@ -1,9 +1,17 @@
 # Demo Runbook — printed copy (draft for G12–G16)
 
 > **Status:** draft. Numbers marked *(measured)* were measured; everything else is a
-> procedure to be timed at dry run #1, now **before the assessment (presentation ≈
-> 2026-11-23)**; the former 2027-01-09/10 slots were superseded by A's D-005 (2026-11-09).
+> procedure to be executed and timed at dry run #1 (2027-01-09/10).
 > **Owner:** B · **Used by:** A (backend), C (phone), D (narration), B (fallback).
+> **Updated 2026-11-10:** strict classroom mode (`REQUIRE_CLASSROOM_WIFI=true`;
+> decision D-006 in `docs/A/DECISIONS.md`, not the B-006 database-recovery entry) and
+> the check-in preflight are now part of the demo path, and the app only lists schedules
+> whose window is open. The dry-run dates above predate the accelerated timeline (D-005);
+> the dates will be re-cut, the procedures below will not.
+> **Updated 2026-11-13:** the timings in §2 are now measured on the Windows 11 laptop
+> (native `uvicorn`, Python 3.12, no Docker). Model warm-up moved into its own step and is
+> measured; the install needs `dill==0.3.8` (§2 step 0). Raw evidence:
+> `docs/B/evidence/2026-11-13-windows/`.
 
 ---
 
@@ -24,100 +32,106 @@ B and A sit next to each other: only B touches the database, only A touches the 
 
 | Thing | Value |
 |---|---|
-| Backend | `http://127.0.0.1:8000` (host), `http://<laptop-ip>:8000` (LAN) |
+| Backend (host) | `http://127.0.0.1:8000` |
+| Backend (phones) | `http://192.168.137.1:8000` — the Windows Mobile Hotspot host, and the app's built-in default |
 | Dashboard | `http://127.0.0.1:8000/dashboard` |
 | API docs (only if asked) | `http://127.0.0.1:8000/docs` |
-| Phone connection | `adb reverse tcp:8000 tcp:8000`, app URL `http://127.0.0.1:8000` |
-| Hotspot | SSID `Attendance-Demo`, password on the printed sheet (not in git) |
+| Hotspot | SSID `Attendance-Demo`, 2.4 GHz, password on the printed sheet (not in git) |
+| Phone connection | join `Attendance-Demo`; no cable needed |
+| Alternative (USB only) | `adb reverse tcp:8000 tcp:8000`, then set the app URL to `http://127.0.0.1:8000` in Settings |
 
 ---
 
 ## 2. Startup order (T−30 min)
 
-1. **Laptop network first.** Join the demo network or start the Mobile hotspot. Write the
-   laptop IP on the printed sheet.
-2. **Backend** (native — Docker cannot see the Wi-Fi LAN, decision D-002) **with the log
-   captured to a file** (the "CCTV" record — see §2b):
+0. **Environment, done the day before (needs internet).** Python **3.12**; `pip install -r
+   backend\requirements.txt` measured **577 s** on this laptop, then
+   `pip install dill==0.3.8` — `dill` is required to load `yolov8m-face.pt` and is not yet in
+   the A-owned requirements file (hardening item 7, D-012). `backend\data\models\yolov8m-face.pt`
+   and `%USERPROFILE%\.insightface\models\buffalo_l` must already exist (step 7 checks them).
+1. **Hotspot first.** Turn on the Windows Mobile Hotspot: SSID `Attendance-Demo`, band
+   2.4 GHz. Windows assigns the host address `192.168.137.1`; write it on the printed sheet.
+   A phone hotspot or a small travel router works too — what matters is that the server and
+   the student phones share one flat network with **client isolation off**, which campus
+   Wi-Fi does not give us (`network_validation.md` F2).
+2. **Backend** (native — Docker cannot see the Wi-Fi LAN, decision D-002):
    ```powershell
    $env:TIMEZONE="Asia/Shanghai"; $env:FACE_SIMILARITY_THRESHOLD="0.5"; $env:YOLO_IMG_SIZE="640"
+   $env:WI_FI_SUBNET="192.168.137.0/24"; $env:REQUIRE_CLASSROOM_WIFI="true"
    $env:CORS_ORIGINS="http://127.0.0.1:8000"
-   $log = "backend\server_$(Get-Date -Format 'yyyyMMdd-HHmm').log"
-   cmd /c "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > `"$log`" 2>&1"
+   .\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
    ```
-   In a **second** PowerShell window, follow the file live (use the filename printed above;
-   the `$log` variable only exists in the first window):
+   Cold start to healthy: **17.3 s** *(measured 2026-11-13, Windows 11; a restart right after
+   a process stop took 25.3 s — still far inside the T−30 min window)*. Python must be
+   **3.12**; 3.13 cannot install the pinned wheels (D-012). Keep
+   `REQUIRE_CLASSROOM_WIFI=true` for the demo: it turns the Wi-Fi condition into a visible
+   gate (403, no row) instead of a silent downgrade to `face_only`.
+3. **Health + Wi-Fi** in a second terminal:
    ```powershell
-   Get-Content backend\server-20261123-0900.log -Wait -Tail 20
+   curl.exe http://127.0.0.1:8000/health      # {"status":"ok","database":"ok"}
+   curl.exe http://127.0.0.1:8000/wifi/scan   # the phone MAC must appear in "devices"
    ```
-   Cold start to healthy: **5.9 s** *(2026-11-02)*, **6.1–9.1 s** *(2026-11-11/12, same
-   host, cold page cache — the reason the runbook starts at T−30 min, not T−5)*.
-3. **Health + Wi-Fi** in another terminal:
+   The response also carries `bssid` — that is the **hotspot's** BSSID and the value the
+   schedule will pin in step 5. (In Windows PowerShell `curl` is an alias for
+   `Invoke-WebRequest`; the commands below use `curl.exe` so you see the raw JSON.)
+4. **Replace the seeded MACs with the real phones.** `seed_demo.py` deliberately gives demo
+   students fake local MACs (`02:00:00:00:00:NN`), so with strict mode on **every check-in
+   from a seeded student is rejected with 403**. Register the real Wi-Fi MAC of each demo
+   phone (and switch off "private/random MAC" for `Attendance-Demo` on that phone):
    ```powershell
-   curl http://127.0.0.1:8000/health      # {"status":"ok","database":"ok"}
-   curl http://127.0.0.1:8000/wifi/scan   # phone MAC must appear
+   curl.exe -X PUT "http://127.0.0.1:8000/students/1/mac?mac_address=aa:bb:cc:dd:ee:ff"
    ```
-4. **Backup the database now** (so a broken demo can be restored in ~6 s):
+   Note the query parameter — this endpoint takes no JSON body.
+5. **Check the active schedule and pin the AP.** The app lists only `/schedules/active`, so
+   the demo class must be inside its window *and* on today's weekday:
    ```powershell
+   curl.exe http://127.0.0.1:8000/schedules/active     # must not be []
+   ```
+   If it is empty, re-run `seed_demo.py` (it opens a class 5 min before now and closes 55 min
+   after) or fix the window. Then pin the hotspot BSSID from step 3:
+   ```powershell
+   curl.exe http://127.0.0.1:8000/schedules/1     # copy day_of_week/start_time/end_time/room
+   ```
+   `PUT /schedules/{id}` replaces **every** field, so copy the current window from that GET
+   and add only the BSSID — do not retype the times, or the class window breaks:
+   ```powershell
+   curl.exe -X PUT http://127.0.0.1:8000/schedules/1 -H "Content-Type: application/json" `
+     -d '{"class_name":"<from GET>","day_of_week":<from GET>,"start_time":"<from GET>","end_time":"<from GET>","ap_bssid":"<bssid from step 3>","room":"<from GET>"}'
+   ```
+   `day_of_week` is 0 = Monday. Leaving `ap_bssid` empty is allowed — the MAC layer still
+   applies — but then the BSSID half of the story is not demonstrated.
+6. **Preflight must be green before the audience arrives:**
+   ```powershell
+   curl.exe "http://127.0.0.1:8000/attendance/preflight?student_id=1&schedule_id=1&check_type=start"
+   ```
+   Expect `"allowed": true`, `"wifi_verified": true`, and `schedule_bssid` equal to
+   `server_bssid`. If `wifi_verified` is false, do **not** start with strict mode: go to the
+   fallback table (§4).
+7. **Models present, then warm them.** Both models load **lazily**, on the first face
+   request — a cold first selfie on stage would look like a 13-second hang. So:
+
+   ```powershell
+   Get-Item backend\data\models\yolov8m-face.pt | Select-Object Length   # expect 52028566
+   Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l"        # expect 5 .onnx files
+   # then one throwaway call, before the audience arrives:
+   curl.exe -F "file=@C:\path\to\any\photo.jpg" http://127.0.0.1:8000/faces/recognize
+   ```
+
+   Measured 2026-11-13: cold call **13.4 s**, warm **1.5–1.6 s**, and the server's own
+   warm-up call **8.3 s**. Both models resident cost ≈ **1.0 GB RSS**. If `dill` is missing
+   the call returns `500` with `ModuleNotFoundError: No module named 'dill'` — install
+   `dill==0.3.8` into the venv and restart (step 0), do not debug it on stage.
+   `buffalo_l` lives in `%USERPROFILE%\.insightface`, **not** `DATA_DIR` (D-012), so that is
+   the folder to copy to the backup stick.
+8. **Backup the database now** (measured: copy **1.2 ms** for 40 KB; restore to healthy
+   **13.9 s** on this laptop — the older 6.2 s figure was the Linux machine):
+   ```powershell
+   New-Item -ItemType Directory -Force backups | Out-Null
    Copy-Item backend\attendance.db "backups\attendance-prerun.db"
    ```
-5. **Warm the models** with one `/faces/recognize` call **using a photo that contains a
-   face** — a faceless image stops after YOLO and leaves ArcFace cold, so it warms nothing.
-   Then confirm the cache exists: `dir %USERPROFILE%\.insightface\models\buffalo_l` must list
-   five `.onnx` files (~326 MB). With the cache present, loading took 3.1–4.2 s here (D-014);
-   afterwards a check-in is ~1 s. Missing cache + no internet = a failed check-in
-   (`ProxyError`), **not** `face_only`.
-6. **Phone**: `adb reverse tcp:8000 tcp:8000`, open the app, log in, confirm Settings →
-   Test Connection is green.
-7. **Dashboard** open in a browser tab, zoomed for the projector. Refresh once after the
-   first check-in so the audience sees new rows appear.
-
----
-
-## 2b. Log capture — the "CCTV" file (decision D-012)
-
-Why: if the terminal is closed, scrolled away, or the laptop reboots, a demo whose output
-only ever existed on screen has no record. The log file is the evidence that a disputed
-check-in was (or was not) served, and when.
-
-**One command, no code change.** The backend has no file-handler configuration and B does not
-own `backend/main.py`, so capture is done by the shell. `cmd /c` is used instead of
-PowerShell's `2>&1 | Tee-Object` because PowerShell 5.1 wraps native stderr in
-`ErrorRecord`s and writes formatting noise into the file; `cmd /c` writes the raw lines.
-
-What the file contains *(measured 2026-11-11 on port 8098)*:
-
-```
-INFO:     Started server process [11320]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8098 (Press CTRL+C to quit)
-INFO:     127.0.0.1:34112 - "GET /health HTTP/1.1" 200 OK
-Interface network 10.163.128.0/17 is wider than /24; sweeping only 10.163.167.0/24. ...
-scapy ARP scan failed ([Errno 1] Operation not permitted); using ping + neighbour fallback
-INFO:     127.0.0.1:34128 - "GET /wifi/scan HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [11320]
-```
-
-So the log proves: start time, every HTTP request with status code, scanner warnings (why a
-scan degraded), tracebacks, and clean versus unclean shutdown. It does **not** contain face
-images, embeddings, or similarity scores — those are not logged anywhere.
-
-Housekeeping for the demo day:
-
-| When | Action |
-|---|---|
-| Before the demo | `Remove-Item backend\server_*.log -ErrorAction SilentlyContinue` so the file of the day is unambiguous |
-| During | Leave the tail window open; the file is the authority if the screen is scrolled |
-| After | `Copy-Item $log "backups\server-demo.log"` next to `attendance-after-demo.db` |
-| Never | `git add` the log — `backend/server_*.log` is already in `.gitignore` (verified with `git check-ignore`) |
-
-Privacy: access lines include the request path, so a check-in line contains
-`student_id=…`. That is a student number, not biometric data, but it is still personal — keep
-the logs on the demo laptop and the USB backup only, and delete them once the report is
-written.
+9. **Phone**: join `Attendance-Demo`, open the app, log in, confirm Settings → Test
+   Connection is green. **Dashboard** open in a browser tab, zoomed for the projector.
+   Refresh once after the first check-in so the audience sees new rows appear.
 
 ---
 
@@ -126,12 +140,14 @@ written.
 | Time | Who | Action | Expected visible result |
 |---|---|---|---|
 | 0:00 | D | problem + three-condition rule | slide |
-| 1:00 | C | student logs in with NIM | app home with the class banner |
+| 1:00 | C | student logs in with NIM | home screen lists **only** the class whose window is open |
+| 1:15 | C | tap check-in — the app calls preflight first | camera opens only because the server answered `allowed: true` |
 | 1:30 | C | **start** selfie | `partial` row, dashboard row appears (refresh) |
 | 2:30 | A | explain face match confidence on the dashboard | confidence ≈ 0.7–0.95 |
-| 3:00 | C | **end** selfie | row becomes `verified` (or `face_only`) |
-| 3:30 | B | `/wifi/scan` + `ap_logs` evidence | phone MAC logged on the classroom AP |
-| 4:00 | D | CSV export / history | spreadsheet opens with the rows |
+| 3:00 | C | **end** selfie | row becomes `verified`; with strict mode the Wi-Fi was confirmed on both stages |
+| 3:30 | B | `/wifi/scan` + `ap_logs` evidence | phone MAC logged, `bssid` = the hotspot, matching `schedule_bssid` |
+| 3:45 | C | *optional negative test*: leave the hotspot (mobile data only), tap check-in | app refuses **before** the camera: "not connected to the classroom Wi-Fi", no row written |
+| 4:15 | D | CSV export / history | spreadsheet opens with the rows |
 | 5:00 | D | limitations + future work | slides |
 
 ---
@@ -140,10 +156,13 @@ written.
 
 | Trigger | Threshold | Action |
 |---|---|---|
-| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: restore backup (`deployment_guide.md` §8, 6.1–6.2 s re-measured 2026-11-12) or `seed_demo.py --reset` |
+| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: kill the stuck window (a corrupt DB leaves the process alive without binding the port), restore the backup (`deployment_guide.md` §8, **13.9 s** measured on Windows) or `seed_demo.py --reset` (**0.7 s**) |
 | Check-in returns 403 `outside_class_time` | once | check clock/timezone first (`TIMEZONE` must be `Asia/Shanghai`), then fix the schedule window |
+| Check-in returns 403 `not_on_classroom_network` | first occurrence | the student's MAC is not visible on the hotspot: wrong MAC registered, phone using a private/random MAC, or the phone is on another network. Check `/wifi/scan`, fix with `PUT /students/{id}/mac`. If the network itself is unreliable, restart the backend with `REQUIRE_CLASSROOM_WIFI=false` — rows then degrade to `face_only`; say that on stage instead of hiding it |
+| App shows "No active class right now" | before going on stage | `/schedules/active` is empty: the schedule is outside its window or on another weekday. Re-run `seed_demo.py` or correct start/end |
+| Preflight says `wifi_verified: false` while `/wifi/scan` sees the phone | before going on stage | `schedule_bssid` ≠ `server_bssid`. Clear `ap_bssid` or set it to the value preflight reports |
 | Check-in returns 403 `identity mismatch` | once | wrong student logged in — C fixes the login, do not re-run blindly |
-| `/wifi/scan` lists no phone | 1 scan | rung 2: continue, say the §4 sentence from `offline_fallback.md` |
+| `/wifi/scan` lists no phone | 1 scan | with strict mode on this blocks every check-in, so do not "continue": restart with `REQUIRE_CLASSROOM_WIFI=false`, demo the face path, and say the §4 sentence from `offline_fallback.md` |
 | Recognition error twice | 2 attempts | rung 3: seeded dashboard + CSV, explain the flow with real rows from the pilot |
 | Laptop dies | — | rung 5: backup video (D) |
 
@@ -152,36 +171,30 @@ written.
 ## 5. Shutdown / reset after the demo
 
 ```powershell
-# copy the demo database and the day's log somewhere for the report's evidence
-# (use the actual filename; $log only exists in the window that started the server)
+# copy the demo database somewhere for the report's evidence
 Copy-Item backend\attendance.db "backups\attendance-after-demo.db"
-Copy-Item backend\server-20261123-0900.log "backups\server-demo.log"
-# stop the server with Ctrl+C in its terminal; the log ends with
-#   "Application shutdown complete." + "Finished server process"  ← confirms a clean stop
-# then:
+# stop the server with Ctrl+C in its terminal; then:
 adb reverse --remove tcp:8000
 ```
 
 Before the **next** demo run: `python backend/scripts/seed_demo.py --reset --students 5`
-if the previous run left a half-finished class.
+if the previous run left a half-finished class. **A reset puts the fake demo MACs back**
+(`02:00:00:00:00:NN`), so repeat step 4 of §2 and re-pin the BSSID (step 5) before the next
+run — with strict mode on, otherwise every check-in is rejected.
 
 ---
 
 ## 6. Dry-run log (fill in at G13/G15)
 
-**Run #0 — 2026-11-12, seeded path only, on the Linux host.** Executed and measured:
-seed 5 students → 5 attendance rows, cold start 8.2 s, smoke test 14/14, `/attendance/today`
-and CSV correct, dashboard title correct, log capture verified, restore 6.2 s + 6.1 s with
-data intact. Full table in `dry_run_2026-11-12.md`. It does **not** cover a real face
-check-in, a real phone, Windows, or the hotspot — those are the rows below.
-
-| Item | Dry run #1 (before 2026-11-23) | Dry run #2 (December pilot) |
+| Item | Dry run #1 (Jan 9–10) | Dry run #2 (Jan 14–15) |
 |---|---|---|
+| Strict mode on (`REQUIRE_CLASSROOM_WIFI=true`) | | |
+| Preflight `allowed: true` before the first selfie | | |
+| Negative test: off-hotspot check-in refused | | |
 | Cold start → healthy (s) | | |
 | `/wifi/scan` sees the phone (Y/N) | | |
 | Start → `partial` (s) | | |
 | End → `verified` (s) | | |
 | Full run wall time (min) | | |
-| Log file written + clean shutdown line (Y/N) | | |
 | Fallback used (which rung) | | |
 | Surprises | | |

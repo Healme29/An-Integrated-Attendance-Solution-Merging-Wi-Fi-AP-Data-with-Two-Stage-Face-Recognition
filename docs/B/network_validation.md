@@ -106,7 +106,7 @@ ARP alone. Room-level presence needs the AP management plane (see Recommendation
 
 | Priority | Action | Why |
 |---|---|---|
-| **Pilot (M1)** | Set `WI_FI_SUBNET` explicitly to the classroom's /24 and register each student's **real phone MAC** (disable "private/random MAC" for the school SSID during enrollment; collection procedure and template in `mac_inventory.md`) | makes the AP check meaningful and predictable |
+| **Pilot (M1)** | Set `WI_FI_SUBNET` explicitly to the classroom's /24 and register each student's **real phone MAC** (disable "private/random MAC" for the school SSID during enrollment) | makes the AP check meaningful and predictable |
 | **Pilot (M1)** | Run the demo/pilot on one access point where client isolation is **off** (or a dedicated router/hotspot) | ARP scanning then sees the phones |
 | **M2** | Read client↔AP association + RSSI from the AP management plane (SSH/SNMP/controller API); pin the room via `schedules.ap_bssid` | real room-level presence; enables the RSSI threshold idea (~ -72 dBm ≈ outside the room) |
 | **M2** | ✅ **DONE 2026-11-02:** derive the true netmask in `detect_local_subnet()`, cap the sweep, and report exactly what was swept | F1 is fixed; `/wifi/scan` no longer claims a range it did not search |
@@ -293,68 +293,66 @@ three platform ping command shapes. Suite: `187 passed` (34 of them in the scann
 
 ---
 
-## 8. What `wifi_verified` actually means (2026-11-11)
+## 8. Re-run on 2026-11-13 — Windows 11 laptop, campus Wi-Fi
 
-Reviewers and the lecturer both asked the same question in different words: what does the
-Wi-Fi condition *prove*? This section is the single place where that is defined, because
-three other documents quote it.
+Third session, on the operating system the demo will use. Interface `10.163.158.239/17`,
+gateway `10.163.255.254`, SSID `NJUPT-CMCC`, AP `78:2c:29:09:e2:f2`, Python 3.12.10, native
+`uvicorn`. Raw output and scripts: `docs/B/evidence/2026-11-13-windows/`.
 
-### 8.1 The code path
+### 8.1 Result
 
-`backend/services/attendance.py` lines 186–198 (owner: A — quoted, not modified by B):
-
-```python
-wifi_verified = False
-if student and student["mac_address"]:
-    wifi_verified = check_mac_on_network(student["mac_address"])
-    if wifi_verified and schedule_row and schedule_row["ap_bssid"]:
-        wifi_verified = is_same_bssid(get_current_bssid(), schedule_row["ap_bssid"])
+```json
+GET /wifi/scan
+{"devices":[{"ip":"10.163.255.254","mac":"70:c6:dd:09:b0:02"}],
+ "subnet":"10.163.158.0/24","count":1,"bssid":"78:2c:29:09:e2:f2"}
 ```
 
-So `wifi_verified = true` means **both** of these hold:
-
-1. the student's `mac_address` is reachable on the server's L2 segment
-   (`check_mac_on_network()` → `scan_network_arp()`, which does an ARP scan or a
-   ping + neighbour-table fallback and matches the MAC), **and**
-2. the **server** is associated with the AP pinned in `schedules.ap_bssid`
-   (`get_current_bssid()` reads the server's own association).
-
-### 8.2 The precise claim, and the three things it does not say
-
-| Claim | Supported? |
+| Measurement | Value |
 |---|---|
-| The student's device was on the classroom network at check-in time | ✅ yes |
-| The check-in machine was associated with the scheduled AP | ✅ yes |
-| The phone is inside room 201 | ❌ no |
-| The server knows which AP the phone is attached to | ❌ no — it cannot; ARP has no AP dimension |
-| The MAC belongs to that physical handset | ❌ no — MACs are spoofable and randomised |
+| Fresh scan (254-host ARP sweep) | **4,281 ms** |
+| Cached scan (< 10 s later) | **29 ms** |
+| `ap_logs` rows after two scans | 0 → 1 → 1 (dedupe holds) |
+| Interface network (server log) | `10.163.128.0/17` → sweep capped to `10.163.158.0/24` |
+| BSSID | `78:2c:29:09:e2:f2` via `netsh`, stable across calls |
 
-The accepted wording is "the check-in was made **within the coverage area of the scheduled
-AP**" (lecturer reply 2026-11-11, D-013). The failure modes are threats T1–T6 in
-`threat_model.md`; the answer to "can this be gamed?" is "not fully, and here is exactly
-where it can".
+Devices visible: the gateway only — identical to the Linux runs. That is client
+isolation/VLAN segmentation on campus (F2), not a Windows regression, and it is why the demo
+network is a hotspot the team controls.
 
-### 8.3 Measured re-run, 2026-11-11 (same laptop, campus network)
+### 8.2 What the Windows run exposed — localized `ipconfig`
 
-| # | Call | Result |
-|---|---|---|
-| 1 | `resolve_subnet()` | `10.163.167.0/24` (host is `10.163.167.58/17`; sweep capped to /24 and says so) |
-| 2 | `get_current_bssid()` | `f4:74:88:70:c2:f1` — **different from the 2026-11-03 value** `50:98:b8:c9:2b:e2` at the same desk |
-| 3 | `scan_network_arp()` | 1 device (gateway `70:c6:dd:09:b0:02`) in **6.15 s**; scapy denied (`Operation not permitted`), unprivileged fallback used |
-| 4 | Passive beacon scan | 10 distinct BSSIDs of `NJUPT-CMCC` from one seat (39 beacon rows, 6 SSIDs) |
+The Windows subnet parser searched for the English label `Subnet Mask`. On a localized
+Windows that label is translated (`子网掩码`, `Masque de sous-réseau`, …), so the mask would
+not be found and the scanner would silently fall back to a guessed /24.
 
-Two conclusions that belong in the report, not only in the log:
+Fixed in `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`, `_prefix_from_netmask`):
 
-- **A pinned BSSID must be captured live at the venue.** Fact 2 above shows the host's AP
-  changes between sessions without moving desks; a value copied from an earlier run would
-  make every check-in `face_only`.
-- **"On the campus SSID" is much weaker than "in the room"** because one SSID is served by
-  at least ten APs (fact 4). This is the measured basis for the limitation in
-  `room_presence_spike.md` §2 and `threat_model.md` §3.1.
+1. English label fast path (unchanged behaviour on this laptop — its output is English);
+2. otherwise, in the same adapter block, take the first netmask-shaped token after the IPv4
+   address line;
+3. reject any mask that is not a contiguous run of ones (e.g. `255.0.255.0`) instead of
+   silently converting it.
 
-### 8.4 What the `start` / `end` pair adds
+Pinned by four new cases in `backend/tests/test_wifi_subnet.py` (Chinese block, French block,
+an `(Preferred)` suffix, a non-contiguous mask). Suite: **209 passed** (38.7 s). Decision:
+D-011.
 
-`start` is written as `partial`, and `end` becomes `verified` only if **both** rows had
-`wifi_verified = true` (`attendance.py` 194–205). That proves the device was on the
-classroom network at **two separate moments**, not that it stayed. It is the strongest
-statement the current design supports without a liveness check or a rotating token.
+### 8.3 Cross-platform summary of the scanner today
+
+| Capability | Linux (measured 2026-11-02/03) | Windows (measured 2026-11-13) | macOS |
+|---|---|---|---|
+| Subnet from real netmask | `ip -4 addr` | `ipconfig`, locale-independent (D-011) | `ifconfig` |
+| Sweep cap at /24 + warning | ✅ | ✅ (`10.163.128.0/17` → `10.163.158.0/24`) | ✅ (code path) |
+| BSSID probe | `iw` → `nmcli` → `iwconfig` | `netsh wlan show interfaces` | ❌ none (D-010) |
+| Raw-socket scan | scapy, falls back to ping+`ip neigh` | ping + `arp -a` (no Npcap needed) | ping + `arp` |
+| Phones visible on campus | ❌ only gateway (F2) | ❌ only gateway (F2) | not tested |
+| Phones visible on a flat hotspot | **not measured yet** | **not measured yet** | not measured |
+
+### 8.4 Still not proven
+
+- The **hotspot** rung: two phones on a flat network where the scan must list their MACs.
+  This is the configuration the demo uses. Still blocked on a second phone
+  (`offline_fallback.md` §2, `review_response.md` §5).
+- Whether the demo AP keeps client isolation off; measure before pinning `ap_bssid`.
+- A scan with more than one visible device has never been observed in this project, so the
+  multi-device formatting of `devices` is only proven by unit tests, not by a live network.

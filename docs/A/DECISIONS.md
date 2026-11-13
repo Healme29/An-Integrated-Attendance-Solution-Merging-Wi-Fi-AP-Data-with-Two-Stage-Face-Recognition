@@ -201,3 +201,38 @@
 
 ---
 
+### D-006 — Strict classroom mode: refuse check-in when the phone is not on the classroom network
+- **Date:** 2026-11-10 · **Stage:** M2 stage 3 (robustness) / affects G7 pilot and the demo
+- **Problem:** A student could record attendance from anywhere: the Wi-Fi result only
+  downgraded the row to `face_only`, and the app opened the camera outside the class window.
+  The intended rule is "photo only when the time is right AND the student is in the room".
+  Observed case: a 23:25–23:27 class accepted `start` at 23:29 and `end` at 23:30 because
+  the ±15 min grace applies to both stages (rows 18–19 in the demo DB).
+- **Options:** (1) keep the current soft rule — any face match records attendance, Wi-Fi is
+  advisory (`face_only`); (2) strict mode behind `REQUIRE_CLASSROOM_WIFI=true` — no device
+  visible on the classroom network means HTTP 403 and no row, keeping the soft rule as the
+  default for environments without a classroom network; (3) always strict — simplest, but
+  breaks every setup whose server is not on the classroom subnet, including all current
+  tests.
+- **Evidence:** `backend/tests/test_classroom_wifi_strict.py` (11 tests: preflight reasons,
+  403 without network, 200 with network, `/schedules/active` filtering) and the full suite
+  at **198 passed**. Location verification is two-layer by design: the student MAC must be
+  visible in the server's ARP table, and when `schedules.ap_bssid` is set the server itself
+  must be associated with that BSSID (`docs/B/network_validation.md` F6 covers the case
+  where the BSSID cannot be read). A campus-wide SSID still means the BSSID pin proves the
+  *server's* AP, not each phone's AP — the honest limit of a laptop-side scan.
+- **Decision:** Option 2. Edge cases are rejected **before** the camera opens through
+  `GET /attendance/preflight` (time window, wrong day, classroom network, duplicate stage,
+  end-without-start) and enforced again server-side in `POST /attendance/check`, so a
+  modified client cannot bypass it. The mobile app now lists only `/schedules/active`, which
+  removes the "pick an old schedule and take a photo" dead end.
+- **Consequences:** the demo machine must be the classroom network host (laptop hotspot
+  `Attendance-Demo` or a laptop inside the classroom LAN); enrolment MAC addresses must be
+  real, because a placeholder MAC can never verify. `face_only` rows remain possible only
+  when the flag is off.
+- **Revisit by:** before the G7 classroom enrolment — confirm the flag and the hotspot
+  address are part of the runbook; revisit the BSSID layer if the campus AP controller ever
+  exposes per-client AP information.
+
+---
+

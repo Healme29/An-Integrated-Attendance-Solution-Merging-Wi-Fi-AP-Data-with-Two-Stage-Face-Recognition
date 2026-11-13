@@ -161,10 +161,19 @@ Use this mode on the demo/pilot machine. Measured on 2026-11-02: a cold start is
 Docker cannot see (details in `docs/B/demo_environment.md`).
 
 ```powershell
-# 0. once: Python 3.11+ and the dependencies
-py -3.11 -m venv .venv
+# 0. once: Python 3.11 or 3.12 and the dependencies.
+#    3.13 does NOT work: the pinned numpy==1.26.4 / onnxruntime==1.18.1 /
+#    opencv-python==4.10.0.84 have no cp313 wheels (measured 2026-11-13:
+#    pip fell back to source builds and failed). Use 3.12.
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r backend\requirements.txt
+# measured 2026-11-13: 577 s (9 min 37 s) for the full pinned set on this laptop
+#
+# REQUIRED EXTRA STEP until A adds it to requirements.txt (see D-012):
+# the YOLO checkpoint is dill-pickled, so without this every /faces/recognize
+# returns 500 "ModuleNotFoundError: No module named 'dill'" (measured).
+pip install dill==0.3.8
 
 # 1. once: YOLO weights (52 MB, not in git)
 #    the folder does NOT exist in a fresh clone - create it first (measured: the
@@ -227,48 +236,41 @@ This is a property of container networking, not a bug in our code.
 
 ---
 
-## 7. First attendance check downloads models (~326 MB)
+## 7. First attendance check loads models — prepare them the day before
 
-The ArcFace models are **not** in this repository. InsightFace downloads `buffalo_l`
-(five `.onnx` files, ~326 MB) on the first recognition that reaches the embedding step.
+Two model sets are involved and they live in **different places**. Both must be on the demo
+laptop before the presentation; the first call pays the load cost even when the files are
+already present.
 
-**Where they are cached**
+| Model set | Location | Size | When it is needed |
+|---|---|---|---|
+| YOLOv8-face (`yolov8m-face.pt`) | `backend\data\models\` (in the repo, git-ignored) | 52,028,566 bytes | first `/faces/recognize` or check-in |
+| InsightFace `buffalo_l` (5 `.onnx` files) | `%USERPROFILE%\.insightface\models\buffalo_l\` (**outside** the repo) | 341,268,726 bytes (288,621,354 zipped) | first time a face is actually detected |
 
-| Run mode | Cache directory | Why |
-|---|---|---|
-| Native, Windows | `%USERPROFILE%\.insightface\models\buffalo_l` | the installed insightface 2.1 hardcodes `~/.insightface`; `INSIGHTFACE_HOME` is **ignored** by this version |
-| Native, Linux/macOS | `~/.insightface/models/buffalo_l` | same |
-| Docker | `/app/data/dbdata/.insightface/models/buffalo_l` | the image sets `HOME=/app/data/dbdata`, which is the mounted volume |
-
-`DATA_DIR` (`backend/data`) holds the YOLO weights, face crops and embeddings — **not**
-`buffalo_l`. The old `INSIGHTFACE_HOME` setting did nothing on the installed version and was
-removed (D-014).
-
-**A photo without a detectable face does not warm the model.** The request runs YOLO first;
-if no face is found it returns `{"recognized": false, ...}` and never initialises ArcFace.
-Measured on 2026-11-12: a faceless JPEG returned in 4.8 s with ArcFace still unloaded
-(`_app is None`). So use a real selfie:
+Measured on the Windows laptop (2026-11-13): cold YOLO call **13.4 s**, then **1.5–1.6 s**
+per call; ArcFace load **2.8–3.0 s**; backend RSS with both sets resident **1,001 MB**. The
+`DATA_DIR` setting does **not** relocate the InsightFace models (insightface 2.1 hard-codes
+`~/.insightface`), so do not look for them in `backend\data`.
 
 ```powershell
-# a photo WITH A FACE; a landscape or an empty wall only warms YOLO
-curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\my-selfie.jpg"
-# expect {"recognized": ...} once the model load finishes; the download time depends on the link
+# one-time: fetch buffalo_l while the laptop still has internet (GitHub release)
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.insightface\models" | Out-Null
+curl.exe -L -o "$env:TEMP\buffalo_l.zip" `
+  https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip
+Expand-Archive "$env:TEMP\buffalo_l.zip" `
+  "$env:USERPROFILE\.insightface\models\buffalo_l" -Force
+Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l" |
+  Measure-Object Length -Sum | Select-Object Sum      # ~341 MB, 5 files
+
+# every demo, after the server is up: burn the one-time load out of sight
+curl.exe -X POST http://127.0.0.1:8000/faces/recognize -F "file=@C:\path\to\any\image.png"
+# first call: up to ~15 s; second call: ~1.5 s. If it stays slow, the files are
+# not where this table says they are.
 ```
 
-Then prove the cache is where the table says, before relying on it offline:
-
-```powershell
-# Windows native: must list five .onnx files totalling ~326 MB
-Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l"
-# Docker
-docker compose exec backend ls -lh /app/data/dbdata/.insightface/models/buffalo_l
-```
-
-A second identical call must be fast (measured ~1 s per check-in afterwards). If it is slow,
-or the folder is missing, the download did not land where you think it did — and at the venue
-your first real check-in will try to reach GitHub. Offline that fails rather than falling back:
-measured 2026-11-12, a missing cache with no network raised a `ProxyError` for
-`buffalo_l.zip` after 3.2 s, so the check-in errors instead of becoming `face_only`.
+No internet on demo day is fine once both sets are local (they are only read). If the
+download resets (it did here at ~19 s on the first attempt), resume it:
+`curl.exe -L -C - -o ... <same URL>`.
 
 ---
 
@@ -319,7 +321,9 @@ and keep it on a USB stick/phone as well.
 | `/wifi/scan` returns Docker-internal addresses | expected in Docker Desktop; see §6 |
 | `/wifi/scan` shows a /24 although the network is wider | expected: only one /24 is swept; set `WI_FI_SUBNET` to the classroom /24 |
 | `/wifi/scan` returns `devices: []` on Linux as a normal user | raw sockets are unavailable; the scanner falls back to ping + `ip neigh` automatically (log line `scapy ARP scan failed`) |
-| Server refuses connections and the log ends with `sqlite3.DatabaseError: file is not a database` | the DB file is damaged: restore a backup (§8) |
+| Server refuses connections and the log ends with `sqlite3.DatabaseError: file is not a database` | the DB file is damaged: restore a backup (§8). Do **not** just start it again — the failed process stays alive (measured) and must be stopped first |
+| Every `/faces/recognize` or check-in returns `500 Internal Server Error` | read the server log: `ModuleNotFoundError: No module named 'dill'` → `pip install dill==0.3.8` (step 0 of §5b); `FileNotFoundError: YOLOv8-face model not found` → download the weights (§5b step 1) |
+| First recognition takes 10–15 s, later ones ~1.5 s | expected: models load lazily. Do the warm-up call in §7 before the audience arrives |
 | Phone cannot connect | firewall port 8000; same Wi-Fi; use the machine's LAN IP, or USB `adb reverse` for a phone |
 
 ---
@@ -400,7 +404,35 @@ Setup: Linux 6.x laptop, Python 3.12.3 in `venv`, `python -m uvicorn backend.mai
 | Recovery from a corrupted DB | ✅ restore + start = **6.2 s** to healthy (see §8) |
 | Docker in this environment | ⏸ not measured — no Docker daemon on this machine; last Docker run 2026-10-25 (§10) |
 
-G1 on the **actual demo laptop** (Windows) is still open: install, run §5b, repeat this
-table there and paste the numbers into `docs/B/demo_environment.md`.
+G1 on the **actual demo laptop** (Windows) was repeated on 2026-11-13 — see §13. Whether
+that laptop is the one used on stage is a team decision; if it changes, run §5b there and
+repeat §13's table.
+
+---
+
+## 13. Verified on 2026-11-13 — native run on Windows 11
+
+Setup: Windows 11 `10.0.22621`, AMD64, Python **3.12.10** in a project `.venv`, native
+`uvicorn` on an isolated port, isolated `DATABASE_PATH`/`DATA_DIR`, `TIMEZONE=Asia/Shanghai`,
+`FACE_SIMILARITY_THRESHOLD=0.5`, `YOLO_IMG_SIZE=640`. Campus Wi-Fi `10.163.158.239/17`.
+Raw output and scripts: `docs/B/evidence/2026-11-13-windows/`.
+
+| Check | Result |
+|---|---|
+| `py -3.12 -m venv` + full `pip install -r requirements.txt` | ✅ **577 s** (9 min 37 s), CPU `torch` 2.15.0+cpu |
+| Same install on Python 3.13 | ❌ impossible — no cp313 wheels for the pinned numpy/onnxruntime/opencv |
+| `pip install dill==0.3.8` (not in requirements yet) | ✅ required; without it recognition is 500 |
+| Cold start → `/health` ok | ✅ **17.3 s** (restart: 25.3 s) |
+| `TIMEZONE` applied | ✅ schedule `created_at` − student `created_at` = **+8.0 h** |
+| Data persists across stop/start | ✅ |
+| `/wifi/scan` native | ✅ 1 device (gateway), `subnet 10.163.158.0/24`, BSSID `78:2c:29:09:e2:f2`, fresh **4.3 s** / cached **29 ms** |
+| Subnet auto-detect on a /17 interface | ✅ `10.163.128.0/17` detected, sweep capped to the host's /24 |
+| Smoke test | ✅ **15/15** in 10.4 s (after `dill`; 12/15 before) |
+| `seed_demo.py --reset` | ✅ 0.7 s, 5 students + open class + 5 rows |
+| Backup → restore → healthy | ✅ copy 1.2 ms, restore **13.9 s** |
+| First recognition / warm recognition | ⚠️ **13.4 s** / **1.5 s** — do the §7 warm-up |
+| Correct outputs for the demo's error paths | ✅ no face → 400 `Face not recognized: no_face_detected`; enroll without a face → 400 |
+| Upload cap | ⚠️ enroll 413 ✅, recognize/check accept 11 MB (A-owned gap, `hardening_checklist.md` §2.1) |
+| Docker | ⏸ not measured here — daemon not running, not on the demo path (D-002) |
 
 

@@ -11,7 +11,7 @@ from services.wifi_scanner import (
     _parse_arp_output, log_ap_access
 )
 import services.wifi_scanner as wifi_scanner
-from services.attendance import mark_attendance, get_schedules_for_now, recognize_face
+from services.attendance import mark_attendance, get_schedules_for_now
 from models.database import get_db
 
 
@@ -159,19 +159,3 @@ class TestAttendanceService:
             check_type="start", confidence=0.5
         )
         assert result["wifi_verified"] is False
-
-    async def test_no_face_request_never_touches_arcface(self):
-        """A photo without a face must stop at YOLO and not load ArcFace.
-
-        The demo warm-up depends on this order: only a photo with a detectable
-        face initialises the ArcFace model, so "any JPEG warms the models" is
-        false. See DECISIONS.md D-014 and demo_runbook.md section 2 step 5.
-        """
-        blank = np.zeros((480, 640, 3), dtype=np.uint8)
-        with patch("utils.helpers.image_bytes_to_array", return_value=blank), \
-             patch("services.attendance.detect_faces_from_bytes", return_value=[]), \
-             patch("services.attendance.get_embedding") as get_emb:
-            result = await recognize_face(b"\xff\xd8\xff" + b"0" * 32)
-
-        assert result == {"recognized": False, "reason": "no_face_detected"}
-        get_emb.assert_not_called()

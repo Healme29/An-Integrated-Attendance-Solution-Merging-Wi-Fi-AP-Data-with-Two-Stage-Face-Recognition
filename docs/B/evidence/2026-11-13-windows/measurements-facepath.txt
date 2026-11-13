@@ -1,0 +1,30 @@
+=== environment ===
+python 3.12.10
+dill_installed 0.3.8
+cold_start_to_healthy_ms 18419
+student_id 1
+
+=== 1. YOLO cold load and warm inference (no-face image) ===
+recognize_no_face_1 status=200 ms=13435 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+recognize_no_face_2 status=200 ms=1637 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+recognize_no_face_3 status=200 ms=1535 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+
+=== 2. enroll without a face ===
+enroll_no_face status 400 ms 1419 {"detail":"No face detected in image"}
+
+=== 3. check-in without a face (valid student) ===
+attendance_check_no_face status 400 ms 1400 {"detail":"Face not recognized: no_face_detected"}
+
+=== 4. upload cap: 11 MB body (limit is 10 MB) ===
+oversized_11MB_recognize status=200 ms=145 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+oversized_11MB_attendance_check status=400 ms=155 {"detail":"Face not recognized: invalid_image"}
+oversized_11MB_enroll status=413 ms=88 {"detail":"Image too large (max 10 MB)"}
+
+=== 5. image decode edge cases ===
+truncated_jpeg status 200 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+tiny_valid_png status 200 {"recognized":false,"student_id":null,"student_name":null,"confidence":0.0}
+
+=== 6. shutdown ===
+shutdown_s 0.22
+log_500_count 0
+log_traceback_count 0

@@ -67,6 +67,14 @@ async def create_test_db():
             FOREIGN KEY (student_id) REFERENCES students(id),
             FOREIGN KEY (schedule_id) REFERENCES schedules(id)
         );
+        CREATE TABLE IF NOT EXISTS schedule_students (
+            schedule_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (schedule_id, student_id),
+            FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS ap_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mac_address TEXT NOT NULL,

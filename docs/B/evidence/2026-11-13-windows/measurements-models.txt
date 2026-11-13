@@ -1,0 +1,31 @@
+=== A. InsightFace buffalo_l cold load (fresh process, models already on disk) ===
+import_s 4.08
+buffalo_l_load_s 2.83
+rss_mb_before 31 after 564 delta 533
+model_names ['detection', 'genderage', 'landmark_2d_106', 'landmark_3d_68', 'recognition']
+icon_shape (192, 192, 3)
+analyzer_get_no_face_1_ms 615 faces 0
+analyzer_get_no_face_2_ms 529 faces 0
+analyzer_get_no_face_3_ms 382 faces 0
+analyzer_get_blank_1_ms 476 faces 0
+analyzer_get_blank_2_ms 410 faces 0
+
+=== B. Both models in one process (the demo backend shape) ===
+rss_start_mb 31
+yolo_load_s 0.21          # ultralytics YOLO() constructor is lazy
+yolo_infer_ms 6891       # first inference: weights load + warm-up
+rss_mb 485
+arcface_load_s 2.98
+rss_mb 1001               # total RSS with YOLOv8-face + buffalo_l resident
+model_names ['detection', 'genderage', 'landmark_2d_106', 'landmark_3d_68', 'recognition']
+
+=== C. Model acquisition from this network (China, 2026-11-13) ===
+yolov8m-face.pt  52,028,566 bytes  ~70 s   github.com/YapaLab/yolo-face release
+buffalo_l.zip   288,621,354 bytes  ~2.5 min final pass (first attempts reset; resumed with curl -C -)
+buffalo_l unpacked 341,268,726 bytes in 5 files:
+  143,607,619 1k3d68.onnx
+  174,383,860 w600k_r50.onnx
+   16,923,827 det_10g.onnx
+    5,030,888 2d106det.onnx
+    1,322,532 genderage.onnx
+sha256(yolov8m-face.pt) = 219f490a97d5722972e1660725fa7cfab54e46c944b833debc28c2302aa1be93

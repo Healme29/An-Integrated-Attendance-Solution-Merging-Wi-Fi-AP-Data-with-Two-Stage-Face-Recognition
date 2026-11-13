@@ -47,12 +47,33 @@ def parse_ip_addr_prefix(output: str, local_ip: str) -> int | None:
     return None
 
 
+def _prefix_from_netmask(mask: str) -> int | None:
+    """Prefix length for a dotted netmask, or None when it is not contiguous.
+
+    `ipaddress` rejects non-contiguous masks such as a gateway address, which
+    is what makes the locale-independent fallback below safe: it can scan a
+    few lines and only accept the real subnet mask.
+    """
+    try:
+        return ipaddress.IPv4Network(f"0.0.0.0/{mask}", strict=False).prefixlen
+    except ValueError:
+        return None
+
+
 def parse_ipconfig_prefix(output: str, local_ip: str) -> int | None:
     """Parse the prefix length of ``local_ip`` from Windows `ipconfig` output.
 
     Adapter blocks are separated by lines that start in column 0. Inside the
-    block that owns ``local_ip`` the `Subnet Mask` line is converted to a
-    prefix length (e.g. 255.255.128.0 -> /17).
+    block that owns ``local_ip`` the subnet-mask line is converted to a prefix
+    length (e.g. 255.255.128.0 -> /17).
+
+    Two paths, in order:
+
+    1. the English label `Subnet Mask` (fast path, unchanged behaviour);
+    2. a locale-independent fallback: `ipconfig` always prints the mask on the
+       line *after* the IPv4 address, whatever the label language. A
+       non-English Windows (e.g. Chinese `子网掩码`) used to fall back to /24,
+       which silently skipped every client outside the local /24.
     """
     for block in re.split(r"\n(?=\S)", output):
         if local_ip not in block:
@@ -60,14 +81,24 @@ def parse_ipconfig_prefix(output: str, local_ip: str) -> int | None:
         mask_match = re.search(
             r"Subnet Mask[ .]*:\s*(\d+\.\d+\.\d+\.\d+)", block, re.IGNORECASE
         )
-        if not mask_match:
-            continue
-        try:
-            return ipaddress.IPv4Network(
-                f"0.0.0.0/{mask_match.group(1)}", strict=False
-            ).prefixlen
-        except ValueError:
-            return None
+        if mask_match:
+            prefix = _prefix_from_netmask(mask_match.group(1))
+            if prefix is not None:
+                return prefix
+
+        lines = block.splitlines()
+        for index, line in enumerate(lines):
+            if local_ip not in line:
+                continue
+            # The mask follows the address line; allow a couple of lines of
+            # slack for adapters that print suffixes or "(Preferred)" first.
+            for candidate in lines[index + 1:index + 4]:
+                values = re.findall(r"\d+\.\d+\.\d+\.\d+", candidate)
+                if len(values) != 1:
+                    continue
+                prefix = _prefix_from_netmask(values[0])
+                if prefix is not None:
+                    return prefix
     return None
 
 

@@ -58,3 +58,20 @@ mobile/android/.idea/
 mobile/ios/.symlinks/
 mobile/ios/Pods/
 mobile/.idea/
+# Local Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Offline dependencies
+wheelhouse/
+
+# Local backups
+backups/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+wheelhouse_download.log
