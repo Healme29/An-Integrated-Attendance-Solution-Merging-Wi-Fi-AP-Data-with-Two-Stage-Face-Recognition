@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTEND — Student Attendance System</title>
+
+<!-- Fonts are optional: the fallbacks below keep the layout intact offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #f3f1e9;
+  --ink: #20221d;
+  --lime: #c9f45b;
+  --muted: #77786e;
+  --line: rgba(32,34,29,.18);
+  --font: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container {
+  width: min(1400px, 90%);
+  margin: auto;
+}
+
+/* NAVIGATION */
+
+nav {
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.logo {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+.logo span { color: #8aab36; }
+
+.nav-links {
+  display: flex;
+  gap: 38px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: opacity .25s;
+}
+
+.nav-links a:hover { opacity: .45; }
+
+.nav-cta {
+  background: var(--ink);
+  color: white;
+  padding: 13px 20px;
+  border-radius: 30px;
+  font-size: 12px;
+  transition: .3s;
+}
+
+.nav-cta:hover {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.menu-toggle {
+  display: none;
+  border: 0;
+  background: none;
+  font-size: 25px;
+  cursor: pointer;
+}
+
+/* HERO */
+
+.hero {
+  padding: 110px 0 80px;
+  min-height: 690px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9cce38;
+}
+
+.hero h1 {
+  font-size: clamp(70px, 11.5vw, 166px);
+  line-height: .86;
+  letter-spacing: -.095em;
+  font-weight: 600;
+  margin-top: 45px;
+}
+
+.hero h1 .outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--ink);
+}
+
+.hero-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-top: 55px;
+}
+
+.hero-desc {
+  max-width: 420px;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.hero-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--lime);
+  padding: 17px 24px;
+  border-radius: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: .3s;
+}
+
+.hero-button:hover {
+  transform: translateY(-5px);
+  background: var(--ink);
+  color: white;
+}
+
+/* MARQUEE */
+
+.marquee {
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 20px 0;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: move 25s linear infinite;
+}
+
+.marquee span {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -.5px;
+  padding-right: 35px;
+}
+
+.marquee span b {
+  color: var(--lime);
+  margin-right: 35px;
+}
+
+@keyframes move {
+  to { transform: translateX(-50%); }
+}
+
+/* SECTIONS */
+
+.section {
+  padding: 115px 0;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 45px;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
+
+.section-heading h2 {
+  font-size: clamp(42px, 6vw, 76px);
+  letter-spacing: -.07em;
+  line-height: .95;
+}
+
+.section-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 230px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+/* EVIDENCE PANELS — replaces the stock photography with product data */
+
+.projects {
+  display: grid;
+  grid-template-columns: 1.25fr .75fr;
+  gap: 24px;
+}
+
+.project:nth-child(2) {
+  margin-top: 110px;
+}
+
+.project-image {
+  overflow: hidden;
+  background: #d6d4c9;
+  aspect-ratio: 1.2 / 1;
+}
+
+.project:nth-child(2) .project-image {
+  aspect-ratio: .9 / 1;
+}
+
+.signal-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  padding: clamp(22px, 4vw, 46px);
+  transition: transform .7s cubic-bezier(.2,.7,.2,1);
+}
+
+.project:hover .signal-panel {
+  transform: scale(1.015);
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px;
+}
+
+.signal-row .key {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.signal-row .value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  border-radius: 30px;
+  white-space: nowrap;
+}
+
+.tag-pass { background: var(--lime); color: var(--ink); }
+.tag-block { background: var(--ink); color: white; }
+
+.mini-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+  font-size: 13px;
+}
+
+.mini-row:last-child { border-bottom: 0; }
+
+.mini-row .who { font-weight: 600; }
+.mini-row .stage { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; }
+.mini-row .state { font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.mini-row .state.ok { color: #5f7d1f; }
+.mini-row .state.warn { color: #9a6a1f; }
+
+.panel-caption {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.project-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.project-info h3 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.project-info p {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+.project-number {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* FLOW — lime band */
+
+.about {
+  background: var(--lime);
+  padding: 100px 0;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: .7fr 1.3fr;
+  gap: 80px;
+}
+
+.about h2 {
+  font-size: 15px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.about-copy {
+  font-size: clamp(30px, 4.5vw, 59px);
+  letter-spacing: -.06em;
+  line-height: 1.12;
+}
+
+.about-copy span {
+  color: rgba(32,34,29,.42);
+}
+
+.flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 45px;
+}
+
+.flow-strip span {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  border-radius: 30px;
+  padding: 10px 16px;
+}
+
+.fine-print {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 30px;
+  max-width: 720px;
+}
+
+/* OPERATOR SHORTCUTS */
+
+.contact {
+  padding: 125px 0 70px;
+}
+
+.contact h2 {
+  font-size: clamp(55px, 10vw, 130px);
+  line-height: .9;
+  letter-spacing: -.09em;
+  margin: 35px 0;
+}
+
+.contact h2 span { color: #a3a398; }
+
+.contact-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 35px;
+  border-top: 1px solid var(--line);
+}
+
+.contact-bottom p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.contact-bottom a {
+  font-family: var(--mono);
+  font-size: 12px;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 5px;
+  white-space: nowrap;
+}
+
+footer {
+  padding: 25px 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* REVEAL ANIMATION */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(35px);
+  transition: opacity .8s ease, transform .8s ease;
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* MOBILE */
+
+@media(max-width: 768px) {
+  .container { width: 88%; }
+
+  nav { height: 72px; }
+
+  .menu-toggle { display: block; }
+
+  .nav-cta { display: none; }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    width: 100%;
+    background: var(--bg);
+    padding: 30px 6%;
+    flex-direction: column;
+    gap: 25px;
+    border-bottom: 1px solid var(--line);
+    z-index: 10;
+  }
+
+  .nav-links.open { display: flex; }
+
+  .hero {
+    padding: 100px 0 65px;
+    min-height: 590px;
+  }
+
+  .hero h1 {
+    font-size: clamp(64px, 15vw, 105px);
+    margin-top: 55px;
+  }
+
+  .hero-bottom {
+    align-items: start;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .section { padding: 85px 0; }
+
+  .section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-note { text-align: left; }
+
+  .projects {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+
+  .project:nth-child(2) { margin-top: 0; }
+
+  .project:nth-child(2) .project-image {
+    aspect-ratio: 1.2 / 1;
+  }
+
+  .about { padding: 75px 0; }
+
+  .about-grid {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+
+  .contact { padding: 90px 0 55px; }
+
+  .contact-bottom {
+    align-items: start;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  footer {
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+}
+
+@media(prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <nav>
+    <a href="#today" class="logo">A<span>.</span>TTEND</a>
+
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#today">Today</a></li>
+      <li><a href="#sheet">Attendance Sheet</a></li>
+      <li><a href="#flow">The Flow</a></li>
+      <li><a href="#operator">Operator</a></li>
+    </ul>
+
+    <a href="http://127.0.0.1:8000/dashboard" class="nav-cta">Live Dashboard ↗</a>
+    <button class="menu-toggle" id="menuToggle"
+      aria-label="Toggle navigation"
+      aria-expanded="false">☰</button>
+  </nav>
+
+  <header class="hero" id="today">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      INTEGRATED ATTENDANCE — WI-FI AP + TWO-STAGE FACE RECOGNITION
+    </div>
+
+    <h1>
+      THREE SIGNALS.<br>
+      <span class="outline">ONE</span><br>
+      ATTENDANCE<span style="color:#a5cb43">.</span>
+    </h1>
+
+    <div class="hero-bottom">
+      <p class="hero-desc">
+        Attendance is granted only when the device is on the classroom AP, the scan
+        falls inside the class window, and both selfies match the enrolled student.
+        Miss one condition and no row is written.
+      </p>
+
+      <a href="http://127.0.0.1:8000/dashboard" class="hero-button">
+        VIEW LIVE DASHBOARD <span>↗</span>
+      </a>
+    </div>
+  </header>
+
+</div>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>CORRECT AP <b>✳</b></span>
+    <span>VALID CLASS WINDOW <b>✳</b></span>
+    <span>START + END SELFIE <b>✳</b></span>
+    <span>CORRECT AP <b>✳</b></span>
+    <span>VALID CLASS WINDOW <b>✳</b></span>
+    <span>START + END SELFIE <b>✳</b></span>
+  </div>
+</div>
+
+<main class="container">
+
+  <section class="section" id="sheet">
+
+    <div class="section-heading reveal">
+      <div>
+        <p class="section-label">01 / ATTENDANCE SHEET</p>
+        <h2>Evidence, not<br>assumptions.</h2>
+      </div>
+      <p class="section-note">ILLUSTRATIVE — SEEDED DEMO DATA, NOT REAL STUDENTS</p>
+    </div>
+
+    <div class="projects">
+
+      <article class="project reveal">
+        <div class="project-image signal-panel">
+          <div class="signal-row">
+            <span class="key">Classroom AP</span>
+            <span class="tag tag-pass">Matched</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Class window</span>
+            <span class="tag tag-pass">Inside</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Start selfie</span>
+            <span class="value">Enrolled face ✓</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">End selfie</span>
+            <span class="value">Enrolled face ✓</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Result</span>
+            <span class="tag tag-pass">Verified</span>
+          </div>
+          <p class="panel-caption">Decision shown by GET /attendance/preflight + /attendance/check</p>
+        </div>
+        <div class="project-info">
+          <div>
+            <h3>The decision</h3>
+            <p>Three conditions / all required</p>
+          </div>
+          <span class="project-number">01 ↗</span>
+        </div>
+      </article>
+
+      <article class="project reveal">
+        <div class="project-image signal-panel">
+          <div class="mini-row">
+            <span class="who">Demo Student 2</span>
+            <span class="stage">start</span>
+            <span class="state ok">verified</span>
+          </div>
+          <div class="mini-row">
+            <span class="who">Demo Student 2</span>
+            <span class="stage">end</span>
+            <span class="state ok">verified</span>
+          </div>
+          <div class="mini-row">
+            <span class="who">Demo Student 3</span>
+            <span class="stage">start</span>
+            <span class="state warn">partial</span>
+          </div>
+          <div class="mini-row">
+            <span class="who">Demo Student 4</span>
+            <span class="stage">end</span>
+            <span class="state warn">face only</span>
+          </div>
+          <p class="panel-caption">Status flow: start → partial · end → verified / face_only</p>
+        </div>
+        <div class="project-info">
+          <div>
+            <h3>Today's rows</h3>
+            <p>Two-stage check-in / synthetic names</p>
+          </div>
+          <span class="project-number">02 ↗</span>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+</main>
+
+<section class="about" id="flow">
+  <div class="container about-grid reveal">
+    <h2>02 / HOW IT DECIDES</h2>
+
+    <div>
+      <p class="about-copy">
+        A selfie alone is not enough. The device must be on the classroom network,
+        the scan must sit inside the class window, and both faces must match.
+        <span>In strict mode, an off-network device gets a 403 and leaves no row.</span>
+      </p>
+
+      <div class="flow-strip">
+        <span>01 · AP check</span>
+        <span>02 · Time window</span>
+        <span>03 · Start face</span>
+        <span>04 · End face</span>
+      </div>
+
+      <p class="fine-print">
+        Wi-Fi evidence is AP-coverage level (L2), not proof that a person sat in the room.
+        The copy here deliberately avoids saying otherwise. The app checks
+        /schedules/active and /attendance/preflight before the camera opens, so a blocked
+        check-in never reaches the selfie step.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="contact container" id="operator">
+  <p class="section-label">03 / OPERATOR SHORTCUTS</p>
+
+  <h2 class="reveal">
+    OPEN THE<br>
+    <span>DASHBOARD.</span>
+  </h2>
+
+  <div class="contact-bottom">
+    <p>Live server: 127.0.0.1:8000<br>Strict classroom mode on (D-006)</p>
+    <a href="http://127.0.0.1:8000/docs">API DOCS ↗</a>
+  </div>
+</section>
+
+<div class="container">
+  <footer>
+    <span>© 2026 STUDENT ATTENDANCE SYSTEM</span>
+    <span>BUILT FOR THE STITP DEMO</span>
+    <span>BACK TO TOP ↑</span>
+  </footer>
+</div>
+
+<script>
+// MOBILE NAVIGATION
+
+const menuToggle = document.getElementById("menuToggle");
+const navLinks = document.getElementById("navLinks");
+
+menuToggle.addEventListener("click", () => {
+  const isOpen = navLinks.classList.toggle("open");
+
+  menuToggle.textContent = isOpen ? "✕" : "☰";
+  menuToggle.setAttribute("aria-expanded", isOpen);
+});
+
+navLinks.querySelectorAll("a").forEach(link => {
+  link.addEventListener("click", () => {
+    navLinks.classList.remove("open");
+    menuToggle.textContent = "☰";
+    menuToggle.setAttribute("aria-expanded", "false");
+  });
+});
+
+// SCROLL REVEAL
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add("active");
+      observer.unobserve(entry.target);
+    }
+  });
+}, {
+  threshold: 0.12
+});
+
+document.querySelectorAll(".reveal").forEach(element => {
+  observer.observe(element);
+});
+
+// BACK TO TOP
+
+document.querySelector("footer span:last-child")
+  .addEventListener("click", () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  });
+</script>
+
+</body>
+</html>
