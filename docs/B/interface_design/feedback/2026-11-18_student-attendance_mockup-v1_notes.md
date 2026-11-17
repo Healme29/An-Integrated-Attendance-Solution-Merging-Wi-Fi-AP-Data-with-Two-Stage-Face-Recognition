@@ -40,7 +40,8 @@
 The real dashboard's "Today's Schedule" card filters with `new Date().getDay()`
 (Sunday = 0) against backend `day_of_week` (Monday = 0), so it is empty on weekdays.
 That is a C-owned defect in `backend/static/dashboard.html`; this mockup does not
-implement a fix, it only avoids repeating the assumption in its copy.
+implement a fix, it only avoids repeating the assumption in its copy. The live
+dashboard has since been corrected — see the critical-review revision pass below.
 
 ## What C needs to decide
 
@@ -72,7 +73,9 @@ text at a readable contrast; yellow is never used behind white text.
 Typography and hierarchy changes in both the mockup and the live dashboard:
 Inter/Segoe UI with tabular numerals for every count and timestamp, DM Mono for
 eyebrows, table headers and status chips, uppercase tracking on section labels,
-34 px stat values, 26 px page headings, and a yellow square before each card title.
+36 px stat values, 30 px page headings, 15 px card headings, 11 px table headers,
+and a yellow square before each card title. Fonts are used only when installed
+locally; the fallback stack is deliberate so the dashboard works offline.
 
 ## Live dashboard rollout
 
@@ -96,3 +99,73 @@ Verified in the browser at 800 px and 1000 px: no horizontal overflow, sidebar
 `rgb(25,40,83)`, active item and "Live" badge `rgb(255,225,79)`, canvas
 `rgb(236,244,247)`. The seeded instance still shows 5 students / 4 verified / 11
 rows. C should review before this is merged, since the file is theirs.
+
+---
+
+## Critical-review revision pass (2026-11-18)
+
+Source: `backend/static/STITP_Frontend_Critical_Review_and_OpenCode_Instructions.md`.
+Each finding was checked against the current repository and backend before editing.
+No backend code, schema, attendance rule, Wi-Fi rule or API contract was changed.
+
+### P0 — correctness
+
+| Finding | Resolution |
+|---|---|
+| Weekday mismatch (review 3.1) | `const today = (new Date().getDay() + 6) % 7;` matches the backend's Monday=0. The seeded Wednesday class now appears in "Today's Schedule". |
+| Chart lifecycle (3.2) | `statusChart` / `classChart` refs are destroyed before each rebuild; `typeof Chart` guards show a text fallback instead of throwing when the CDN is unreachable. |
+| Edit Student (3.3) | The dialog is now "Edit MAC Address": name/NIM are disabled, the hint says they are fixed after enrollment, the button reads "Update MAC". The request uses the real contract `PUT /students/{id}/mac?mac_address=...` (query parameter, not JSON body). A JSON body was confirmed to return 422 locally. |
+| Output escaping (3.4) | `statusChip` and `checkChip` allowlist the CSS class and escape the label; enrollment messages and the recognition `reason` are escaped. `<script>` / `<img onerror>` probes render as text. |
+| UTC date (3.5) | `getLocalDateInputValue()` builds `YYYY-MM-DD` from local `getFullYear/getMonth/getDate`. |
+| Debug card (3.6) | The unused "Debug: All Stored Embeddings" card was removed. No raw embedding was ever rendered. |
+| Chart title (6.1) | "Class Distribution" → "Scheduled Classes by Subject" — the chart counts schedule rows, not attendance. |
+
+### P1 — presentation and CSS
+
+- Yellow (`#FFE14F`) is reserved for accent/action: Wi-Fi `Yes`, `Scan complete` and
+  `Recognized!` now use `--success` (`#12624F`); chart headings and stat numbers stay
+  navy. Semantic chips keep green/amber/red.
+- Spacing tokens `--space-1`…`--space-7` were introduced; readable type scale:
+  30 px headings, 15 px card headings, 36 px stats, 11 px table headers, 13 px body.
+- Review 4.4 resolved: the `DESIGN SYSTEM REFINEMENTS` override block was folded into
+  the authoritative base rules and reduced to genuinely unique rules. There are no
+  duplicate selectors in the base context; the only repeated selectors left are
+  intentional `@media` overrides.
+
+### P2 — responsiveness, accessibility, reliability
+
+- A real mobile drawer replaces the unlabeled icon sidebar: `#menuToggle` with
+  `aria-expanded`, `#navOverlay`, focus-visible outlines, Escape and overlay-click
+  close, and automatic close on navigation.
+- All three modals have `role="dialog"`, `aria-modal="true"` and an `aria-labelledby`
+  target; `openModal()` moves focus to the first enabled field and `closeModal()`
+  restores it to the trigger.
+- Student search is debounced (250 ms) and guarded by a request sequence number so
+  stale responses cannot overwrite newer results; `refreshCurrent()` ignores repeat
+  triggers while a refresh is in flight.
+
+### Verification actually performed
+
+- `./venv/bin/python -m pytest backend/tests -q` → **209 passed** (4 pre-existing
+  deprecation warnings; no failures).
+- Browser checks on `http://127.0.0.1:8000/dashboard` (empty real DB) and
+  `http://127.0.0.1:8097/dashboard` (seeded DB): local date `2026-11-18`, no debug
+  card, MAC-only edit dialog, escaped HTML probes, no horizontal overflow,
+  `Chart.getChart()` true for both canvases before and after two refreshes, and no
+  console errors.
+- 1000 px checked directly; 768 px layout checked by re-applying the file's own
+  `@media (max-width: 768px)` rules in the review viewport: menu button visible,
+  sidebar off-canvas at −260 px, main margin 0, drawer opens on click, no overflow.
+- API contract confirmed with curl: JSON body → 422 `missing query mac_address`;
+  query string → 200 `{"message":"MAC address updated"}`.
+
+### Still open / deliberately deferred
+
+- Chart.js is loaded from a CDN; this venue intermittently returns
+  `ERR_CONNECTION_CLOSED`. The fallback message keeps the rest of the dashboard
+  usable, but self-hosting Chart.js is the durable fix (infrastructure decision).
+- P3 modularization (splitting the single-file dashboard into modules) was not done;
+  it is a larger refactor and needs separate approval.
+- `backend/static/dashboard.html` is normally C-owned. C must review this revision
+  before it is merged. This revision pass is committed only on `task-b`; no merge,
+  PR or push.
