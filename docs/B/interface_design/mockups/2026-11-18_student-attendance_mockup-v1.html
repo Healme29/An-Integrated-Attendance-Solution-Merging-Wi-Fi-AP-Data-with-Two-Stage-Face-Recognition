@@ -12,11 +12,11 @@
 
 <style>
 :root {
-  --bg: #f3f1e9;
-  --ink: #20221d;
-  --lime: #c9f45b;
-  --muted: #77786e;
-  --line: rgba(32,34,29,.18);
+  --bg: #ECF4F7;          /* pale blue — canvas */
+  --ink: #192853;         /* deep navy — type, structure, contrast */
+  --lime: #FFE14F;        /* gargoyle gas — signal, action, highlight */
+  --muted: #5A6B82;       /* slate — supporting copy */
+  --line: rgba(25,40,83,.16);
   --font: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
   --mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
 }
@@ -62,7 +62,7 @@ nav {
   letter-spacing: -2px;
 }
 
-.logo span { color: #8aab36; }
+.logo span { color: #A88600; }
 
 .nav-links {
   display: flex;
@@ -125,14 +125,16 @@ nav {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #9cce38;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px rgba(255,225,79,.55);
 }
 
 .hero h1 {
   font-size: clamp(70px, 11.5vw, 166px);
   line-height: .86;
   letter-spacing: -.095em;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.095em;
   margin-top: 45px;
 }
 
@@ -151,7 +153,7 @@ nav {
 .hero-desc {
   max-width: 420px;
   font-size: 16px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--muted);
 }
 
@@ -254,7 +256,7 @@ nav {
 
 .project-image {
   overflow: hidden;
-  background: #d6d4c9;
+  background: #DCE8EE;
   aspect-ratio: 1.2 / 1;
 }
 
@@ -286,7 +288,8 @@ nav {
 
 .signal-row .key {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -305,7 +308,7 @@ nav {
   white-space: nowrap;
 }
 
-.tag-pass { background: var(--lime); color: var(--ink); }
+.tag-pass { background: var(--lime); color: var(--ink); font-weight: 500; }
 .tag-block { background: var(--ink); color: white; }
 
 .mini-row {
@@ -323,8 +326,8 @@ nav {
 .mini-row .who { font-weight: 600; }
 .mini-row .stage { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; }
 .mini-row .state { font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
-.mini-row .state.ok { color: #5f7d1f; }
-.mini-row .state.warn { color: #9a6a1f; }
+.mini-row .state.ok { color: #12624F; }
+.mini-row .state.warn { color: #8A5200; }
 
 .panel-caption {
   font-family: var(--mono);
@@ -385,7 +388,7 @@ nav {
 }
 
 .about-copy span {
-  color: rgba(32,34,29,.42);
+  color: rgba(25,40,83,.48);
 }
 
 .flow-strip {
@@ -425,7 +428,7 @@ nav {
   margin: 35px 0;
 }
 
-.contact h2 span { color: #a3a398; }
+.contact h2 span { color: #9AAEC2; }
 
 .contact-bottom {
   display: flex;
@@ -596,7 +599,7 @@ footer {
     <h1>
       THREE SIGNALS.<br>
       <span class="outline">ONE</span><br>
-      ATTENDANCE<span style="color:#a5cb43">.</span>
+      ATTENDANCE<span style="color:#A88600">.</span>
     </h1>
 
     <div class="hero-bottom">

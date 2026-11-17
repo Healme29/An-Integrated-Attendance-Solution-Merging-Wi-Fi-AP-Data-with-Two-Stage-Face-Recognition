@@ -8,25 +8,29 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
   :root {
-    --primary: #1a56db;
-    --primary-dark: #1343b0;
-    --primary-light: #e8effd;
-    --accent: #0e9f6e;
-    --accent-light: #e6f7f0;
-    --warning: #e37400;
-    --warning-light: #fff3e0;
-    --danger: #d93025;
-    --danger-light: #fce8e6;
-    --bg: #f0f2f5;
-    --card: #fff;
-    --text: #1f2937;
-    --text-secondary: #6b7280;
-    --border: #e5e7eb;
+    /* Palette: gargoyle gas #FFE14F / deep navy #192853 / pale blue #ECF4F7 */
+    --primary: #192853;
+    --primary-dark: #101A38;
+    --primary-light: #E4ECF4;
+    --accent: #FFE14F;
+    --accent-light: #FFF7CC;
+    --warning: #B45309;
+    --warning-light: #FEF1D6;
+    --danger: #C4323C;
+    --danger-light: #FCE9EB;
+    --success: #12624F;
+    --bg: #ECF4F7;
+    --card: #FFFFFF;
+    --text: #192853;
+    --text-secondary: #5A6B82;
+    --border: #D7E3EA;
     --sidebar-width: 260px;
     --header-height: 64px;
-    --radius: 12px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(25,40,83,.06), 0 6px 18px rgba(25,40,83,.05);
+    --shadow-lg: 0 10px 30px rgba(25,40,83,.14);
+    --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    --font-mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -312,9 +316,9 @@
   .modern-date {
     min-width: 210px; height: 46px; padding: 6px 12px;
     display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, #ffffff, #f8fbff);
-    border: 1px solid #dbe5f3; border-radius: 11px;
-    box-shadow: 0 1px 2px rgba(26,86,219,0.04);
+    background: linear-gradient(135deg, #FFFFFF, #F4F8FB);
+    border: 1px solid var(--border); border-radius: 11px;
+    box-shadow: 0 1px 2px rgba(25,40,83,0.05);
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   }
   .modern-date:focus-within {
@@ -487,6 +491,216 @@
     .header { padding: 0 16px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* ============================================================
+     DESIGN SYSTEM REFINEMENTS
+     Palette: #FFE14F gargoyle gas / #192853 navy / #ECF4F7 pale blue
+     Scope: all three sidebar groups — Overview (live dashboard),
+     Management and Operations. Presentation logic is untouched.
+     ============================================================ */
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Sidebar: navy anchor for the whole product */
+  .sidebar {
+    background: var(--primary);
+    border-right: 1px solid rgba(255,255,255,.08);
+    box-shadow: 6px 0 24px rgba(25,40,83,.10);
+  }
+  .sidebar-brand {
+    color: #FFFFFF;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    letter-spacing: -.02em;
+  }
+  .sidebar-brand .brand-icon {
+    background: var(--accent);
+    color: var(--primary);
+  }
+  .sidebar-nav { padding: 18px 0; }
+  .sidebar-nav a {
+    color: rgba(236,244,247,.72);
+    font-size: 13px;
+    border-radius: 9px;
+  }
+  .sidebar-nav a i { color: inherit; opacity: .85; }
+  .sidebar-nav a:hover { background: rgba(255,255,255,.09); color: #FFFFFF; }
+  .sidebar-nav a.active {
+    background: var(--accent);
+    color: var(--primary);
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
+  .sidebar-nav .section-label {
+    color: rgba(255,225,79,.72);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    padding: 22px 20px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-nav .section-label::before {
+    content: "";
+    width: 14px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .sidebar-footer {
+    color: rgba(236,244,247,.55);
+    border-top: 1px solid rgba(255,255,255,.12);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .04em;
+  }
+
+  /* Keep wide tables inside the content column instead of stretching the page */
+  .main, .content { min-width: 0; }
+  .table-wrap { max-width: 100%; }
+
+  /* Header and page hierarchy */
+  .header { box-shadow: 0 1px 0 rgba(25,40,83,.06); }
+  .header-left h2 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+  .header-left .badge {
+    background: var(--accent);
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .header-left .badge i { color: var(--primary) !important; }
+  .header-right .status-dot.online {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+  }
+  .header-right .status-label {
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .header-right .refresh-btn { background: var(--primary-light); color: var(--primary); }
+  .header-right .refresh-btn:hover { background: var(--accent); color: var(--primary); }
+  .page-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .page-heading {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -.035em;
+    color: var(--primary);
+  }
+  .page-heading small {
+    font-size: 13px;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+  }
+
+  /* Data cards: numbers are the primary reading target */
+  .stat-card, .card, .chart-card { border: 1px solid var(--border); }
+  .stat-card { border-top: 3px solid var(--primary); }
+  .stat-card.green { border-top-color: var(--success); }
+  .stat-card.orange { border-top-color: var(--warning); }
+  .stat-card.red { border-top-color: var(--danger); }
+  .stat-card .stat-icon { opacity: 1; color: var(--primary); }
+  .stat-card .stat-value {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -.045em;
+    font-variant-numeric: tabular-nums;
+    color: var(--primary);
+  }
+  .stat-card .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+  .stat-card .stat-detail { font-variant-numeric: tabular-nums; }
+  .card-header h3, .chart-card h3 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+  .card-header h3::before {
+    content: "";
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin-right: 9px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+  }
+
+  /* Tables: quiet structure, scannable rows */
+  th {
+    background: #F4F8FB;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+  }
+  tr:hover td { background: #F7FAFC; }
+  td { font-variant-numeric: tabular-nums; }
+  .sheet-tabs { background: #F4F8FB; }
+  .sheet-tab.active { color: var(--primary); border-bottom-color: var(--accent); }
+  .attendance-mark.present { background: #E4F2ED; color: var(--success); }
+
+  /* Status language: only the backend's real values, always legible */
+  .chip { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+  .chip.verified, .chip.present { background: var(--success); }
+  .chip.partial { background: var(--warning); }
+  .chip.face_only { background: var(--danger); }
+  .chip.start { background: var(--primary); }
+  .chip.end { background: var(--accent); color: var(--primary); }
+
+  /* Actions and focus: yellow ring on navy controls */
+  .controls-bar .btn, .modal-footer .btn-primary { background: var(--primary); }
+  .controls-bar .btn:hover, .modal-footer .btn-primary:hover { background: var(--primary-dark); }
+  .controls-bar .btn-secondary, .modal-footer .btn-cancel { background: var(--primary-light); color: var(--primary); }
+  .controls-bar .btn-secondary:hover, .modal-footer .btn-cancel:hover { background: var(--accent); color: var(--primary); }
+  .controls-bar select:focus, .controls-bar input:focus,
+  .modal-body .form-group input:focus, .modal-body .form-group select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+  .card-header .card-action { background: var(--accent-light); color: var(--primary); }
+  .table-wrap .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .modern-date {
+    background: linear-gradient(135deg, #FFFFFF, #F4F8FB);
+    border-color: var(--border);
+    box-shadow: 0 1px 2px rgba(25,40,83,.05);
+  }
+  .modern-date > i { color: var(--primary); }
+  .modern-date:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent); }
+
+  /* Supporting components */
+  .arch-card .arch-icon { color: #FFFFFF; }
+  .arch-flow .flow-step { background: var(--primary-light); color: var(--primary); }
+  .toast { border-left-color: var(--accent); }
+  .toast.success i { color: var(--success); }
+  .detail-time-card { border-radius: 10px; background: #F9FBFD; }
+  .detail-time-card strong { color: var(--primary); font-variant-numeric: tabular-nums; }
+
+  /* The two-up chart grid needs more room than the original 768 px breakpoint */
+  @media (max-width: 1100px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .chart-card canvas { max-width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -575,32 +789,32 @@
 
       <div class="arch-grid">
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#1a56db,#3b82f6)"><i class="fas fa-wifi"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#192853,#35509B)"><i class="fas fa-wifi"></i></div>
           <h4>Wi-Fi AP Detection</h4>
           <p>Scans classroom network via ARP to verify the student's device is physically present on the correct access point. Uses Npcap/Scapy.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#0e9f6e,#34d399)"><i class="fas fa-eye"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#E8B800,#FFE14F)"><i class="fas fa-eye" style="color:#192853"></i></div>
           <h4>Face Detection &amp; Recognition</h4>
           <p>YOLOv8-face detects faces, InsightFace ArcFace (buffalo_l) generates 512-D embeddings. Cosine similarity threshold: 0.5.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#e37400,#f59e0b)"><i class="fas fa-flag-checkered"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#8A4300,#C77917)"><i class="fas fa-flag-checkered"></i></div>
           <h4>Two-Stage Attendance</h4>
           <p>Start of class: status = "partial". End of class: finalizes to "verified" (Wi-Fi ok on both) or "face_only" (no Wi-Fi).</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)"><i class="fas fa-database"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#243A73,#4C68B0)"><i class="fas fa-database"></i></div>
           <h4>SQLite Database</h4>
           <p>Stores students, faces (embeddings), schedules, attendance records, and AP logs. Rollback-safe transaction logic.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#d93025,#ef4444)"><i class="fas fa-mobile-alt"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#98232B,#C4323C)"><i class="fas fa-mobile-alt"></i></div>
           <h4>Flutter Mobile App</h4>
           <p>Android/iOS app for student selfies. Captures face images via camera for enrollment and attendance check-in.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#065f46,#0e9f6e)"><i class="fas fa-server"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#0C4C3E,#12624F)"><i class="fas fa-server"></i></div>
           <h4>FastAPI Backend</h4>
           <p>Python web server connecting all components. Endpoints for face operations, attendance logic, Wi-Fi scanning, and data export.</p>
         </div>
@@ -957,7 +1171,7 @@ async function loadOverview() {
           attendance.filter(r => r.status==='verified'||r.status==='present').length,
           attendance.filter(r => r.status==='partial').length,
           attendance.filter(r => r.status==='face_only').length,
-        ], backgroundColor: ['#0e9f6e','#e37400','#d93025'], borderWidth: 0 }]
+        ], backgroundColor: ['#12624F','#B45309','#C4323C'], borderWidth: 0 }]
       },
       options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
@@ -1004,7 +1218,7 @@ async function loadOverview() {
       type: 'bar',
       data: {
         labels: Object.keys(classCounts),
-        datasets: [{ data: Object.values(classCounts), backgroundColor: '#1a56db', borderRadius: 4 }]
+        datasets: [{ data: Object.values(classCounts), backgroundColor: '#192853', borderRadius: 4 }]
       },
       options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });

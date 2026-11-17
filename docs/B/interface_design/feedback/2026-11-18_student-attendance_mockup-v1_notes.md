@@ -50,3 +50,49 @@ implement a fix, it only avoids repeating the assumption in its copy.
    venue either self-host the two fonts or accept the system-font rendering.
 3. The two URLs in the mockup point at `127.0.0.1:8000`. If the dashboard is served on
    another host/port, they must be made relative before it ships.
+
+---
+
+## Design system v2 — lead-requested palette (2026-11-18)
+
+The first version used the source template's cream/lime palette. On the lead's
+instruction it was replaced with a higher-contrast system:
+
+| Token | Hex | Role |
+|---|---|---|
+| Signal | `#FFE14F` (gargoyle gas) | Active navigation, focus rings, chart accent, "Live" badge, key numbers' marker |
+| Structure | `#192853` (deep navy) | Sidebar, headings, primary buttons, body copy, chart bars |
+| Canvas | `#ECF4F7` (pale blue) | Page background, table hover, chart surfaces |
+
+Supporting tokens derived from those three: `--text-secondary #5A6B82`,
+`--border #D7E3EA`, `--success #12624F`, `--warning #B45309`, `--danger #C4323C`,
+`--accent-light #FFF7CC`. Semantic colours were darkened until they carried white
+text at a readable contrast; yellow is never used behind white text.
+
+Typography and hierarchy changes in both the mockup and the live dashboard:
+Inter/Segoe UI with tabular numerals for every count and timestamp, DM Mono for
+eyebrows, table headers and status chips, uppercase tracking on section labels,
+34 px stat values, 26 px page headings, and a yellow square before each card title.
+
+## Live dashboard rollout
+
+On the lead's explicit instruction, `backend/static/dashboard.html` (normally C-owned)
+was restyled **without changing any presentation logic**:
+
+- **Overview / live dashboard** — navy sidebar, yellow "Live" badge and active rail,
+  pale-blue canvas, tabular stat values, card-title markers.
+- **Management** — Attendance Sheet, Schedules and Face Enrollment inherit the same
+  table, tab, modal and form-focus treatment; the active sheet tab now uses the yellow
+  underline.
+- **Operations** — Attendance, Wi-Fi Scanner and Recognition Demo inherit the same
+  chip language (`verified`, `partial`, `face_only`), buttons and toasts.
+- Inline architecture-diagram gradients and the two Chart.js colour arrays were moved
+  to the new palette as well.
+- Two layout defects were corrected while restyling: wide tables/charts no longer
+  stretch the page (`.main { min-width: 0 }`, chart grid drops to one column below
+  1100 px).
+
+Verified in the browser at 800 px and 1000 px: no horizontal overflow, sidebar
+`rgb(25,40,83)`, active item and "Live" badge `rgb(255,225,79)`, canvas
+`rgb(236,244,247)`. The seeded instance still shows 5 students / 4 verified / 11
+rows. C should review before this is merged, since the file is theirs.

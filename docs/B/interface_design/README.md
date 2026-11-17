@@ -61,5 +61,5 @@ binary; put a short note file beside any image that is committed.
 
 | Date | Item | File | Status |
 |---|---|---|---|
-| 2026-11-18 | FORM-style landing mockup adapted to the attendance system | `mockups/2026-11-18_student-attendance_mockup-v1.html` | proposal — not implemented |
+| 2026-11-18 | FORM-style landing mockup, v2 palette (#FFE14F / #192853 / #ECF4F7) | `mockups/2026-11-18_student-attendance_mockup-v1.html` | proposal — not implemented |
 | 2026-11-18 | Review notes for that mockup | `feedback/2026-11-18_student-attendance_mockup-v1_notes.md` | awaiting C's decision |
