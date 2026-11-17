@@ -3,10 +3,15 @@
 > **Status:** draft. Numbers marked *(measured)* were measured; everything else is a
 > procedure to be executed and timed at dry run #1 (2027-01-09/10).
 > **Owner:** B · **Used by:** A (backend), C (phone), D (narration), B (fallback).
-> **Updated 2026-11-10:** strict classroom mode (`REQUIRE_CLASSROOM_WIFI=true`, D-006) and
+> **Updated 2026-11-10:** strict classroom mode (`REQUIRE_CLASSROOM_WIFI=true`;
+> decision D-006 in `docs/A/DECISIONS.md`, not the B-006 database-recovery entry) and
 > the check-in preflight are now part of the demo path, and the app only lists schedules
 > whose window is open. The dry-run dates above predate the accelerated timeline (D-005);
 > the dates will be re-cut, the procedures below will not.
+> **Updated 2026-11-13:** the timings in §2 are now measured on the Windows 11 laptop
+> (native `uvicorn`, Python 3.12, no Docker). Model warm-up moved into its own step and is
+> measured; the install needs `dill==0.3.8` (§2 step 0). Raw evidence:
+> `docs/B/evidence/2026-11-13-windows/`.
 
 ---
 
@@ -39,6 +44,11 @@ B and A sit next to each other: only B touches the database, only A touches the 
 
 ## 2. Startup order (T−30 min)
 
+0. **Environment, done the day before (needs internet).** Python **3.12**; `pip install -r
+   backend\requirements.txt` measured **577 s** on this laptop, then
+   `pip install dill==0.3.8` — `dill` is required to load `yolov8m-face.pt` and is not yet in
+   the A-owned requirements file (hardening item 7, D-012). `backend\data\models\yolov8m-face.pt`
+   and `%USERPROFILE%\.insightface\models\buffalo_l` must already exist (step 7 checks them).
 1. **Hotspot first.** Turn on the Windows Mobile Hotspot: SSID `Attendance-Demo`, band
    2.4 GHz. Windows assigns the host address `192.168.137.1`; write it on the printed sheet.
    A phone hotspot or a small travel router works too — what matters is that the server and
@@ -49,9 +59,11 @@ B and A sit next to each other: only B touches the database, only A touches the 
    $env:TIMEZONE="Asia/Shanghai"; $env:FACE_SIMILARITY_THRESHOLD="0.5"; $env:YOLO_IMG_SIZE="640"
    $env:WI_FI_SUBNET="192.168.137.0/24"; $env:REQUIRE_CLASSROOM_WIFI="true"
    $env:CORS_ORIGINS="http://127.0.0.1:8000"
-   python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+   .\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
    ```
-   Cold start to healthy: **5.9 s** *(measured 2026-11-02)*. Keep
+   Cold start to healthy: **17.3 s** *(measured 2026-11-13, Windows 11; a restart right after
+   a process stop took 25.3 s — still far inside the T−30 min window)*. Python must be
+   **3.12**; 3.13 cannot install the pinned wheels (D-012). Keep
    `REQUIRE_CLASSROOM_WIFI=true` for the demo: it turns the Wi-Fi condition into a visible
    gate (403, no row) instead of a silent downgrade to `face_only`.
 3. **Health + Wi-Fi** in a second terminal:
@@ -95,12 +107,28 @@ B and A sit next to each other: only B touches the database, only A touches the 
    Expect `"allowed": true`, `"wifi_verified": true`, and `schedule_bssid` equal to
    `server_bssid`. If `wifi_verified` is false, do **not** start with strict mode: go to the
    fallback table (§4).
-7. **Backup the database now** (so a broken demo can be restored in ~6 s):
+7. **Models present, then warm them.** Both models load **lazily**, on the first face
+   request — a cold first selfie on stage would look like a 13-second hang. So:
+
    ```powershell
+   Get-Item backend\data\models\yolov8m-face.pt | Select-Object Length   # expect 52028566
+   Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l"        # expect 5 .onnx files
+   # then one throwaway call, before the audience arrives:
+   curl.exe -F "file=@C:\path\to\any\photo.jpg" http://127.0.0.1:8000/faces/recognize
+   ```
+
+   Measured 2026-11-13: cold call **13.4 s**, warm **1.5–1.6 s**, and the server's own
+   warm-up call **8.3 s**. Both models resident cost ≈ **1.0 GB RSS**. If `dill` is missing
+   the call returns `500` with `ModuleNotFoundError: No module named 'dill'` — install
+   `dill==0.3.8` into the venv and restart (step 0), do not debug it on stage.
+   `buffalo_l` lives in `%USERPROFILE%\.insightface`, **not** `DATA_DIR` (D-012), so that is
+   the folder to copy to the backup stick.
+8. **Backup the database now** (measured: copy **1.2 ms** for 40 KB; restore to healthy
+   **13.9 s** on this laptop — the older 6.2 s figure was the Linux machine):
+   ```powershell
+   New-Item -ItemType Directory -Force backups | Out-Null
    Copy-Item backend\attendance.db "backups\attendance-prerun.db"
    ```
-8. **Warm the models** with one throwaway `/faces/recognize` call (first call may load
-   YOLO + ArcFace; measured ~1 s per check-in afterwards).
 9. **Phone**: join `Attendance-Demo`, open the app, log in, confirm Settings → Test
    Connection is green. **Dashboard** open in a browser tab, zoomed for the projector.
    Refresh once after the first check-in so the audience sees new rows appear.
@@ -128,7 +156,7 @@ B and A sit next to each other: only B touches the database, only A touches the 
 
 | Trigger | Threshold | Action |
 |---|---|---|
-| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: restore backup (`deployment_guide.md` §8, 6.2 s measured) or `seed_demo.py --reset` |
+| Backend does not answer `/health` | 2 attempts, 5 s apart | rung 4: kill the stuck window (a corrupt DB leaves the process alive without binding the port), restore the backup (`deployment_guide.md` §8, **13.9 s** measured on Windows) or `seed_demo.py --reset` (**0.7 s**) |
 | Check-in returns 403 `outside_class_time` | once | check clock/timezone first (`TIMEZONE` must be `Asia/Shanghai`), then fix the schedule window |
 | Check-in returns 403 `not_on_classroom_network` | first occurrence | the student's MAC is not visible on the hotspot: wrong MAC registered, phone using a private/random MAC, or the phone is on another network. Check `/wifi/scan`, fix with `PUT /students/{id}/mac`. If the network itself is unreliable, restart the backend with `REQUIRE_CLASSROOM_WIFI=false` — rows then degrade to `face_only`; say that on stage instead of hiding it |
 | App shows "No active class right now" | before going on stage | `/schedules/active` is empty: the schedule is outside its window or on another weekday. Re-run `seed_demo.py` or correct start/end |

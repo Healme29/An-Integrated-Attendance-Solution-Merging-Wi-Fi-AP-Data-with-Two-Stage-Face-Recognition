@@ -263,154 +263,121 @@
 - **Evidence files:** `backend/services/wifi_scanner.py` (`_ping_command`),
   `backend/tests/test_wifi_subnet.py` (`TestPingCommand`).
 
----
+### D-011 — Windows netmask parsing must not depend on the display language (G5)
+- **Date:** 2026-11-13 · **Stage:** M2 / G5 (Windows demo-laptop run)
+- **Problem:** the Windows branch of `detect_local_network()` found the netmask by searching
+  for the English label `Subnet Mask`. A localized Windows (Chinese, French, …) prints a
+  translated label, so the mask was not found and subnet detection degraded to a guessed /24
+  — the scanner would then report and sweep a range that is not the machine's real network.
+  The failure is silent, which is the worst property for a Wi-Fi gate.
+- **Options:** (1) keep the English label and require an English Windows — free, but the
+  demo laptop's language is not something the project controls; (2) keep the English fast
+  path and add an order-based fallback: after the adapter's IPv4 address line, take the
+  first netmask-shaped token and require it to be a contiguous mask; (3) shell out to
+  PowerShell `Get-NetIPAddress -PrefixLength`; (4) use a library — `psutil` exposes addresses
+  but not netmasks on Windows, so this is not available without a new dependency.
+- **Evidence:** on this laptop `ipconfig` is English (`Subnet Mask . . . : 255.255.128.0`),
+  and the server detected `10.163.128.0/17`, then logged
+  `Interface network 10.163.128.0/17 is wider than /24; sweeping only 10.163.158.0/24`
+  and returned exactly `10.163.158.0/24` as `subnet` (`measurements-g1.txt` §3). New unit
+  tests feed captured Chinese (`子网掩码`) and French (`Masque de sous-réseau`) blocks,
+  an `(Preferred)` suffix and a non-contiguous `255.0.255.0`, which must be rejected;
+  suite goes from 205 to **209 passed**.
+- **Decision:** option 2. A netmask that is not a run of ones followed by zeros cannot be a
+  CIDR prefix, so it is rejected instead of silently converted. Option 3 was kept as a
+  mental fallback but not implemented: it would add a subprocess whose output format also
+  changes with PowerShell versions.
+- **Consequences:** the fallback depends on `ipconfig` printing the mask near the address
+  line; that order is pinned by a captured fixture, and `WI_FI_SUBNET` remains the explicit
+  escape hatch (already in the troubleshooting table). A future Windows build that reorders
+  the output would make detection fall back to "nothing found", which is loud (no wrong
+  subnet is claimed).
+- **Revisit by:** the first run on the actual demo laptop if its Windows language is not
+  English; or if Windows changes `ipconfig` output.
+- **Evidence files:** `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`,
+  `_prefix_from_netmask`), `backend/tests/test_wifi_subnet.py` (locale cases).
 
-## Entri M2 — demo preparation, accelerated timeline (Nov 2026)
+### D-012 — Reference interpreter is Python 3.12, and the YOLO checkpoint needs `dill`
+- **Date:** 2026-11-13 · **Stage:** M2 / G1 (clean install on the Windows laptop) + M3 hygiene
+- **Problem:** which Python version and dependency set lets a **fresh** machine actually
+  recognise a face? The pinned requirements were assumed to be sufficient; the clean-install
+  run proved otherwise.
+- **Options:** (1) move to Python 3.13 and unpin `numpy`/`onnxruntime`/`opencv-python` —
+  A's threshold and G3 numbers were measured on the pinned versions, so this silently
+  invalidates existing evidence; (2) pin Python 3.12 and add the one missing runtime
+  dependency (`dill`) to the install steps; (3) produce a hash-pinned lock file — correct
+  long-term, disproportionate two weeks before the presentation.
+- **Evidence:** system Python **3.13.5** cannot install the pinned set (no cp313 wheels for
+  `numpy==1.26.4`, `onnxruntime==1.18.1`, `opencv-python==4.10.0.84`; pip falls back to
+  source builds and fails). Python **3.12.10** installs in **577 s**
+  (`INSTALL_STARTED/FINISHED` in `.venv/pip_install.log`, Tsinghua mirror). With the model
+  file present, `/faces/recognize` still returned **500**: `torch.load` of
+  `yolov8m-face.pt` raises `ModuleNotFoundError: No module named 'dill'`
+  (`measurements-g1.txt` §5, full traceback in `run2/s1.log`). After
+  `pip install dill==0.3.8`: `/faces/recognize` → 200, cold 13.4 s, warm 1.5–1.6 s, smoke
+  **15/15** (`measurements-smoke.txt`).
+- **Decision:** option 2. Python 3.12 is the reference interpreter; the Dockerfile stays on
+  `python:3.11-slim` (also supported). B adds `pip install dill==0.3.8` to
+  `deployment_guide.md` §5b immediately and **asks A to add `dill==0.3.8` to
+  `backend/requirements.txt`** (`requirements.txt` is A-owned, so B does not edit it).
+- **Consequences:** until A makes that one-line change, a machine that follows only
+  `requirements.txt` gets a 500 on the first recognition; the guide, the runbook pre-flight
+  and the troubleshooting table now name the symptom and the fix. The Docker path has the
+  same hole because the checkpoint is mounted, not installed.
+- **Revisit by:** when `requirements.txt` is updated (then delete the extra command), or if
+  the model file is replaced by a checkpoint that is not dill-pickled.
+- **Evidence files:** `.venv/pip_install.log`, `docs/B/evidence/2026-11-13-windows/`,
+  `docs/B/deployment_guide.md` §5b/§7/§9.
 
-### D-011 — Room-level presence: spike closed with a documented verdict, demo must not depend on it
-- **Date:** 2026-11-11 · **Stage:** M2 / stage 2, gate G5 (spike window 2026-11-09 → 2026-11-11)
-- **Problem:** The captain's 2026-11-09 replan (`PLAN_TIMELINE.md` §5) added a timeboxed spike:
-  can the system prove a phone is **inside the scheduled room**, not merely on the same
-  subnet? The answer decides whether the Wi-Fi condition is strengthened or documented as
-  AP-level and left alone.
-- **Options:** (A) SSH into the classroom AP and parse its client table; (B) SNMP poll
-  (`dot11StationTable`); (C) vendor controller API; (D) the app reports its own BSSID
-  (`NEHotspotNetwork`, needs an iOS entitlement); (E) per-room SSID/VLAN from campus IT;
-  (F) rotating classroom token on the dashboard; (G) run on a router **we** control and read
-  its client table.
-- **Evidence (measured 2026-11-11, passive only — no probe was sent to campus equipment):**
-  from one seat, **10 distinct BSSIDs** of `NJUPT-CMCC` were visible (10 for `eduroam`, 9 for
-  `NJUPT`, 8 for `NJUPT-CHINANET`; 39 beacon rows, 6 SSIDs), so one SSID carries no room
-  information. The host's own AP changed between sessions at the same desk
-  (`50:98:b8:c9:2b:e2` on 2026-11-03 → `f4:74:88:70:c2:f1` today). `scan_network_arp()`
-  returned **1** device (the gateway) in **6.15 s** — client isolation unchanged, so the
-  server cannot observe another device's AP even with a perfect room map. No credentials, SNMP
-  community or controller access were ever provided (`ap_management_plane.md` §3).
-- **Decision:** options A/B/C are not viable (authorisation, not code); E is campus IT's
-  decision; D is plausible but cannot be built or tested this month (C has no Flutter tooling,
-  C-002); F is the strongest non-network mitigation but belongs to A/C and is outside the
-  frozen demo scope (D-007); **G is adopted for the assessment** — one AP, one room, so
-  room-level presence is effectively exact there. On the campus network the claim stays at
-  AP-coverage level and is stated as a limitation. **Stop rule: the spike ended 2026-11-11
-  and reopens only on a trigger** (credentials/SNMP/controller access, school-bought AP, C
-  regains tooling, or a pilot with > 50 % `face_only`).
-- **Consequences:** no new dependency, no unverifiable claim, and no demo dependency — the
-  remaining candidate mechanisms are recorded as post-assessment work. The team must not
-  describe the Wi-Fi condition as room-exact on campus; the approved sentence is in
-  `threat_model.md` §3.2 and `offline_fallback.md` §4c.
-- **Revisit by:** after the November assessment, or immediately if a trigger fires.
-- **Evidence files:** `docs/B/room_presence_spike.md` (options, measurement table, verdict,
-  timebox accounting), `docs/B/ap_management_plane.md` §3 (access evidence),
-  `docs/B/network_validation.md` §8.3 (re-run), `backend/services/wifi_scanner.py`
-  (`resolve_subnet`, `get_current_bssid`, `scan_network_arp`).
+### D-013 — Demo security posture: open API + no TLS, constrained to a controlled hotspot
+- **Date:** 2026-11-13 · **Stage:** M2 / G12 input, M3 backlog
+- **Problem:** the backend has no authentication, no transport encryption and no rate
+  limiting (`hardening_checklist.md` §3, §4, §6). Is that acceptable for the November demo,
+  and what must be true on the day?
+- **Options:** (1) add an API key or teacher login plus TLS before the demo — touches A's
+  routers and C's device-tested APK two weeks before the presentation, with a real chance of
+  breaking the demo; (2) keep the open API but shrink the blast radius: run only on a
+  password-protected hotspot the team controls, scope the firewall rule to the hotspot
+  subnet, one CORS origin, strict Wi-Fi mode on, stop the server after the demo; (3) demo
+  only seeded dashboard data with the radio off — safest, but it cannot show the
+  three-condition check-in that is the project's claim.
+- **Evidence:** every endpoint answers without credentials, over plain HTTP (observed in all
+  runs above; there is no auth dependency in any router). The demo network is a
+  laptop/phone hotspot, not the campus SSID — on campus the scanner sees only the gateway
+  anyway (F2), so the campus network is not a viable demo path. `REQUIRE_CLASSROOM_WIFI=true`
+  turns the Wi-Fi condition into a visible 403 instead of a silent `face_only`.
+- **Decision:** option 2 for the November demo. The controls are written into
+  `demo_runbook.md` §2/§5 and stated as a limitation on the slides. Option 1 remains the M3
+  plan (API key vs teacher login is still open, `hardening_checklist.md` §11).
+- **Consequences:** the demo must never be reachable from the campus VLAN or the internet;
+  the presenter's phone MAC is registered as a student, so one phone is both client and
+  attendance device — acceptable for a pilot, to be said out loud in the report. Any public
+  deployment in this state would be a serious fault, which is why the limitation is explicit.
+- **Revisit by:** before any pilot where people outside the team can reach the server, or as
+  soon as C's APK needs a token.
 
-### D-012 — Demo log capture: the "CCTV" record is produced by the shell, not by application code
-- **Date:** 2026-11-11 · **Stage:** M2 / stage 2, gate G5 (demo readiness)
-- **Problem:** On demo day the backend writes only to the terminal. If the window is closed,
-  scrolled, or the laptop reboots, there is no record that a check-in was served — and no
-  evidence to settle a disputed result after the demo.
-- **Options:** (1) add a `RotatingFileHandler` / `--log-config` to the backend — needs edits to
-  `backend/main.py`, which is not in B's allowed-file list, and changes code on the critical
-  path days before the demo; (2) redirect the existing uvicorn output into a timestamped file
-  from the shell (PowerShell `cmd /c "... > file 2>&1"` plus `Get-Content -Wait`), zero code
-  change; (3) rely on terminal scrollback / copy-paste — not a record.
-- **Evidence:** measured 2026-11-11 on ports 8098/8099 with `DATABASE_PATH` pointed at a
-  throwaway DB: the redirected file contained the startup banner, every access line
-  (`"GET /wifi/scan HTTP/1.1" 200 OK`), the scanner's own warnings (subnet cap, scapy
-  denial), and the shutdown banner `Application shutdown complete.` +
-  `Finished server process`. A PowerShell-only `2>&1 | Tee-Object` was rejected because PS 5.1
-  wraps native stderr in `ErrorRecord`s and writes formatting noise; `cmd /c` writes raw lines.
-  `git check-ignore backend/server_20261111-0900.log` → matched by `.gitignore:28`.
-- **Decision:** option 2. The demo start command is `cmd /c "python -m uvicorn backend.main:app
-  --host 0.0.0.0 --port 8000 > backend\server_<timestamp>.log 2>&1"`, with a second window
-  tailing the file. After the demo the log is copied to `backups\server-demo.log` beside the
-  database backup.
-- **Consequences:** one extra command in the runbook and one more file to clear before a run;
-  no code path changes, so `pytest` cannot regress. Logs contain request paths (thus
-  `student_id`) but no images or embeddings — they stay on the demo laptop/USB and are deleted
-  after the report. Uncaught tracebacks are now recoverable after the fact.
-- **Revisit by:** dry run #1 (`demo_runbook.md` §6 row "Log file written + clean shutdown").
-- **Evidence files:** `docs/B/demo_runbook.md` §2/§2b/§5/§6,
-  `docs/B/offline_fallback.md` §5 row 10, `.gitignore` (lines 26–28).
-
-### D-013 — Assessment runs on a network we control; "AP coverage area" is the accepted claim; BSSID is pinned live
-- **Date:** 2026-11-11 · **Stage:** M2 / demo scope, revises the operational part of D-007
-- **Problem:** Two questions had to be settled before the runbook could be finalised: may the
-  assessment demo run on our own router/hotspot instead of the campus SSID, and is
-  "within the coverage area of the scheduled AP" an acceptable claim? The answer also
-  determines whether a pinned BSSID may be reused between runs.
-- **Options:** (1) insist on the campus SSID to look realistic, accepting client isolation and
-  a shared multi-AP SSID; (2) run the demo on a network we control, state the AP-coverage
-  limitation honestly, and keep the campus network as a pilot environment; (3) claim
-  room-level precision everywhere — contradicted by the measurements in D-011.
-- **Evidence:** lecturer reply, Zhe Zhang, 2026-11-11: "For the assessment, may we demonstrate
-  the system on a network we control … Either should be fine." and, on the coverage-area
-  claim, "In practice, an AP only covers one classroom. Even an AP can cover multiple
-  classrooms, the capacity is not enough to hold all students." Measured support:
-  D-011's beacon scan (10 BSSIDs per SSID) and `network_validation.md` §8.3 (the host's AP
-  changed between sessions at the same desk).
-- **Decision:** option 2. The assessment demo runs on a router/hotspot we control with client
-  isolation off; `schedules.ap_bssid` is captured **live at setup on that network** and never
-  copied from a previous session or hand-typed from a phone; the report and narration use the
-  approved "coverage area" wording with the limitation stated.
-- **Consequences:** the demo claim is strong but bounded (one AP, one room); a future campus
-  pilot must not inherit the demo's BSSID, and must be described as AP-level only. D-007's
-  scope lock is unchanged; this entry only fixes *where* the demo runs and *how* the pin is
-  obtained.
-- **Revisit by:** G4/C-003 room confirmation (C, due 2026-11-22) — the pinned BSSID and the
-  room must be recorded together on the day.
-- **Evidence files:** `docs/B/offline_fallback.md` §2/§4c, `docs/B/demo_runbook.md` §2,
-  `docs/B/room_presence_spike.md` §2/§4, `docs/B/threat_model.md` §3.1–§3.2,
-  `backend/services/wifi_scanner.py` (`get_current_bssid`, `is_same_bssid`).
-
-### D-014 — ArcFace cache path: correct the docs, warm up with a face, persist it in Docker through `HOME`
-- **Date:** 2026-11-12 · **Stage:** M2 / G1 + G5 (offline readiness); operational correction to D-001
-- **Problem:** Three statements in B's own documents did not match the pinned library
-  (`backend/requirements.txt`: `insightface>=2.0`; installed here: 2.1).
-  1. `offline_fallback.md` said `buffalo_l` is cached in `DATA_DIR`.
-  2. `deployment_guide.md` §7 said "any JPEG works" to warm the models.
-  3. `backend/Dockerfile` and `docker-compose.yml` set `INSIGHTFACE_HOME`, which this
-     library version never reads — inside a container the models would download to
-     `/root/.insightface`, i.e. the ephemeral image layer, not the mounted volume.
-
-  Consequence if uncorrected: an operator copies/caches the wrong folder, the warm-up call
-  "succeeds" without loading ArcFace, and the first real check-in at an offline venue tries
-  to reach GitHub and fails.
-- **Options:** (1) leave the documents alone and rely on the native demo only — the claim
-  would still be false and the Docker fallback silently broken; (2) correct the documents and
-  declare Docker recognition unsupported without internet; (3) correct the documents **and**
-  make the container cache under the mounted volume with a one-line `HOME` change to
-  `backend/Dockerfile` (B-owned; no change to A-owned `face_recognition.py`); (4) ask A to
-  pass `root=...` into `FaceAnalysis` — cleanest long-term, but it is A's file and not needed
-  for the November scope.
-- **Evidence:** measured 2026-11-12 on this host, `insightface` 2.1:
-  - cache is `~/.insightface/models/buffalo_l`, **326 MB**, five `.onnx` files
-    (`w600k_r50.onnx` 167 MB, `1k3d68.onnx` 137 MB, `det_10g.onnx` 17 MB, …);
-  - a 480×640 faceless JPEG: **0** YOLO boxes in **4.83 s**, and
-    `services.face_recognition._app is None` afterwards — ArcFace was **not** loaded;
-  - explicit `get_face_analyzer()` with the cache present: **4.21 s** (a second run under a
-    simulated `HOME`: **3.06 s**), five models loaded;
-  - an existing but empty `buffalo_l` directory fails immediately with
-    `AssertionError` at `assert "detection" in self.models` — no useful message;
-  - missing cache with the network unreachable: `requests.exceptions.ProxyError` for
-    `…/model-zoo/buffalo_l.zip` after **3.21 s**;
-  - library source: `FaceAnalysis.__init__(root="~/.insightface")`; no `INSIGHTFACE_HOME`
-    lookup anywhere in the installed package; `HOME` override moved `model_dir` under the new
-    `HOME` (`…/home_sim/home/.insightface/models/buffalo_l`).
-- **Decision:** option 3. `backend/Dockerfile` replaces `INSIGHTFACE_HOME` with
-  `HOME=/app/data/dbdata` (the named volume); `docker-compose.yml` drops the ineffective
-  variable; every B document names the real cache path and states that the warm-up photo must
-  contain a face. Native remains the demo path (D-001/D-002 unchanged).
-- **Consequences:** the Docker image was **not rebuilt here** (no daemon on this machine) —
-  the `HOME` mechanism is verified outside Docker, the build itself is not. A Docker run on a
-  clean volume still downloads 326 MB once, now into the volume, so it survives
-  `docker compose down` and is available offline. If a future insightface honours
-  `INSIGHTFACE_HOME`, the path table must be revisited. Recommendation to A (not applied,
-  file is A-owned): pass `root=os.getenv("INSIGHTFACE_HOME", "~/.insightface")` to
-  `FaceAnalysis` so the environment variable becomes meaningful.
-- **Revisit by:** dry run #1 (G1, the "model warm-up" row) and the first Docker build on a
-  machine that has a daemon.
-- **Evidence files:** `docs/B/model_cache_2026-11-12.md`, `docs/B/deployment_guide.md` §7,
-  `docs/B/offline_fallback.md` §0/§5, `docs/B/demo_runbook.md` §2,
-  `docs/B/demo_environment.md` §6, `backend/Dockerfile`, `docker-compose.yml`,
-  `backend/tests/test_services.py`.
+### D-014 — Warm the models with one deliberate call; do not load them at startup
+- **Date:** 2026-11-13 · **Stage:** M2 / G12 (demo readiness)
+- **Problem:** the first recognition after a cold start costs ~13 s (YOLO weights) and the
+  first ArcFace use adds ~3 s and 341 MB of model files. Where should that cost be paid:
+  at startup, in the background, or at the first real request?
+- **Options:** (1) keep the lazy load and require one throwaway `/faces/recognize` before the
+  audience arrives; (2) eager load in `lifespan` — startup grows by ~13 s and the server
+  refuses to start on a machine with a missing model, a new hard dependency on demo day;
+  (3) preload on a background thread — hides the cost but changes A's `main.py` and makes
+  startup behaviour nondeterministic.
+- **Evidence:** `/health` is ready in **17.3 s** without touching the models; the first
+  `/faces/recognize` took **13,435 ms**, then **1,637 / 1,535 ms**; the smoke warm-up call
+  after a fresh start took **8,282 ms** (page cache warm); ArcFace loads in **2.8–3.0 s** and
+  the process holds **1,001 MB RSS** with both models resident; a missing `.pt` produces a
+  500 `FileNotFoundError` on every recognition (`measurements-g1.txt` §5). With warm-up
+  done, the full smoke test runs in **10.4 s**.
+- **Decision:** option 1. `demo_runbook.md` §2 step 8 requires one throwaway recognition call
+  after startup, and the pre-flight check verifies the `.pt` file is ~52 MB. `main.py` stays
+  untouched (A-owned).
+- **Consequences:** forgetting the warm-up costs ~13 s on the first live check-in (visible,
+  not fatal); the demo laptop needs ~1 GB of free RAM for the backend process on top of the
+  browser and OS. A machine without the model fails loudly with 500s, which the
+  troubleshooting table now maps to "download the model / install dill".
+- **Revisit by:** M3 — a deep health probe or an env-flag eager load, once A agrees to touch
+  the startup path.

@@ -1,0 +1,86 @@
+=== environment ===
+python 3.12.10
+platform Windows-11-10.0.22621-SP0
+machine AMD64 processor Intel64 Family 6 Model 140 Stepping 1, GenuineIntel
+timezone_setting Asia/Shanghai | system China Standard Time
+database C:\Users\nonia\AppData\Local\Temp\opencode\g1win\attendance.db
+data_dir C:\Users\nonia\AppData\Local\Temp\opencode\g1win\data
+
+=== 1. cold start and core endpoints ===
+cold_start_to_healthy_ms 17313
+GET /health status=200 median_ms=5.4
+GET / status=200 median_ms=1.7
+GET /dashboard status=200 median_ms=6.2
+health_body {'status': 'ok', 'database': 'ok'}
+
+=== 2. TIMEZONE applied ===
+POST /students/ status 200 created_at 2026-11-13T04:21:07
+POST /schedules/ status 200 created_at 2026-11-13T12:21:07
+created_at delta hours 8.0
+
+=== 3. Wi-Fi scan on the real campus network ===
+scan_status 200 fresh_ms 4281 cached_ms 29
+scan_body {"devices": [{"ip": "10.163.255.254", "mac": "70:c6:dd:09:b0:02"}], "subnet": "10.163.158.0/24", "count": 1, "bssid": "78:2c:29:09:e2:f2"}
+ap_logs_rows before 0 after_first 1 after_second 1
+
+=== 4. persistence across a restart ===
+restart_to_healthy_ms 25260
+GET /students/?nim status 200 rows 1 id 1
+
+=== 5. end-to-end smoke test (native, Windows) ===
+smoke: [PASS] GET / (health)
+smoke: [PASS] GET /dashboard
+smoke: [PASS] POST /students/ - nim=smoke94543698
+smoke: [PASS] GET /students/?nim= (login)
+smoke: [PASS] POST /schedules/ (active now)
+smoke: [PASS] POST /schedules/ rejects end<=start
+smoke: [PASS] GET /wifi/scan (real ARP scan) - 1 devices found
+smoke: [PASS] GET /wifi/check (unknown MAC -> False)
+smoke: [PASS] GET /wifi/check/{own-mac} - mac=00-FF-5F-12-8D-C6 on_network=False (may be False on isolated APs)
+smoke: [FAIL] POST /faces/recognize (no face -> not recognized) - Internal Server Error
+smoke: [FAIL] POST /attendance/check (no face -> 400) - Internal Server Error
+smoke: [FAIL] POST /attendance/check (unknown schedule handled) - Internal Server Error
+smoke: [PASS] GET /attendance/today
+smoke: [PASS] GET /attendance/export/csv - CSV header OK
+smoke: [PASS] Cleanup (delete smoke student/schedule)
+smoke:
+smoke: 12/15 checks passed
+smoke: FAILED:
+smoke:   - POST /faces/recognize (no face -> not recognized): Internal Server Error
+smoke:   - POST /attendance/check (no face -> 400): Internal Server Error
+smoke:   - POST /attendance/check (unknown schedule handled): Internal Server Error
+smoke_exit_code 1
+
+=== 6. offline seed data (server stopped) ===
+seed: database: C:\Users\nonia\AppData\Local\Temp\opencode\g1win\attendance.db
+seed: reset: all students, schedules, faces, attendance and ap_logs deleted
+seed: reset: stale embedding/face files removed: 0
+seed: students ready: 5
+seed: schedule created: id=1 'Demo Class' 12:16-13:16 (today, server timezone)
+seed: attendance rows created: 5
+seed:
+seed: --- demo data summary ---
+seed:   student id=1   Demo Student 1
+seed:   student id=2   Demo Student 2
+seed:   student id=3   Demo Student 3
+seed:   student id=4   Demo Student 4
+seed:   student id=5   Demo Student 5
+seed:   schedule id=1   Demo Class 12:16-13:16 (server timezone: Asia/Shanghai)
+seed:
+seed: Open the dashboard: http://127.0.0.1:8000/dashboard
+seed: Demo MACs are fake (02:00:00:00:00:NN): the Wi-Fi prompt stays false for
+seed: these students. For a live Wi-Fi demo set a real phone MAC with
+seed: PUT /students/{id}/mac, or use the real students instead.
+seed: Run with --reset to start from a clean database before the next demo.
+seed_wall_ms 695 exit 0
+post_seed_start_to_healthy_ms 15676
+GET /attendance/today status 200 rows 5
+first_row {"id": 2, "student_id": 1, "student_name": "Demo Student 1", "schedule_id": 1, "check_type": "end", "confidence": 0.91, "wifi_verified": true, "status": "verified", "timestamp": "2026-11-13T12:19:45", "class_name": "Demo Class", "faces_detected": 0}
+GET /attendance/export/csv status 200 lines 6 header id,timestamp,check_type,confidence,wifi_verified,status,student_id,student_name,nim,schedule_id,class_name,room,faces_detected
+GET /me/prompt student 1 status 200 body {"student_id": 1, "prompt": false, "check_available": false, "wifi_seen": false, "reason": "check_in_complete", "schedule_id": null, ...}
+
+=== 7. backup, corruption and restore ===
+backup_copy_ms 1.2 size_bytes 40960
+[ABORTED] server started with the corrupted DB did not answer /health within 120 s
+           (see measurements-hardening.txt section 8: the process logs
+            "Application startup failed" but does not exit; it had to be killed)

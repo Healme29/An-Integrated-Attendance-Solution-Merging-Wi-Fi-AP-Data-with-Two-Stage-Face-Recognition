@@ -56,6 +56,54 @@ class TestParsePrefix:
     def test_windows_ipconfig_without_match(self):
         assert parse_ipconfig_prefix("Windows IP Configuration\n", "10.0.0.5") is None
 
+    def test_windows_ipconfig_chinese_labels(self):
+        # Localized Windows keeps the line order but translates the labels;
+        # matching only "Subnet Mask" silently degraded the scan to /24.
+        output = (
+            "Windows IP 配置\n"
+            "\n"
+            "无线局域网适配器 WLAN:\n"
+            "\n"
+            "   连接特定的 DNS 后缀 . . . . . . . : campus.edu\n"
+            "   本地链接 IPv6 地址. . . . . . . . : fe80::1%12\n"
+            "   IPv4 地址 . . . . . . . . . . . . : 10.163.158.239\n"
+            "   子网掩码  . . . . . . . . . . . . : 255.255.128.0\n"
+            "   默认网关. . . . . . . . . . . . . : 10.163.255.254\n"
+        )
+        assert parse_ipconfig_prefix(output, "10.163.158.239") == 17
+
+    def test_windows_ipconfig_french_labels(self):
+        output = (
+            "Configuration IP de Windows\n"
+            "\n"
+            "Carte réseau sans fil Wi-Fi :\n"
+            "\n"
+            "   Suffixe DNS propre à la connexion. . . : campus.edu\n"
+            "   Adresse IPv4. . . . . . . . . . . . . .: 10.163.158.239\n"
+            "   Masque de sous-réseau. . . . . . . . .: 255.255.128.0\n"
+            "   Passerelle par défaut. . . . . . . . .: 10.163.255.254\n"
+        )
+        assert parse_ipconfig_prefix(output, "10.163.158.239") == 17
+
+    def test_windows_ipconfig_preferred_suffix(self):
+        output = (
+            "Ethernet adapter Ethernet:\n"
+            "   IPv4 Address. . . . . . . . . . . : 192.168.1.20(Preferred)\n"
+            "   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n"
+            "   Default Gateway . . . . . . . . . : 192.168.1.1\n"
+        )
+        assert parse_ipconfig_prefix(output, "192.168.1.20") == 24
+
+    def test_windows_ipconfig_non_contiguous_mask_is_rejected(self):
+        # A gateway address is a dotted quad but not a mask; the fallback must
+        # not turn it into a prefix length.
+        output = (
+            "Wireless LAN adapter Wi-Fi:\n"
+            "   IPv4 Address. . . . . . . . . . . : 10.20.30.40\n"
+            "   Default Gateway . . . . . . . . . : 255.0.255.0\n"
+        )
+        assert parse_ipconfig_prefix(output, "10.20.30.40") is None
+
 
 class TestSweepHosts:
     def test_slash_24_sweeps_254_hosts(self):

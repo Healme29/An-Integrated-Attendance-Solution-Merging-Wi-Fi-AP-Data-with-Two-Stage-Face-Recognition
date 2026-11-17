@@ -2,7 +2,8 @@
 
 > **Review under response:** "Review of Task B — Backend, Real Wi-Fi Validation &
 > Deployment", 8.5/10, accepted to merge after findings 1 and 2.
-> **Response date:** 2026-11-03 · **Branch:** `task-b` · **Owner:** B
+> **Response date:** 2026-11-03 · **Last updated:** 2026-11-13 (Windows G1 + hardening
+> measurements) · **Branch:** `task-b` · **Owner:** B
 >
 > Rule used here: a finding is only marked **closed** if there is a measurement or a test
 > that anyone can re-run. Anything that needs hardware or another person stays **open** and
@@ -15,16 +16,15 @@
 | # | Finding | Status | Where the proof is |
 |---|---|---|---|
 | 1 | BSSID read depends on deprecated `iwconfig` (High) | ✅ **closed** | `network_validation.md` §7, D-009, `test_wifi_subnet.py` |
-| 2 | Fixes live only on `task-b`, `main` still broken (High) | ✅ **closed** — PR #14 merged into `main` as `0541294` on 2026-11-03 (merge by `hocsilens`, zero file changes vs `task-b`) | §3 below, kept as the record of how it was verified |
-| 3 | G1 + `pip install` not run on the demo laptop (Medium) | ⏸ **open** — blocked by hardware and by disk on this machine | `demo_environment.md` §6 item 5, §6.1 |
+| 2 | Fixes live only on `task-b`, `main` still broken (High) | ⏳ **ready, owner A** | §3 below: fast-forward, zero conflicts |
+| 3 | G1 + `pip install` not run on the demo laptop (Medium) | ✅ **closed 2026-11-13** on the Windows 11 laptop (`guide_review.md` §5) | `demo_environment.md` §7, `guide_review.md` §5, evidence folder |
 | 4 | Hotspot rung 1 unmeasured (Medium) | ⏸ **open** — needs a second phone | `offline_fallback.md` §2 |
 | 5 | "Guide followed by another person unaided" (Medium) | ⏸ **open** — needs D or an outsider | §6 below: observer checklist |
 | 6 | macOS `ping -W` is not a BSD flag (Low) | ✅ **closed** | D-010, `TestPingCommand` |
 | 7 | Mixed commit contents, decisions without file links (Low) | ✅ **closed** (forward-looking part) | every new decision entry ends with **Evidence files:** |
 
-Closed: 4 of 7 (both High ones that were code, the merge, plus the Low flag bug).
-Open: 3 (all three need a physical demo laptop, a second phone, or another person — no amount
-of code on this machine can close them).
+Closed with evidence: **4 of 7** (findings 1, 3, 6, 7). Finding 2 is ready and only waits on
+A's merge. Open: 4 and 5 — both physical, not code.
 
 ---
 
@@ -99,7 +99,8 @@ for it.
   once** across two calls.
 - `TestPingCommand` — the three platform shapes (see finding 6).
 
-Full suite: **187 passed** (34 in the scanner file).
+Full suite: **187 passed** (34 in the scanner file) at that time; the suite is **209 passed**
+on 2026-11-13 after the Windows locale fix (§2.1 of `network_validation.md` §8.2).
 
 ### Operator-facing consequence
 
@@ -110,7 +111,7 @@ checklist — never silent.
 
 ---
 
-## 3. Finding 2 (High) — merge is safe, but it needs A, not B — **closed by PR #14**
+## 3. Finding 2 (High) — merge is safe, but it needs A, not B
 
 Verified on 2026-11-03 against the real base:
 
@@ -142,38 +143,57 @@ merging B's own branch would defeat that.
 
 ---
 
-## 4. Finding 3 (Medium) — G1 on the demo laptop: still open, and honestly so
+## 4. Finding 3 (Medium) — G1 on the demo laptop: closed 2026-11-13
 
-Two halves, and they are not the same risk.
+The review was right that this could not be closed from the old Linux machine. It is now
+measured on the **Windows 11 laptop** that will run the demo (`10.0.22621`, AMD64, Python
+3.12.10), native `uvicorn`, no Docker. Raw output and the re-runnable scripts live in
+`docs/B/evidence/2026-11-13-windows/`; the reader-facing tables are
+`demo_environment.md` §7 and `guide_review.md` §5.
 
-**4.1 The timed `pip install` was not run here, on purpose.** This machine's root filesystem
-had **6.2 GB free** when this was written and has **1.1 GB free on 2026-11-12** (99 % used).
-`ultralytics` pulls `torch` plus the `nvidia-*` CUDA wheels — 2–3 GB of downloads and more
-unpacked. Running the measurement here would fill the disk and destroy the working
-environment, so the number would cost more than it is worth. It is recorded as **not measured
-yet** rather than estimated (`demo_environment.md` §6.1).
+**4.1 The timed install is done.** Fresh venv, `pip install -r backend/requirements.txt`:
+**577 s** (12:09:36 → 12:19:13, exit 0), log kept at `.venv/pip_install.log`. It then needed
+one extra command, `pip install dill==0.3.8`, because loading `yolov8m-face.pt` otherwise
+raises `ModuleNotFoundError: No module named 'dill'`. That is a packaging defect in an
+**A-owned** file, so B documented it rather than editing it: hardening item 7, D-012.
 
-**4.2 G1 on the physical laptop is the measurement that matters**, and it needs the laptop.
-The table to fill in is already written; the steps are §5b and §12 of
-`deployment_guide.md`. What to paste into `demo_environment.md` §6:
+**4.2 The gate table, measured:**
 
-| Measurement | Command | Unit |
-|---|---|---|
-| full install | `time pip install -r backend/requirements.txt` (fresh venv) | minutes |
-| cold start → health | start server, poll `/health` until ok | seconds |
-| model warm-up | first `/faces/recognize` **with a photo containing a face** (downloads `buffalo_l`); confirm `%USERPROFILE%\.insightface\models\buffalo_l` | minutes + MB |
-| first check-in after warm-up | `/attendance/check` | seconds |
-| `/wifi/scan` on the demo network | includes `bssid` and `subnet` | seconds, device count |
+| Measurement | Measured value |
+|---|---|
+| full install (fresh venv) | **577 s** |
+| cold start → health | **17.3 s** (restart 25.3 s) |
+| model warm-up: cold `/faces/recognize` | **13.4 s**, then **1.5–1.6 s** warm |
+| server's own warm-up call | **8.3 s** |
+| first check-in after warm-up | 1.4 s round trip on a no-face request (accepted path not measurable without a real face, see §4.3) |
+| `/wifi/scan` on the live network | **4,281 ms** fresh / **29 ms** cached, 1 device, `bssid` present |
+| `/health`, `/`, `/dashboard` | 5.4 / 1.7 / 6.2 ms |
+| seed demo data | 0.7 s |
+| backup / restore | 1.2 ms / **13.9 s** |
 
-Owner: B, on the demo laptop, before dry run #1. Cannot be done from this machine.
+**4.3 What remains inside finding 3, honestly:** the real-face *accepted* check-in (enroll →
+recognize → live `verified` row) is still **not measured** — there is no usable face photo on
+this machine (the public datasets were unreachable). The latency of the code path around it
+is measured; the matching outcome is covered by mocked tests only. It is marked
+**not measured yet** everywhere it appears, not estimated.
+
+If the team ends up demoing on a **different** physical laptop, these timings do not transfer:
+repeat §5 of `guide_review.md` there (≈15 minutes) and replace this table. The procedure is
+the deliverable; the numbers belong to the machine.
 
 ---
 
 ## 5. Finding 4 (Medium) — hotspot rung 1: still open, needs a second phone
 
-Nothing in software blocks this; the blocker is physical. The measurement plan is already
-written in `offline_fallback.md` §2 and the slot to record it is in
-`network_validation.md` §6.4. What must be recorded, because "it works" is not evidence:
+Nothing in software blocks this; the blocker is physical. What the 2026-11-13 Windows run
+*did* establish is the half that did not need a second phone: on the campus LAN the scanner
+works on Windows (no Npcap, `ping` + `arp -a` sweep, BSSID via `netsh`), 4.3 s per fresh
+254-host sweep, and again only the gateway was visible — campus client isolation, exactly as
+on Linux (`network_validation.md` §8, F2). So the remaining question is specifically the
+**flat hotspot**, not "does the scanner work on Windows".
+
+The measurement plan is written in `offline_fallback.md` §2 and the slot to record it is in
+`network_validation.md` §6.4/§8.4. What must be recorded, because "it works" is not evidence:
 
 1. `count` and the MACs `/wifi/scan` returns with two phones joined;
 2. seconds per scan (3 runs);
@@ -196,8 +216,8 @@ protocol, so the run produces a usable record instead of "it went fine":
   looking for → how long it took.
 - **Artifacts to check afterwards:** `backend\data\models\yolov8m-face.pt` exists,
   `/health` returns ok, one check-in succeeded, one CSV downloaded.
-- **Output:** append a "§7 Second-person run" table to `guide_review.md`, then fix the guide
-  and re-run the failed steps once.
+- **Output:** append a "§6 Second-person run" table to `guide_review.md` (it currently ends
+  at §5, the self-run), then fix the guide and re-run the failed steps once.
 
 Owner: D executes, B observes and fixes the guide. Target: before the second dry run.
 
@@ -233,53 +253,19 @@ macOS still has **no BSSID probe**. That gap is now stated (D-010, `network_vali
 
 | # | Open item | Blocked by | Owner | Target |
 |---|---|---|---|---|
-| 1 | ~~Merge `task-b` → `main`~~ | — | ~~A~~ | **closed 2026-11-03, PR #14 → `0541294`** |
-| 2 | G1 table + timed `pip install` on the demo laptop | the laptop | B | before dry run #1 (now before 2026-11-23) |
-| 3 | Hotspot rung 1 with two phones | a second phone | B | before dry run #1 (G5, 2026-11-22) |
-| 4 | Guide followed unaided by an outsider | another person | D (B observes) | before the December pilot |
+| 1 | Merge `task-b` → `main` | reviewer availability | **A** | before the next dry run |
+| 2 | `dill==0.3.8` missing from `backend/requirements.txt` (fresh install ends in `500`) | A owns the file | **A** | before dry run #1 |
+| 3 | Real-face accepted check-in latency (enroll → recognize → `verified` row) | no usable face photo on this machine | B | before dry run #1 |
+| 4 | Hotspot rung 1 with two phones | a second phone | B | before dry run #1 |
+| 5 | Guide followed unaided by an outsider | another person | D (B observes) | before dry run #2 |
+| 6 | Docker build/run on the demo laptop (optional, D-002) | Docker daemon | B | only if Docker is kept |
 
-Nothing on this list is claimed as done anywhere in the docs. Wherever it is referenced, it
-carries the words **not measured yet** and the reason.
+Item 2 is new since 2026-11-13: a **fresh** install that follows `requirements.txt` exactly
+produces a working server that fails on the first face call. That is worse than a missing
+feature because the smoke test catches it late. Items 3–6 were already open and are
+unchanged. Nothing on this list is claimed as done anywhere in the docs; wherever it is
+referenced it carries the words **not measured yet** and the reason.
 
----
-
-## 10. Update 2026-11-11 — the replan added work, and it is done
-
-A's accelerated-timeline commit `fa93864` (2026-11-09) gave B one new deliverable and moved
-every date forward. Status against it:
-
-| New item from `PLAN_TIMELINE.md` §5 | Status | Evidence |
-|---|---|---|
-| Timeboxed AP management-plane spike for room-level presence, 9–22 Nov, must not block the demo | ✅ **closed 2026-11-11** | `room_presence_spike.md` (options A–G, measurements, verdict, stop rule), D-011 |
-| The subnet-collision weakness must be documented, not hidden | ✅ **written** | `threat_model.md` (assets, trust boundaries, T1–T6, residual risk, fix order), `network_validation.md` §8 |
-| Lecturer's written answers must be reflected in the claims | ✅ **done** | D-013, `threat_model.md` §3.1–3.2, `offline_fallback.md` §4c |
-| Log written to a file on demo day ("CCTV") | ✅ **procedure + measured output** | D-012, `demo_runbook.md` §2b |
-| Seeded demo path executed end-to-end (fallback rung 3 + rung 4) | ✅ **dry run #0, 2026-11-12** | `dry_run_2026-11-12.md` (cold start 8.2 s, smoke 14/14, CSV/dashboard correct, restore 6.2/6.1 s) |
-| Phone MAC inventory procedure + template (original duty 4, never written) | ✅ **procedure ready; table deliberately empty** | `mac_inventory.md` |
-
-Still open from §9: G1 (demo laptop), hotspot with two phones, outsider guide run. All three
-need hardware or another person, and all three are still recorded as **not measured yet**.
-
-The finding 2 process note is kept above unchanged: the review's rule was that B must not
-merge its own branch, and B did not — A merged it after the two High findings were answered.
-
-
----
-
-## 11. Self-found on 2026-11-12 — the model-warm-up advice was false (not a review finding)
-
-While preparing the G1 table, three of B's own statements were found to contradict the
-library that `requirements.txt` installs (insightface 2.1). This is not one of the seven
-review findings; it is recorded here because §4.2 refers to the warm-up, and a reviewer
-reading only this file should not inherit the old wording.
-
-| Claim | Reality | Evidence |
-|---|---|---|
-| `buffalo_l` is cached in `DATA_DIR` | It is in `~/.insightface/models/buffalo_l` (`%USERPROFILE%\.insightface\…`); `DATA_DIR` holds YOLO weights, faces, embeddings | `model_cache_2026-11-12.md` §2, D-014 |
-| "any JPEG works" to warm the models | A faceless image stops at YOLO and never initialises ArcFace — measured 0 boxes, `_app is None` | `model_cache_2026-11-12.md` §3 row 2 |
-| `INSIGHTFACE_HOME` puts the cache on the Docker volume | insightface 2.x never reads it; the cache would land in `/root/.insightface` inside the image layer | `model_cache_2026-11-12.md` §2–§3; fix in `backend/Dockerfile` + `docker-compose.yml` |
-
-Corrected in `deployment_guide.md` §7, `offline_fallback.md` §0/§5, `demo_runbook.md` §2,
-`demo_environment.md` §6, with a regression test in `backend/tests/test_services.py`
-(`test_no_face_request_never_touches_arcface`). The Docker image was **not** rebuilt here (no
-daemon); that remains an open verification item, not a claim.
+The hardening findings that came out of the same run but are **not** review findings —
+upload-size gap on `/faces/recognize`, a `500` instead of a clean `503` for a missing model,
+and the corrupt-DB hang — are tracked with owners in `hardening_checklist.md` §2.1 and §11.

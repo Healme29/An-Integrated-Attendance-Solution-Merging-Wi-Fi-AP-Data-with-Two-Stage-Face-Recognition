@@ -299,82 +299,52 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
-### 2026-11-12 (2) — B: ArcFace cache path corrected; the "any JPEG warms the models" trap removed
-- While preparing the G1 warm-up row, three B claims were checked against the pinned library
-  (`insightface` 2.1) and were wrong: the cache is `~/.insightface/models/buffalo_l`, not
-  `DATA_DIR`; a photo without a detectable face never initialises ArcFace, so it does not warm
-  anything; and `INSIGHTFACE_HOME` is not read by this version, so the Docker cache would land
-  in the ephemeral image layer instead of the mounted volume.
-- Measured: cache **326 MB** / five `.onnx`; faceless 480×640 JPEG → **0** boxes in **4.83 s**
-  with `_app is None`; explicit load **4.21 s** (**3.06 s** under a simulated `HOME`); empty
-  cache → `AssertionError`; missing cache + no network → `ProxyError` for `buffalo_l.zip` after
-  **3.21 s**. Evidence: `docs/B/model_cache_2026-11-12.md`, D-014.
-- Fixed: `backend/Dockerfile` now sets `HOME=/app/data/dbdata` (volume) instead of the ignored
-  `INSIGHTFACE_HOME`; `docker-compose.yml` drops the dead variable; the deployment guide,
-  offline fallback, runbook and G1 table now require a warm-up photo **with a face** and a
-  cache-folder check; regression test added. Docker build not re-run (no daemon) — stated as
-  unverified, not claimed.
-- Suite: see the commit; the new test is
-  `test_no_face_request_never_touches_arcface`.
+### 2026-11-13 — B: G1 measured on the Windows demo laptop; Windows locale bug fixed; hardening gaps quantified
 
-### 2026-11-12 — B: seeded demo path executed end-to-end (dry run #0); MAC inventory procedure written
-- **Dry run #0 (measured, documented):** seeded 5 students into an isolated DB, started the
-  server with log capture, ran the smoke test, and exercised the fallback path the demo
-  relies on. Results: cold start **8.2 s**, smoke **14/14**, `/attendance/today` 5 rows with
-  both `verified` and `face_only`, CSV header (13 columns) + filename + `charset=utf-8`
-  correct, dashboard title correct, log file contains startup + access lines + warnings +
-  clean shutdown, restore drill **6.2 s and 6.1 s** with all 5 rows intact. The 6.2 s figure
-  in `deployment_guide.md` §8 is re-confirmed. Table: `docs/B/dry_run_2026-11-12.md`.
-- **Scope honesty:** dry run #0 does **not** cover a real face check-in, a real phone on the
-  network, Windows, the hotspot, or the projector. Those stay with G1/G5 and dry run #1.
-- **New fact, twice now:** the host's subnet changed between sessions
-  (`10.163.167.0/24` on 11 Nov → `10.163.208.0/24` on 12 Nov, same laptop, same SSID).
-  Consequence already required by D-013, now measured: set `WI_FI_SUBNET` explicitly on the
-  demo network and pin the BSSID **live**, never from an earlier session.
-- **Original duty 4 (phone MAC inventory) had no artefact in the repo.** Procedure and
-  template written (`docs/B/mac_inventory.md`): disable private/random MAC per SSID, read the
-  MAC from the phone or `/wifi/scan`, confirm it survives a rejoin, register with
-  `PUT /students/{id}/mac`, verify `wifi_verified` on the pilot network. The table is
-  deliberately **empty** — collecting it needs the real phones, and inventing values would
-  produce exactly the false negatives the page is meant to prevent.
-- **Still open and unchanged:** G1 on the demo laptop (this disk has **1.1 GB free**, down
-  from 6.2 GB, so the timed `pip install` cannot run here), G5 hotspot with two phones, and
-  the outsider guide run. All three need hardware or another person; due 2026-11-22.
-
-### 2026-11-11 — B: AP management-plane spike closed, threat model written, demo log capture specified
-- **New stage-2 deliverable from the 2026-11-09 replan is closed, inside its window.** The
-  timeboxed spike asked one question: can the system prove a phone is **inside the scheduled
-  room**? Verdict: not on the campus network this month, exact on the network we control
-  (`docs/B/room_presence_spike.md`, D-011). Stop rule recorded: the spike ended 2026-11-11
-  and reopens only on a named trigger, so it cannot drift into G1/G5 time.
-- **Measured, passive only (no probe to campus gear):** 10 distinct BSSIDs of `NJUPT-CMCC`
-  visible from one seat (39 beacon rows, 6 SSIDs) → one SSID carries no room information; the
-  host's own AP changed between sessions at the same desk (`50:98:b8:c9:2b:e2` on 2026-11-03
-  → `f4:74:88:70:c2:f1` today); `scan_network_arp()` returned only the gateway in **6.15 s**
-  (client isolation unchanged). Re-run table in `network_validation.md` §8.3.
-- **The subnet-collision weakness is now documented instead of implied.** `threat_model.md`
-  defines what each condition proves, T1–T6 with severity, residual risk, and the fix order
-  (auth + token before any new network mechanism). `network_validation.md` §8 defines
-  `wifi_verified` precisely: MAC reachable on the server's L2 **and** server associated with
-  the pinned AP — never "which AP the phone is on".
-- **Lecturer answers recorded (D-013).** Zhe Zhang, 2026-11-11: a network we control is
-  acceptable for the assessment ("Either should be fine"), and the claim "within the coverage
-  area of the scheduled AP" is acceptable if the limitation is stated; he adds that an AP
-  covers one classroom and cannot hold all students anyway. Consequence: the demo pins the
-  BSSID **live** on the demo network — a BSSID copied from an earlier session is stale
-  (measured above).
-- **Demo log capture ("CCTV") specified and its output verified (D-012).** No application
-  code change (B does not own `backend/main.py`): the runbook starts uvicorn through
-  `cmd /c "... > backend\server_<timestamp>.log 2>&1"` and tails the file. Measured capture
-  contains startup banner, every access line, scanner warnings, and the clean-shutdown line;
-  `backend/server_*.log` is already gitignored. `demo_runbook.md` §2b.
-- **Still open, unchanged and honestly labelled not measured:** G1 on the demo laptop
-  (timed `pip install`, warm-up, smoke), G5 hotspot rung with two phones, and the guide run by
-  an outsider. All three need hardware or a second person; none is blocked by code. Due
-  **2026-11-22**.
-- **Review status:** the task-b review now stands at **4 of 7 findings closed** — finding 2
-  closed via PR #14 (`0541294`); `docs/B/review_response.md` §9–§10 records the rest with
-  owners.
+- **The demo machine changed, so G1 was re-measured instead of inherited.** Windows 11
+  `10.0.22621` AMD64, Python **3.12.10** in a fresh `.venv` (3.13 cannot install the pinned
+  wheels), native `uvicorn`, no Docker. Fresh `pip install -r backend/requirements.txt`
+  **577 s**, exit 0. Cold start → `/health` **17.3 s** (restart 25.3 s, dominated by the
+  `torch` import), `/health` / `/` / `/dashboard` **5.4 / 1.7 / 6.2 ms**, `TIMEZONE` delta
+  **8.0 h**, data persisted across restart, seed **0.7 s** (5 students, 5 rows, CSV 6 lines),
+  backup **1.2 ms** / restore **13.9 s**, fresh-DB start **14.7 s**. G1's pass condition is
+  met on the machine that will run the demo; a different laptop needs a re-run (procedure:
+  `guide_review.md` §5).
+- **Scanner works on Windows without Npcap**, BSSID via `netsh`: live `/wifi/scan`
+  **4,281 ms** fresh / **29 ms** cached, subnet `10.163.158.0/24` inside the real `/17`,
+  `ap_logs` 0 → 1 → 1 (dedupe). Only the gateway was visible — campus client isolation (F2),
+  same as Linux; the hotspot rung is still **not measured yet** (needs a second phone).
+- **Real bug caught by the new platform:** the Windows subnet parser matched the English
+  label `Subnet Mask`, which a localized `ipconfig` translates, silently degrading to a /24
+  guess. Fixed in `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`,
+  `_prefix_from_netmask`, non-contiguous masks rejected) with **4 new tests** (Chinese,
+  French, `(Preferred)`, invalid mask). Suite: **209 passed** (38.7 s). Decision D-011.
+- **Model path measured end to end:** `yolov8m-face.pt` 52,028,566 bytes (sha256
+  `219f490a…`), `buffalo_l` 341,268,726 bytes unpacked in 5 `.onnx` files under
+  `%USERPROFILE%\.insightface` — **not** `DATA_DIR`, because `insightface 2.1` hard-codes
+  `~/.insightface`. Cold `/faces/recognize` **13.4 s**, warm **1.5–1.6 s**, server warm-up
+  **8.3 s**, both models resident ≈ **1.0 GB RSS**. Loading the `.pt` needs `dill==0.3.8`,
+  which is **missing from the A-owned `requirements.txt`** → a fresh install returns `500` on
+  the first face call until A adds it (D-012, hardening item 7). Smoke test 12/15 → **15/15**
+  after the manual install.
+- **Hardening gaps are now numbers, not opinions** (`hardening_checklist.md` §2.1/§5/§7a):
+  24 parallel writes all 200 (wall 823 ms), 24 parallel reads all 200 (68 ms), zero
+  `database is locked`; upload cap is enforced on enroll (**413**) but **not** on
+  `/faces/recognize` (**200** with an 11 MB file); a missing model returns `500` instead of a
+  clean `503`; a corrupt DB logs `DatabaseError` and **keeps the process alive without
+  binding the port**, so the runbook now says kill it before restoring. Items 7–10 are A's,
+  listed with owners.
+- **Decisions:** D-011 (locale-independent netmask), D-012 (Python 3.12 + missing `dill` +
+  model location), D-013 (open API/no TLS only on a controlled hotspot — demo posture),
+  D-014 (lazy model load plus a deliberate warm-up call, not eager startup). Every entry has
+  an **Evidence files:** line.
+- **Docs:** `demo_environment.md` §7, `network_validation.md` §8 (+ cross-platform table),
+  `offline_fallback.md` §0/§5 (model paths and an offline pre-flight), `demo_runbook.md`
+  §2 (step 0 `dill`, measured start/warm-up/restore), `deployment_guide.md` §7/§9/§13,
+  `guide_review.md` §1/§2/§5, `review_response.md` findings 3/4 and §9. Raw output and
+  re-runnable scripts: `docs/B/evidence/2026-11-13-windows/`.
+- **Still honestly open:** hotspot rung with 1–2 phones, the outsider guide run, real-face
+  accepted check-in latency (no usable photo), Docker on the demo laptop (optional, D-002).
 
 ### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
 - **Replanning (drives this entry):** the team will be assessed at a presentation in about
