@@ -3,23 +3,53 @@ from models.database import get_db
 from services.face_recognition import get_embedding, compare_faces, is_match, load_embeddings
 from services.face_detection import detect_faces_from_bytes, dedupe_faces, distinct_people
 from services.wifi_scanner import check_mac_on_network, get_current_bssid, is_same_bssid
-from config import ATTENDANCE_CHECK_WINDOW_MINUTES, now_local
+from config import ATTENDANCE_CHECK_WINDOW_MINUTES, REQUIRE_CLASSROOM_WIFI, now_local
 
 
-async def get_schedules_for_now() -> list[dict]:
-    """Get active schedules based on current time and day."""
+def schedule_window(schedule: dict, now: datetime | None = None) -> tuple[time, time]:
+    """Attendance window for a schedule: start-grace .. end+grace (HH:MM)."""
+    now = now or now_local()
+    grace = timedelta(minutes=ATTENDANCE_CHECK_WINDOW_MINUTES)
+    start = (
+        datetime.combine(now.date(), datetime.strptime(schedule["start_time"], "%H:%M").time())
+        - grace
+    ).time()
+    end = (
+        datetime.combine(now.date(), datetime.strptime(schedule["end_time"], "%H:%M").time())
+        + grace
+    ).time()
+    return start, end
+
+
+def is_within_window(schedule: dict, now: datetime | None = None) -> bool:
+    """True when `now` is inside the schedule's day and attendance window."""
+    now = now or now_local()
+    if schedule["day_of_week"] != now.weekday():
+        return False
+    window_start, window_end = schedule_window(schedule, now)
+    now_time = now.time()
+    if window_start <= window_end:
+        return window_start <= now_time <= window_end
+    # class window crosses midnight (e.g. 23:30 - 00:30)
+    return now_time >= window_start or now_time <= window_end
+
+
+async def get_active_schedules() -> list[dict]:
+    """Schedules whose attendance window currently includes `now`."""
     now = now_local()
-    current_day = now.weekday()
-    current_time = now.strftime("%H:%M")
-
     db = await get_db()
     cursor = await db.execute(
-        "SELECT * FROM schedules WHERE day_of_week = ? AND start_time <= ? AND end_time >= ?",
-        (current_day, current_time, current_time)
+        "SELECT * FROM schedules WHERE day_of_week = ? ORDER BY start_time",
+        (now.weekday(),),
     )
     rows = await cursor.fetchall()
     await db.close()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in rows if is_within_window(dict(row), now)]
+
+
+async def get_schedules_for_now() -> list[dict]:
+    """Schedules the attendance window currently allows (legacy name)."""
+    return await get_active_schedules()
 
 
 async def validate_schedule_time(schedule_id: int) -> dict:
@@ -41,20 +71,40 @@ async def validate_schedule_time(schedule_id: int) -> dict:
     if schedule["day_of_week"] != now.weekday():
         raise ValueError("wrong_day")
 
-    grace = timedelta(minutes=ATTENDANCE_CHECK_WINDOW_MINUTES)
-    window_start = (datetime.combine(now.date(), datetime.strptime(schedule["start_time"], "%H:%M").time()) - grace).time()
-    window_end = (datetime.combine(now.date(), datetime.strptime(schedule["end_time"], "%H:%M").time()) + grace).time()
-    now_time = now.time()
-
-    if window_start <= window_end:
-        in_window = window_start <= now_time <= window_end
-    else:
-        # class window crosses midnight (e.g. 23:30 - 00:30)
-        in_window = now_time >= window_start or now_time <= window_end
-    if not in_window:
+    if not is_within_window(schedule, now):
         raise ValueError("outside_class_time")
 
     return schedule
+
+
+async def classroom_wifi_verified(student_id: int, schedule_id: int) -> bool:
+    """True when the student's device is on the network the schedule expects.
+
+    Layer 1: the student's registered MAC is visible in the server's ARP table.
+    Layer 2 (only when the schedule pins an AP): the server itself must be
+    associated with that BSSID. A single campus SSID spans many APs, so the
+    server's own AP is the only location fact this machine can verify.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT mac_address FROM students WHERE id = ?", (student_id,)
+        )
+        student = await cursor.fetchone()
+        cursor = await db.execute(
+            "SELECT ap_bssid FROM schedules WHERE id = ?", (schedule_id,)
+        )
+        schedule_row = await cursor.fetchone()
+    finally:
+        await db.close()
+
+    if not student or not student["mac_address"]:
+        return False
+    if not check_mac_on_network(student["mac_address"]):
+        return False
+    if schedule_row and schedule_row["ap_bssid"]:
+        return is_same_bssid(get_current_bssid(), schedule_row["ap_bssid"])
+    return True
 
 
 async def get_existing_check(student_id: int, schedule_id: int, check_type: str) -> dict | None:
@@ -173,23 +223,11 @@ async def mark_attendance(
 
     db = await get_db()
 
-    cursor = await db.execute(
-        "SELECT mac_address FROM students WHERE id = ?", (student_id,)
-    )
-    student = await cursor.fetchone()
+    wifi_verified = await classroom_wifi_verified(student_id, schedule_id)
 
-    cursor = await db.execute(
-        "SELECT ap_bssid FROM schedules WHERE id = ?", (schedule_id,)
-    )
-    schedule_row = await cursor.fetchone()
-
-    wifi_verified = False
-    if student and student["mac_address"]:
-        wifi_verified = check_mac_on_network(student["mac_address"])
-        # When the schedule pins a classroom AP (BSSID), the device only
-        # counts as verified if the server itself is associated with it.
-        if wifi_verified and schedule_row and schedule_row["ap_bssid"]:
-            wifi_verified = is_same_bssid(get_current_bssid(), schedule_row["ap_bssid"])
+    if REQUIRE_CLASSROOM_WIFI and not wifi_verified:
+        await db.close()
+        raise ValueError("not_on_classroom_network")
 
     if check_type == "start":
         status = "partial"

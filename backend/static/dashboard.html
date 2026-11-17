@@ -276,6 +276,68 @@
   .controls-bar .btn-danger { background: var(--danger); color: #fff; }
   .controls-bar .btn-danger:hover { background: #c62828; }
   .controls-bar .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .table-wrap .btn {
+    padding: 6px 10px; border-radius: 7px; border: none; cursor: pointer;
+    font-size: 12px; margin-right: 4px;
+  }
+  .table-wrap .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .table-wrap .btn-danger { background: var(--danger-light); color: var(--danger); }
+
+  /* Felix 22.1 Attendance Sheet */
+  .sheet-tabs {
+    display: flex; gap: 8px; padding: 0 24px; border-bottom: 1px solid var(--border);
+    background: #fafafa;
+  }
+  .sheet-tab {
+    border: none; background: transparent; color: var(--text-secondary);
+    padding: 14px 4px 12px; margin-right: 20px; cursor: pointer;
+    font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent;
+  }
+  .sheet-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .sheet-panel { display: none; }
+  .sheet-panel.active { display: block; }
+  .attendance-mark {
+    width: 30px; height: 30px; border-radius: 8px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 16px; font-weight: 700;
+  }
+  .attendance-mark.present { background: var(--accent-light); color: var(--accent); }
+  .attendance-mark.absent { background: var(--danger-light); color: var(--danger); }
+  .sheet-summary { font-size: 13px; color: var(--text-secondary); }
+  .sheet-summary strong { color: var(--text); }
+  .detail-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .detail-time-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .detail-time-card span { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
+  .detail-time-card strong { font-size: 18px; }
+  .hidden-file { display: none; }
+  .modern-date {
+    min-width: 210px; height: 46px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #ffffff, #f8fbff);
+    border: 1px solid #dbe5f3; border-radius: 11px;
+    box-shadow: 0 1px 2px rgba(26,86,219,0.04);
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .modern-date:focus-within {
+    border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+    transform: translateY(-1px);
+  }
+  .modern-date > i { color: var(--primary); font-size: 17px; }
+  .modern-date-content { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .modern-date-content label {
+    color: var(--text-secondary); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.45px; line-height: 1; text-transform: uppercase;
+  }
+  .controls-bar .modern-date input[type="date"] {
+    min-width: 0; width: 100%; padding: 2px 0 0; border: 0; border-radius: 0;
+    background: transparent; color: var(--text); font-size: 14px; font-weight: 600;
+    box-shadow: none; outline: none; cursor: pointer;
+  }
+  .modern-date input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer; opacity: 0.65; padding: 3px; border-radius: 5px;
+  }
+  .modern-date input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    background: var(--primary-light); opacity: 1;
+  }
 
   /* Chart container */
   .chart-row {
@@ -441,7 +503,7 @@
     <a data-section="architecture"><i class="fas fa-sitemap"></i><span>Architecture</span></a>
 
     <div class="section-label">Management</div>
-    <a data-section="students"><i class="fas fa-users"></i><span>Students</span></a>
+    <a data-section="students"><i class="fas fa-clipboard-check"></i><span>Attendance Sheet</span></a>
     <a data-section="schedules"><i class="fas fa-calendar-alt"></i><span>Schedules</span></a>
     <a data-section="enroll"><i class="fas fa-camera"></i><span>Face Enrollment</span></a>
 
@@ -451,7 +513,7 @@
     <a data-section="recognize"><i class="fas fa-face-smile"></i><span>Recognition Demo</span></a>
   </nav>
   <div class="sidebar-footer">
-    <i class="fas fa-cube"></i> v1.0 &mdash; Presentation
+    <i class="fas fa-cube"></i> Felix 22.1 &mdash; Attendance Sheet
   </div>
 </aside>
 
@@ -586,16 +648,33 @@
       </div>
     </div>
 
-    <!-- ===== STUDENTS ===== -->
+    <!-- ===== FELIX 22.0 ATTENDANCE SHEET ===== -->
     <div class="section" id="section-students">
-      <div class="page-heading">Students <small>Manage enrolled students</small></div>
+      <div class="page-heading">Attendance Sheet</div>
       <div class="controls-bar">
+        <select id="sheet-schedule" onchange="loadStudents()">
+          <option value="">Select class / subject</option>
+        </select>
+        <div class="modern-date">
+          <i class="fas fa-calendar-day"></i>
+          <div class="modern-date-content">
+            <label for="sheet-date">Attendance date</label>
+            <input type="date" id="sheet-date" onchange="loadStudents()">
+          </div>
+        </div>
         <input type="text" id="student-search" placeholder="Search by NIM or name..." oninput="loadStudents()" style="min-width:240px">
         <button class="btn" onclick="openStudentModal()"><i class="fas fa-plus"></i> Add Student</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('student-import-file').click()"><i class="fas fa-file-import"></i> Import CSV</button>
+        <button class="btn btn-secondary" onclick="exportAttendanceSheet()"><i class="fas fa-file-excel"></i> Export Excel</button>
+        <input class="hidden-file" type="file" id="student-import-file" accept=".csv,text/csv" onchange="importStudentList(event)">
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-users"></i> Student List</h3><span id="student-count" style="font-size:13px;color:var(--text-secondary)"></span></div>
-        <div class="card-body"><div class="table-wrap"><div id="student-table"><div class="empty-state"><i class="fas fa-users"></i><p>Loading students...</p></div></div></div></div>
+        <div class="sheet-tabs">
+          <button class="sheet-tab active" data-sheet-tab="list" onclick="showSheetTab('list')"><i class="fas fa-users"></i> Student List</button>
+          <button class="sheet-tab" data-sheet-tab="records" onclick="showSheetTab('records')"><i class="fas fa-clock"></i> Attendance Record</button>
+        </div>
+        <div class="card-body sheet-panel active" id="sheet-panel-list"><div class="table-wrap"><div id="student-table"><div class="empty-state"><i class="fas fa-users"></i><p>Select a class to load its student list.</p></div></div></div></div>
+        <div class="card-body sheet-panel" id="sheet-panel-records"><div class="table-wrap"><div id="attendance-record-table"><div class="empty-state"><i class="fas fa-clock"></i><p>No attendance records loaded.</p></div></div></div></div>
       </div>
     </div>
 
@@ -604,6 +683,9 @@
       <div class="page-heading">Schedules <small>Class schedule management</small></div>
       <div class="controls-bar">
         <button class="btn" onclick="openScheduleModal()"><i class="fas fa-plus"></i> Add Schedule</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('schedule-import-file').click()"><i class="fas fa-file-import"></i> Import CSV</button>
+        <button class="btn btn-secondary" onclick="exportSchedules()"><i class="fas fa-file-export"></i> Export CSV</button>
+        <input class="hidden-file" type="file" id="schedule-import-file" accept=".csv,text/csv" onchange="importSchedules(event)">
       </div>
       <div class="card">
         <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Schedule List</h3><span id="schedule-count" style="font-size:13px;color:var(--text-secondary)"></span></div>
@@ -719,6 +801,7 @@
       <button class="modal-close" onclick="closeModal('student-modal')">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="form-group"><label>Class / Subject</label><select id="student-schedule"><option value="">-- Select class --</option></select></div>
       <div class="form-group"><label>Full Name</label><input type="text" id="student-name" placeholder="e.g. John Doe"></div>
       <div class="form-group"><label>NIM (Student ID)</label><input type="text" id="student-nim" placeholder="e.g. 1234567890"></div>
       <div class="form-group"><label>MAC Address (optional)</label><input type="text" id="student-mac" placeholder="e.g. AA:BB:CC:DD:EE:FF"></div>
@@ -728,6 +811,27 @@
       <button class="btn btn-cancel" onclick="closeModal('student-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveStudent()"><i class="fas fa-check"></i> Save</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== FELIX 22.0 ATTENDANCE TIME DETAILS ===== -->
+<div class="modal-overlay" id="attendance-details-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-clock"></i> Attendance Time Details</h3>
+      <button class="modal-close" onclick="closeModal('attendance-details-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:16px">
+        <strong id="details-student-name" style="font-size:18px"></strong>
+        <div id="details-student-meta" style="font-size:13px;color:var(--text-secondary);margin-top:4px"></div>
+      </div>
+      <div class="detail-time-grid">
+        <div class="detail-time-card"><span>Start Attendance</span><strong id="details-start-time">-</strong></div>
+        <div class="detail-time-card"><span>End Attendance</span><strong id="details-end-time">-</strong></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal('attendance-details-modal')">Close</button></div>
   </div>
 </div>
 
@@ -910,46 +1014,88 @@ async function loadOverview() {
 
 // ===== STUDENTS =====
 let allStudents = [];
+let allSheetStudents = [];
+let currentSheet = null;
+
+function showSheetTab(tab) {
+  document.querySelectorAll('.sheet-tab').forEach(button => {
+    button.classList.toggle('active', button.dataset.sheetTab === tab);
+  });
+  document.getElementById('sheet-panel-list').classList.toggle('active', tab === 'list');
+  document.getElementById('sheet-panel-records').classList.toggle('active', tab === 'records');
+}
+
+function populateFaceEnrollmentStudents() {
+  const sel = document.getElementById('enroll-student');
+  sel.innerHTML = '<option value="">-- Select Student --</option>';
+  allStudents.forEach(student => {
+    const option = document.createElement('option');
+    option.value = student.id;
+    option.textContent = `${student.name} (${student.nim})`;
+    sel.appendChild(option);
+  });
+}
 
 async function loadStudents() {
   try {
+    const scheduleId = document.getElementById('sheet-schedule').value;
+    const date = document.getElementById('sheet-date').value;
     const search = document.getElementById('student-search').value;
     allStudents = await api('GET','/students/');
-    let list = allStudents;
+    populateFaceEnrollmentStudents();
+    if (!scheduleId) {
+      currentSheet = null;
+      allSheetStudents = [];
+      document.getElementById('student-table').innerHTML = '<div class="empty-state"><i class="fas fa-calendar-check"></i><p>Select a class / subject to view its full roster.</p></div>';
+      document.getElementById('attendance-record-table').innerHTML = '<div class="empty-state"><i class="fas fa-clock"></i><p>Select a class / subject to view attendance records.</p></div>';
+      return;
+    }
+
+    currentSheet = await api('GET', `/students/attendance-sheet?schedule_id=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`);
+    allSheetStudents = currentSheet.students;
+    let list = allSheetStudents;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(s => s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q));
     }
-    document.getElementById('student-count').textContent = list.length + ' students';
     if (!list.length) {
-      document.getElementById('student-table').innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No students found.</p></div>';
+      document.getElementById('student-table').innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No students are enrolled in this class yet. Add one or import a CSV roster.</p></div>';
     } else {
       document.getElementById('student-table').innerHTML = `<table>
-        <thead><tr><th>NIM</th><th>Name</th><th>MAC Address</th><th>Created</th><th style="width:120px">Actions</th></tr></thead>
+        <thead><tr><th style="width:90px">Attendance</th><th>NIM</th><th>Name</th><th>Status</th><th style="width:130px">Actions</th></tr></thead>
         <tbody>${list.map(s => `<tr>
+          <td>${s.attended
+            ? '<span class="attendance-mark present" title="Attendance submitted"><i class="fas fa-check"></i></span>'
+            : '<span class="attendance-mark absent" title="No attendance submitted"><i class="fas fa-times"></i></span>'}</td>
           <td><strong>${esc(s.nim)}</strong></td>
           <td>${esc(s.name)}</td>
-          <td style="font-family:monospace;font-size:12px">${esc(s.mac_address||'-')}</td>
-          <td>${fmtDate(s.created_at)}</td>
+          <td>${s.attended ? statusChip(s.attendance_status) : '<span class="chip face_only">absent</span>'}</td>
           <td>
-            <button class="btn btn-sm btn-secondary" onclick="editStudent(${s.id})" title="Edit"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-sm btn-danger" onclick="deleteStudent(${s.id})" title="Delete"><i class="fas fa-trash"></i></button>
+            <button class="btn btn-sm btn-secondary" onclick="editStudent(${s.id})" title="Edit student"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="removeStudentFromClass(${s.id})" title="Remove from this class"><i class="fas fa-user-minus"></i></button>
           </td>
         </tr>`).join('')}</tbody></table>`;
     }
-    // Update enrollment dropdown
-    const sel = document.getElementById('enroll-student');
-    sel.innerHTML = '<option value="">-- Select Student --</option>';
-    allStudents.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.id; o.textContent = `${s.name} (${s.nim})`;
-      sel.appendChild(o);
-    });
+
+    const records = list.filter(student => student.attended);
+    if (!records.length) {
+      document.getElementById('attendance-record-table').innerHTML = '<div class="empty-state"><i class="fas fa-clock"></i><p>No students have submitted attendance for this class and date.</p></div>';
+    } else {
+      document.getElementById('attendance-record-table').innerHTML = `<table>
+        <thead><tr><th>NIM</th><th>Student Name</th><th>Status</th><th>Attendance Details</th></tr></thead>
+        <tbody>${records.map(student => `<tr>
+          <td><strong>${esc(student.nim)}</strong></td>
+          <td>${esc(student.name)}</td>
+          <td>${statusChip(student.attendance_status)}</td>
+          <td><button class="btn btn-sm btn-secondary" onclick="openAttendanceDetails(${student.id})"><i class="fas fa-clock"></i> View Times</button></td>
+        </tr>`).join('')}</tbody></table>`;
+    }
   } catch (e) { apiError(e); }
 }
 
 function openStudentModal(data) {
   document.getElementById('student-modal-title').textContent = data ? 'Edit Student' : 'Add Student';
+  document.getElementById('student-schedule').value = document.getElementById('sheet-schedule').value;
   document.getElementById('student-name').value = data?.name || '';
   document.getElementById('student-nim').value = data?.nim || '';
   document.getElementById('student-mac').value = data?.mac_address || '';
@@ -964,6 +1110,8 @@ function editStudent(id) {
 
 async function saveStudent() {
   const id = document.getElementById('student-edit-id').value;
+  const scheduleId = document.getElementById('student-schedule').value;
+  if (!scheduleId) { toast('Select a class / subject first', 'warning'); return; }
   const body = {
     name: document.getElementById('student-name').value,
     nim: document.getElementById('student-nim').value,
@@ -975,12 +1123,59 @@ async function saveStudent() {
       await api('PUT', `/students/${id}/mac`, body.mac_address);
       toast('Student updated', 'success');
     } else {
-      await api('POST', '/students/', body);
-      toast('Student created', 'success');
+      await api('POST', `/students/?schedule_id=${encodeURIComponent(scheduleId)}`, body);
+      toast('Student added to the class roster', 'success');
     }
     closeModal('student-modal');
     loadStudents();
   } catch (e) { apiError(e); }
+}
+
+async function removeStudentFromClass(id) {
+  const scheduleId = document.getElementById('sheet-schedule').value;
+  if (!scheduleId || !confirm('Remove this student from the selected class roster? Their global student profile and attendance history will remain.')) return;
+  try {
+    await api('DELETE', `/students/${id}/schedules/${scheduleId}`);
+    toast('Student removed from this class', 'success');
+    loadStudents();
+  } catch (e) { apiError(e); }
+}
+
+function openAttendanceDetails(id) {
+  const student = allSheetStudents.find(item => item.id === id);
+  if (!student) return;
+  document.getElementById('details-student-name').textContent = student.name;
+  document.getElementById('details-student-meta').textContent = `${student.nim} • ${currentSheet.schedule.class_name} • ${currentSheet.date}`;
+  document.getElementById('details-start-time').textContent = fmtTime(student.start_time);
+  document.getElementById('details-end-time').textContent = fmtTime(student.end_time);
+  document.getElementById('attendance-details-modal').classList.add('show');
+}
+
+async function importStudentList(event) {
+  const file = event.target.files[0];
+  const scheduleId = document.getElementById('sheet-schedule').value;
+  if (!file) return;
+  if (!scheduleId) {
+    toast('Select a class / subject before importing', 'warning');
+    event.target.value = '';
+    return;
+  }
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const result = await api('POST', `/students/import/csv?schedule_id=${encodeURIComponent(scheduleId)}`, form);
+    const message = `${result.enrolled} enrolled, ${result.created} new student profiles` + (result.skipped ? `, ${result.skipped} skipped` : '');
+    toast(message, result.skipped ? 'warning' : 'success');
+    loadStudents();
+  } catch (e) { apiError(e); }
+  event.target.value = '';
+}
+
+function exportAttendanceSheet() {
+  const scheduleId = document.getElementById('sheet-schedule').value;
+  const date = document.getElementById('sheet-date').value;
+  if (!scheduleId) { toast('Select a class / subject before exporting', 'warning'); return; }
+  window.location.href = `/students/export/xlsx?schedule_id=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`;
 }
 
 async function deleteStudent(id) {
@@ -994,6 +1189,25 @@ async function deleteStudent(id) {
 
 // ===== SCHEDULES =====
 let allSchedules = [];
+
+async function importSchedules(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const result = await api('POST', '/schedules/import/csv', form);
+    const message = `${result.imported} schedules imported` + (result.skipped ? `, ${result.skipped} skipped` : '');
+    toast(message, result.skipped ? 'warning' : 'success');
+    await loadSchedules();
+    await loadStudents();
+  } catch (e) { apiError(e); }
+  event.target.value = '';
+}
+
+function exportSchedules() {
+  window.location.href = '/schedules/export/csv';
+}
 
 async function loadSchedules() {
   try {
@@ -1026,6 +1240,26 @@ async function loadSchedules() {
       sel.appendChild(o);
     });
     sel.value = cur;
+
+    // Felix 22.1 class selectors
+    const sheetSelect = document.getElementById('sheet-schedule');
+    const sheetCurrent = sheetSelect.value;
+    sheetSelect.innerHTML = '<option value="">Select class / subject</option>';
+    const modalSelect = document.getElementById('student-schedule');
+    modalSelect.innerHTML = '<option value="">-- Select class --</option>';
+    allSchedules.forEach(schedule => {
+      const label = `${schedule.class_name} (${DAYS[schedule.day_of_week]} ${schedule.start_time})`;
+      const sheetOption = document.createElement('option');
+      sheetOption.value = schedule.id;
+      sheetOption.textContent = label;
+      sheetSelect.appendChild(sheetOption);
+      const modalOption = sheetOption.cloneNode(true);
+      modalSelect.appendChild(modalOption);
+    });
+    sheetSelect.value = sheetCurrent && allSchedules.some(schedule => String(schedule.id) === sheetCurrent)
+      ? sheetCurrent
+      : (allSchedules[0]?.id || '');
+    modalSelect.value = sheetSelect.value;
   } catch (e) { apiError(e); }
 }
 
@@ -1230,10 +1464,11 @@ function refreshCurrent() {
 // ===== INIT =====
 async function init() {
   await checkHealth();
+  document.getElementById('sheet-date').value = new Date().toISOString().slice(0, 10);
+  await loadSchedules();
   await Promise.all([
     loadOverview(),
     loadStudents(),
-    loadSchedules(),
     loadAttendance(),
     loadEnrolledStatus(),
   ]);

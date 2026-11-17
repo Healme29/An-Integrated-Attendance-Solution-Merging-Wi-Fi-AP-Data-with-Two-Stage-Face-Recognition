@@ -103,9 +103,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _schedulesError = null;
     });
     try {
-      final schedules = await ApiService.getSchedules();
+      final schedules = await ApiService.getActiveSchedules();
       if (!mounted) return;
-      setState(() => _schedules = schedules);
+      setState(() {
+        _schedules = schedules;
+        // Drop a selection whose window has closed while the screen was open.
+        if (_selectedScheduleId != null &&
+            !_schedules.any((s) => s['id'] == _selectedScheduleId)) {
+          _selectedScheduleId = null;
+        }
+      });
     } on ApiException catch (e) {
       if (mounted) setState(() => _schedulesError = e.message);
     } catch (e) {
@@ -115,13 +122,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _openCamera() {
+  Future<void> _openCamera() async {
     if (_selectedScheduleId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select a schedule first")),
       );
       return;
     }
+
+    // Ask the server first: the camera must not open when the class window is
+    // closed or the phone is not on the classroom network.
+    Map<String, dynamic> preflight;
+    try {
+      preflight = await ApiService.preflight(
+        studentId: widget.student.id,
+        scheduleId: _selectedScheduleId!,
+        checkType: _selectedCheckType,
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Unexpected error: $e"), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    if (preflight["allowed"] != true) {
+      _showCheckInBlocked(preflight);
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -131,6 +170,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           checkType: _selectedCheckType,
         ),
       ),
+    );
+  }
+
+  void _showCheckInBlocked(Map<String, dynamic> preflight) {
+    final reason = preflight["reason"] as String?;
+    final windowStart = preflight["window_start"] as String? ?? "";
+    final windowEnd = preflight["window_end"] as String? ?? "";
+    final className = preflight["class_name"] as String? ?? "This class";
+    final message = switch (reason) {
+      "outside_class_time" =>
+        "Attendance window closed. $className accepts check-ins $windowStart-$windowEnd.",
+      "wrong_day" => "$className is not scheduled today.",
+      "not_on_classroom_network" =>
+        "You are not connected to the classroom Wi-Fi. Join the classroom network and try again.",
+      "duplicate_check_in" =>
+        "You already did the ${preflight['check_type']} check-in for $className.",
+      "missing_start_check" => "Do the start check-in first.",
+      _ => "Check-in is not available right now.",
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.orange.shade800),
     );
   }
 
@@ -350,12 +410,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           const Icon(Icons.event_busy, size: 44, color: Colors.grey),
                           const SizedBox(height: 8),
                           const Text(
-                            "No class schedules yet",
+                            "No active class right now",
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            "Ask your teacher to create a schedule first.",
+                            "Check-in is only available during a class window.",
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey),
                           ),

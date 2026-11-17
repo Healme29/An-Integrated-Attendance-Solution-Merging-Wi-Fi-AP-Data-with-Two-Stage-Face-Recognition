@@ -78,10 +78,15 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
   enrollment with a friend in frame no longer contaminates the profile
 - `attendance.faces_detected` records the raw YOLO box count per check-in (audit)
 - Attendance outside class window ± grace → 403; wrong day → 403; unknown schedule → 404
+- `REQUIRE_CLASSROOM_WIFI=true` → check-in from a device not visible on the classroom network
+  (and, when `ap_bssid` is pinned, a server not on that BSSID) → 403 `You are not connected to
+  the classroom network.` No row is written. Off by default (`false`), which keeps `face_only`.
+- The mobile app lists only `/schedules/active` and calls `/attendance/preflight` before
+  opening the camera, so out-of-window / off-network check-ins are blocked client-side too
 - `get_embedding(image, bbox)` expects the FULL image + YOLO bbox (crops with margin internally)
 - Wi-Fi detection requires Npcap on Windows (WinPcap API-compatible mode)
 - Cosine similarity threshold: 0.5 (env `FACE_SIMILARITY_THRESHOLD`)
-- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`, `TIMEZONE`, `MAX_UPLOAD_BYTES`, `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`
+- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`, `TIMEZONE`, `MAX_UPLOAD_BYTES`, `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`, `REQUIRE_CLASSROOM_WIFI`
 - `WI_FI_SUBNET` unset → subnet auto-detected from the machine's primary interface at scan time
 - `TIMEZONE` (IANA name, e.g. `Asia/Jakarta`) — set on the server so schedule windows stay consistent across machines; unset → system local time
 - Enrollment hardening: JPEG/PNG magic-byte check, `MAX_UPLOAD_BYTES` cap (413), `MIN_FACE_BBOX_PX` filter, max `MAX_EMBEDDINGS_PER_STUDENT` samples per student
@@ -100,10 +105,12 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | POST | `/faces/enroll?student_id=` | Enroll face (upload image) |
 | POST | `/faces/recognize` | Recognize face (upload image) |
 | POST | `/attendance/check?student_id=&schedule_id=&check_type=` | Check attendance with face scan (identity-bound, time-enforced) |
+| GET | `/attendance/preflight?student_id=&schedule_id=&check_type=` | Whether a check-in could succeed (window, classroom network, duplicates) |
 | GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
 | GET | `/attendance/student/{id}` | Get student history (supports `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count`) |
 | GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |
 | GET | `/schedules/` | List schedules |
+| GET | `/schedules/active` | Schedules whose attendance window includes now |
 | POST | `/schedules/` | Create schedule (validated) |
 | GET | `/schedules/{id}` | Get schedule by ID |
 | PUT | `/schedules/{id}` | Update schedule (validated) |

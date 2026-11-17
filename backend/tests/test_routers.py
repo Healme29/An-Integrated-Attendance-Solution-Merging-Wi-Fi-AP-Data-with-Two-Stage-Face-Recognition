@@ -1,6 +1,8 @@
 import pytest
+from io import BytesIO
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from unittest.mock import patch
 from models.database import get_db, init_db
 from models.schemas import StudentCreate, ScheduleCreate
@@ -91,6 +93,68 @@ class TestStudentAPI:
         assert response.json() == []
 
 
+class TestFelix22AttendanceSheet:
+    def test_full_roster_marks_absent_and_attended(self, client, setup_test_db, fake_jpeg):
+        client.post("/schedules/", json=active_schedule_payload())
+        client.post("/students/?schedule_id=1", json={"name": "Ali", "nim": "A001"})
+        client.post("/students/?schedule_id=1", json={"name": "Budi", "nim": "B002"})
+
+        before = client.get("/students/attendance-sheet?schedule_id=1")
+        assert before.status_code == 200
+        assert before.json()["total"] == 2
+        assert before.json()["attended"] == 0
+        assert all(student["attendance_status"] == "absent" for student in before.json()["students"])
+
+        check_in = client.post(
+            "/attendance/check?student_id=1&schedule_id=1&check_type=start",
+            files={"file": ("selfie.jpg", fake_jpeg, "image/jpeg")},
+        )
+        assert check_in.status_code == 200
+
+        after = client.get("/students/attendance-sheet?schedule_id=1")
+        students = {student["name"]: student for student in after.json()["students"]}
+        assert students["Ali"]["attended"] is True
+        assert students["Ali"]["attendance_status"] == "partial"
+        assert students["Ali"]["start_time"] is not None
+        assert students["Budi"]["attended"] is False
+
+    def test_import_csv_creates_and_enrolls_roster(self, client, setup_test_db):
+        client.post("/schedules/", json=active_schedule_payload())
+        csv_data = b"name,nim,mac_address\nAli,A001,\nBudi,B002,AA:BB:CC:DD:EE:01\n"
+        response = client.post(
+            "/students/import/csv?schedule_id=1",
+            files={"file": ("roster.csv", csv_data, "text/csv")},
+        )
+        assert response.status_code == 200
+        assert response.json()["created"] == 2
+        assert response.json()["enrolled"] == 2
+        sheet = client.get("/students/attendance-sheet?schedule_id=1").json()
+        assert [student["name"] for student in sheet["students"]] == ["Ali", "Budi"]
+
+    def test_export_excel_contains_complete_roster(self, client, setup_test_db):
+        client.post("/schedules/", json=active_schedule_payload(class_name="Data Science"))
+        client.post("/students/?schedule_id=1", json={"name": "Ali", "nim": "A001"})
+
+        response = client.get("/students/export/xlsx?schedule_id=1&date=2026-11-12")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        workbook = load_workbook(BytesIO(response.content))
+        sheet = workbook["Attendance Sheet"]
+        assert sheet["A1"].value == "Felix 22.1 Attendance Sheet"
+        assert sheet["C5"].value == "Ali"
+        assert sheet["D5"].value == "Absent"
+
+    def test_remove_student_only_from_selected_class(self, client, setup_test_db):
+        client.post("/schedules/", json=active_schedule_payload())
+        client.post("/students/?schedule_id=1", json={"name": "Ali", "nim": "A001"})
+        response = client.delete("/students/1/schedules/1")
+        assert response.status_code == 200
+        assert client.get("/students/attendance-sheet?schedule_id=1").json()["total"] == 0
+        assert client.get("/students/1").status_code == 200
+
+
 class TestScheduleAPI:
     def test_list_schedules_empty(self, client, setup_test_db):
         response = client.get("/schedules/")
@@ -173,6 +237,47 @@ class TestScheduleAPI:
             "class_name": "  ", "day_of_week": 0, "start_time": "08:00", "end_time": "09:30"
         })
         assert response.status_code == 400
+
+    def test_import_schedules_csv(self, client, setup_test_db):
+        csv_data = (
+            b"class_name,day,start_time,end_time,room,ap_bssid\n"
+            b"Algorithms,Monday,08:00,09:30,Lab 1,AA:BB:CC:DD:EE:10\n"
+            b"Databases,2,10:00,11:30,Lab 2,\n"
+        )
+        response = client.post(
+            "/schedules/import/csv",
+            files={"file": ("schedules.csv", csv_data, "text/csv")},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 2
+        assert response.json()["skipped"] == 0
+        schedules = client.get("/schedules/").json()
+        assert [schedule["class_name"] for schedule in schedules] == ["Algorithms", "Databases"]
+
+    def test_import_schedules_csv_skips_duplicate(self, client, setup_test_db):
+        client.post(
+            "/schedules/",
+            json={"class_name": "Algorithms", "day_of_week": 0, "start_time": "08:00", "end_time": "09:30"},
+        )
+        csv_data = b"class_name,day,start_time,end_time\nAlgorithms,Monday,08:00,09:30\n"
+        response = client.post(
+            "/schedules/import/csv",
+            files={"file": ("schedules.csv", csv_data, "text/csv")},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 0
+        assert response.json()["skipped"] == 1
+
+    def test_export_schedules_csv(self, client, setup_test_db):
+        client.post(
+            "/schedules/",
+            json={"class_name": "Algorithms", "day_of_week": 0, "start_time": "08:00", "end_time": "09:30"},
+        )
+        response = client.get("/schedules/export/csv")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert "class_name,day_of_week,day,start_time,end_time,room,ap_bssid" in response.text
+        assert "Algorithms,0,Monday,08:00,09:30" in response.text
 
 
 class TestAttendanceAPI:
@@ -441,3 +546,6 @@ class TestRootEndpoint:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "Student Attendance System" in response.text
+        assert "Felix 22.1" in response.text
+        assert "Attendance Sheet" in response.text
+        assert "Attendance Record" in response.text

@@ -109,3 +109,37 @@
 - **Consequences:** C gains one non-code logistics task; the demo narrative must carry the
   honest status of the pilot date.
 - **Revisit by:** Nov 22, or the day the teacher replies.
+
+### C-004 — How the app is updated: keep the debug signature until the demo, then a dedicated release key
+- **Date:** 2026-11-10 · **Stage:** M2 stage 3–6 (pilot devices, RC build, demo APK)
+- **Problem:** Everyone keeps receiving new APKs (default URL fix, strict classroom gate).
+  Each hand-out today means an uninstall/reinstall cycle and a lost login session unless the
+  signing key stays the same for every build. `android/app/build.gradle.kts` still signs the
+  release build with the Flutter **debug** keystore (the template TODO).
+- **Options:** (1) keep signing every build with the debug keystore — updates install over
+  the previous APK and keep app data, but the key is not under the team's control (it lives
+  in `~/.android/debug.keystore`, differs per machine, and is not an acceptable signature
+  for a graded "release"); (2) create a dedicated release keystore now — proper signature,
+  but the switch forces **one** uninstall on every already-installed device and costs a
+  re-verification pass on both test phones; (3) distribute through Play Store / TestFlight —
+  out of scope in the timeframe.
+- **Evidence:** `mobile/android/app/build.gradle.kts` lines 32–38 (`signingConfig =
+  signingConfigs.getByName("debug")`); same `applicationId`
+  `com.attendance.attendance_app` for debug and release, so install-over works while the key
+  is unchanged. APK v0.9.0 was device-tested on the Galaxy S24 (progress log 2026-10-26);
+  the strict-mode build is `mobile/build/app/outputs/flutter-apk/app-release.apk`
+  (51.8 MB, 2026-11-10). **Not measured yet:** a documented install-over run of two
+  consecutive builds on the same device.
+- **Decision:** Option 1 until the end-of-November presentation: every build is signed with
+  the debug keystore, so devices update in place (`adb install -r`, or tap the APK and choose
+  *Update*) and keep their session. No uninstall is required **while the same machine builds
+  every APK**. Immediately after the demo, switch to Option 2: generate
+  `mobile/android/upload-keystore.jks` with `keytool`, keep the passwords in
+  `android/key.properties` (git-ignored), wire `signingConfigs.release`, then perform the
+  single uninstall/reinstall on the pilot phones and record it in `device_test_log.md`.
+- **Consequences:** the demo APK is not store-grade (acceptable, it is sideloaded); if the
+  presenting laptop is replaced before the demo, the new machine has a different debug key
+  and every phone must be uninstalled once anyway; losing the release keystore later means
+  no future in-place updates, so the `.jks` and password must be stored offline by two people.
+- **Revisit by:** the day after the end-of-November demo — generate the release keystore,
+  rebuild, and verify an install-over update on both test devices.
