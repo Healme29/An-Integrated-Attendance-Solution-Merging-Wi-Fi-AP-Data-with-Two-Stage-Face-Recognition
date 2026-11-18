@@ -290,3 +290,69 @@ three platform ping command shapes. Suite: `187 passed` (34 of them in the scann
 - macOS still has no BSSID probe (no macOS host in the project). `get_current_bssid()`
   returns `None` there and the same warning is *not* emitted, because the warning is
   Linux-specific; anyone running macOS must set `ap_bssid` to NULL. Recorded in D-010.
+
+---
+
+## 8. Re-run on 2026-11-13 — Windows 11 laptop, campus Wi-Fi
+
+Third session, on the operating system the demo will use. Interface `10.163.158.239/17`,
+gateway `10.163.255.254`, SSID `NJUPT-CMCC`, AP `78:2c:29:09:e2:f2`, Python 3.12.10, native
+`uvicorn`. Raw output and scripts: `docs/B/evidence/2026-11-13-windows/`.
+
+### 8.1 Result
+
+```json
+GET /wifi/scan
+{"devices":[{"ip":"10.163.255.254","mac":"70:c6:dd:09:b0:02"}],
+ "subnet":"10.163.158.0/24","count":1,"bssid":"78:2c:29:09:e2:f2"}
+```
+
+| Measurement | Value |
+|---|---|
+| Fresh scan (254-host ARP sweep) | **4,281 ms** |
+| Cached scan (< 10 s later) | **29 ms** |
+| `ap_logs` rows after two scans | 0 → 1 → 1 (dedupe holds) |
+| Interface network (server log) | `10.163.128.0/17` → sweep capped to `10.163.158.0/24` |
+| BSSID | `78:2c:29:09:e2:f2` via `netsh`, stable across calls |
+
+Devices visible: the gateway only — identical to the Linux runs. That is client
+isolation/VLAN segmentation on campus (F2), not a Windows regression, and it is why the demo
+network is a hotspot the team controls.
+
+### 8.2 What the Windows run exposed — localized `ipconfig`
+
+The Windows subnet parser searched for the English label `Subnet Mask`. On a localized
+Windows that label is translated (`子网掩码`, `Masque de sous-réseau`, …), so the mask would
+not be found and the scanner would silently fall back to a guessed /24.
+
+Fixed in `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`, `_prefix_from_netmask`):
+
+1. English label fast path (unchanged behaviour on this laptop — its output is English);
+2. otherwise, in the same adapter block, take the first netmask-shaped token after the IPv4
+   address line;
+3. reject any mask that is not a contiguous run of ones (e.g. `255.0.255.0`) instead of
+   silently converting it.
+
+Pinned by four new cases in `backend/tests/test_wifi_subnet.py` (Chinese block, French block,
+an `(Preferred)` suffix, a non-contiguous mask). Suite: **209 passed** (38.7 s). Decision:
+D-011.
+
+### 8.3 Cross-platform summary of the scanner today
+
+| Capability | Linux (measured 2026-11-02/03) | Windows (measured 2026-11-13) | macOS |
+|---|---|---|---|
+| Subnet from real netmask | `ip -4 addr` | `ipconfig`, locale-independent (D-011) | `ifconfig` |
+| Sweep cap at /24 + warning | ✅ | ✅ (`10.163.128.0/17` → `10.163.158.0/24`) | ✅ (code path) |
+| BSSID probe | `iw` → `nmcli` → `iwconfig` | `netsh wlan show interfaces` | ❌ none (D-010) |
+| Raw-socket scan | scapy, falls back to ping+`ip neigh` | ping + `arp -a` (no Npcap needed) | ping + `arp` |
+| Phones visible on campus | ❌ only gateway (F2) | ❌ only gateway (F2) | not tested |
+| Phones visible on a flat hotspot | **not measured yet** | **not measured yet** | not measured |
+
+### 8.4 Still not proven
+
+- The **hotspot** rung: two phones on a flat network where the scan must list their MACs.
+  This is the configuration the demo uses. Still blocked on a second phone
+  (`offline_fallback.md` §2, `review_response.md` §5).
+- Whether the demo AP keeps client isolation off; measure before pinning `ap_bssid`.
+- A scan with more than one visible device has never been observed in this project, so the
+  multi-device formatting of `devices` is only proven by unit tests, not by a live network.

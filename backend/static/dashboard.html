@@ -8,30 +8,38 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
   :root {
-    --primary: #1a56db;
-    --primary-dark: #1343b0;
-    --primary-light: #e8effd;
-    --accent: #0e9f6e;
-    --accent-light: #e6f7f0;
-    --warning: #e37400;
-    --warning-light: #fff3e0;
-    --danger: #d93025;
-    --danger-light: #fce8e6;
-    --bg: #f0f2f5;
-    --card: #fff;
-    --text: #1f2937;
-    --text-secondary: #6b7280;
-    --border: #e5e7eb;
+    /* Palette: gargoyle gas #FFE14F / deep navy #192853 / pale blue #ECF4F7 */
+    --primary: #192853;
+    --primary-dark: #101A38;
+    --primary-light: #E4ECF4;
+    --accent: #FFE14F;
+    --accent-light: #FFF7CC;
+    --warning: #B45309;
+    --warning-light: #FEF1D6;
+    --danger: #C4323C;
+    --danger-light: #FCE9EB;
+    --success: #12624F;
+    --bg: #ECF4F7;
+    --card: #FFFFFF;
+    --text: #192853;
+    --text-secondary: #5A6B82;
+    --border: #D7E3EA;
     --sidebar-width: 260px;
     --header-height: 64px;
-    --radius: 12px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(25,40,83,.06), 0 6px 18px rgba(25,40,83,.05);
+    --shadow-lg: 0 10px 30px rgba(25,40,83,.14);
+    /* Inter / DM Mono are used only if installed locally; the fallbacks are deliberate. */
+    --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    --font-mono: 'DM Mono', 'SFMono-Regular', Consolas, ui-monospace, monospace;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body {
-    font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
     background: var(--bg);
     color: var(--text);
     display: flex;
@@ -44,8 +52,9 @@
     top: 0; left: 0;
     width: var(--sidebar-width);
     height: 100vh;
-    background: var(--card);
-    border-right: 1px solid var(--border);
+    background: var(--primary);
+    border-right: 1px solid rgba(255,255,255,.08);
+    box-shadow: 6px 0 24px rgba(25,40,83,.10);
     z-index: 100;
     display: flex;
     flex-direction: column;
@@ -53,60 +62,77 @@
   }
   .sidebar-brand {
     padding: 18px 20px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(255,255,255,.12);
     display: flex;
     align-items: center;
     gap: 12px;
     font-weight: 700;
     font-size: 16px;
-    color: var(--primary);
+    letter-spacing: -.02em;
+    color: #FFFFFF;
   }
   .sidebar-brand .brand-icon {
     width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
+    background: var(--accent);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 18px;
+    color: var(--primary); font-size: 18px;
   }
-  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .sidebar-nav { flex: 1; padding: 18px 0; }
   .sidebar-nav a {
     display: flex; align-items: center; gap: 12px;
     padding: 11px 20px; margin: 2px 10px;
-    border-radius: 8px;
-    color: var(--text-secondary);
+    border-radius: 9px;
+    color: rgba(236,244,247,.72);
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     transition: all 0.15s;
     cursor: pointer;
   }
-  .sidebar-nav a i { width: 20px; text-align: center; font-size: 15px; }
-  .sidebar-nav a:hover { background: var(--primary-light); color: var(--primary); }
-  .sidebar-nav a.active { background: var(--primary); color: #fff; }
+  .sidebar-nav a i { width: 20px; text-align: center; font-size: 15px; color: inherit; opacity: .85; }
+  .sidebar-nav a:hover { background: rgba(255,255,255,.09); color: #FFFFFF; }
+  .sidebar-nav a.active {
+    background: var(--accent); color: var(--primary); font-weight: 700;
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
   .sidebar-nav .section-label {
-    padding: 16px 20px 6px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-secondary);
+    padding: 22px 20px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    color: rgba(255,225,79,.72);
+  }
+  .sidebar-nav .section-label::before {
+    content: "";
+    width: 14px; height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
   }
   .sidebar-footer {
     padding: 16px 20px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--text-secondary);
+    border-top: 1px solid rgba(255,255,255,.12);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .04em;
+    color: rgba(236,244,247,.55);
     text-align: center;
   }
 
   /* Main */
   .main {
+    min-width: 0;
     margin-left: var(--sidebar-width);
     flex: 1;
     min-height: 100vh;
   }
   .header {
     height: var(--header-height);
+    box-shadow: 0 1px 0 rgba(25,40,83,.06);
     background: var(--card);
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -118,23 +144,27 @@
     z-index: 50;
   }
   .header-left { display: flex; align-items: center; gap: 12px; }
-  .header-left h2 { font-size: 18px; font-weight: 600; }
+  .header-left h2 { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
   .header-left .badge {
-    background: var(--accent-light);
-    color: var(--accent);
+    background: var(--accent);
+    color: var(--primary);
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 11px;
+    font-family: var(--font-mono);
+    font-size: 10px;
     font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
   }
+  .header-left .badge i { color: var(--primary) !important; }
   .header-right { display: flex; align-items: center; gap: 16px; }
   .header-right .status-dot {
     width: 10px; height: 10px; border-radius: 50%;
     display: inline-block;
   }
-  .header-right .status-dot.online { background: var(--accent); box-shadow: 0 0 6px rgba(14,159,110,0.4); }
+  .header-right .status-dot.online { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
   .header-right .status-dot.offline { background: var(--danger); }
-  .header-right .status-label { font-size: 13px; color: var(--text-secondary); }
+  .header-right .status-label { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
   .header-right .refresh-btn {
     background: var(--primary-light);
     border: none;
@@ -149,16 +179,35 @@
     gap: 6px;
     transition: background 0.15s;
   }
-  .header-right .refresh-btn:hover { background: #d0dffb; }
+  .header-right .refresh-btn:hover { background: var(--accent); color: var(--primary); }
 
-  .content { padding: 24px 32px; }
+  .content { min-width: 0; padding: var(--space-5) var(--space-6); }
   .section { display: none; }
   .section.active { display: block; }
 
   /* Page title */
-  .page-title { font-size: 14px; color: var(--text-secondary); margin-bottom: 4px; }
-  .page-heading { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
-  .page-heading small { font-size: 14px; font-weight: 400; color: var(--text-secondary); }
+  .page-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .page-heading {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -.035em;
+    color: var(--primary);
+    margin-bottom: 24px;
+  }
+  .page-heading small {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+  }
 
   /* Stats Grid */
   .stats-grid {
@@ -169,6 +218,7 @@
   }
   .stat-card {
     background: var(--card);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 20px;
     box-shadow: var(--shadow);
@@ -176,17 +226,25 @@
     border-top: 3px solid var(--primary);
   }
   .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-  .stat-card.green { border-top-color: var(--accent); }
+  .stat-card.green { border-top-color: var(--success); }
   .stat-card.orange { border-top-color: var(--warning); }
   .stat-card.red { border-top-color: var(--danger); }
-  .stat-card .stat-icon { font-size: 24px; opacity: 0.6; margin-bottom: 8px; }
-  .stat-card .stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
-  .stat-card .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-  .stat-card .stat-detail { font-size: 12px; color: var(--text-secondary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .stat-card .stat-icon { font-size: 24px; opacity: 1; color: var(--primary); margin-bottom: 8px; }
+  .stat-card .stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -.045em;
+    font-variant-numeric: tabular-nums;
+    color: var(--primary);
+  }
+  .stat-card .stat-label { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--text-secondary); margin-top: 4px; }
+  .stat-card .stat-detail { font-size: 12px; color: var(--text-secondary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 
   /* Cards */
   .card {
     background: var(--card);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     margin-bottom: 20px;
@@ -199,9 +257,23 @@
     align-items: center;
     justify-content: space-between;
   }
-  .card-header h3 { font-size: 16px; font-weight: 600; }
+  .card-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--primary);
+  }
+  .card-header h3::before {
+    content: "";
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin-right: 9px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+  }
   .card-header .card-action {
-    background: var(--primary-light);
+    background: var(--accent-light);
     border: none;
     color: var(--primary);
     padding: 6px 12px;
@@ -216,20 +288,26 @@
   .card-body { padding: 20px 24px; }
 
   /* Tables */
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .table-wrap { overflow-x: auto; max-width: 100%; }
+  .table-wrap table { min-width: 520px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td {
+    text-align: left; padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
   th {
-    background: #fafafa;
+    background: #F4F8FB;
     color: var(--text-secondary);
+    font-family: var(--font-mono);
     font-weight: 600;
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: .1em;
     white-space: nowrap;
   }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #f9fafb; }
+  tr:hover td { background: #F7FAFC; }
   .empty-state { padding: 40px 24px; text-align: center; color: var(--text-secondary); }
   .empty-state i { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
   .empty-state p { font-size: 14px; }
@@ -239,15 +317,18 @@
     display: inline-block;
     padding: 3px 10px;
     border-radius: 12px;
-    font-size: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
     font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
     color: #fff;
   }
-  .chip.verified, .chip.present { background: var(--accent); }
+  .chip.verified, .chip.present { background: var(--success); }
   .chip.partial { background: var(--warning); }
   .chip.face_only { background: var(--danger); }
   .chip.start { background: var(--primary); }
-  .chip.end { background: var(--accent); }
+  .chip.end { background: var(--accent); color: var(--primary); }
   .chip.default { background: var(--text-secondary); }
 
   /* Controls */
@@ -260,8 +341,9 @@
     font-size: 14px; background: var(--card);
     min-width: 200px;
   }
-  .controls-bar select:focus, .controls-bar input:focus {
-    outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+  .controls-bar select:focus, .controls-bar input:focus,
+  .modal-body .form-group input:focus, .modal-body .form-group select:focus {
+    outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent);
   }
   .controls-bar .btn {
     padding: 8px 16px; border-radius: 8px; border: none;
@@ -271,8 +353,8 @@
     transition: background 0.15s;
   }
   .controls-bar .btn:hover { background: var(--primary-dark); }
-  .controls-bar .btn-secondary { background: var(--border); color: var(--text); }
-  .controls-bar .btn-secondary:hover { background: #d1d5db; }
+  .controls-bar .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .controls-bar .btn-secondary:hover { background: var(--accent); color: var(--primary); }
   .controls-bar .btn-danger { background: var(--danger); color: #fff; }
   .controls-bar .btn-danger:hover { background: #c62828; }
   .controls-bar .btn-sm { padding: 6px 10px; font-size: 12px; }
@@ -286,39 +368,39 @@
   /* Felix 22.1 Attendance Sheet */
   .sheet-tabs {
     display: flex; gap: 8px; padding: 0 24px; border-bottom: 1px solid var(--border);
-    background: #fafafa;
+    background: #F4F8FB;
   }
   .sheet-tab {
     border: none; background: transparent; color: var(--text-secondary);
     padding: 14px 4px 12px; margin-right: 20px; cursor: pointer;
     font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent;
   }
-  .sheet-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .sheet-tab.active { color: var(--primary); border-bottom-color: var(--accent); }
   .sheet-panel { display: none; }
   .sheet-panel.active { display: block; }
   .attendance-mark {
     width: 30px; height: 30px; border-radius: 8px; display: inline-flex;
     align-items: center; justify-content: center; font-size: 16px; font-weight: 700;
   }
-  .attendance-mark.present { background: var(--accent-light); color: var(--accent); }
+  .attendance-mark.present { background: #E4F2ED; color: var(--success); }
   .attendance-mark.absent { background: var(--danger-light); color: var(--danger); }
   .sheet-summary { font-size: 13px; color: var(--text-secondary); }
   .sheet-summary strong { color: var(--text); }
   .detail-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .detail-time-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .detail-time-card { border: 1px solid var(--border); border-radius: 10px; background: #F9FBFD; padding: 16px; }
   .detail-time-card span { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
-  .detail-time-card strong { font-size: 18px; }
+  .detail-time-card strong { font-size: 18px; color: var(--primary); font-variant-numeric: tabular-nums; }
   .hidden-file { display: none; }
   .modern-date {
     min-width: 210px; height: 46px; padding: 6px 12px;
     display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, #ffffff, #f8fbff);
-    border: 1px solid #dbe5f3; border-radius: 11px;
-    box-shadow: 0 1px 2px rgba(26,86,219,0.04);
+    background: linear-gradient(135deg, #FFFFFF, #F4F8FB);
+    border: 1px solid var(--border); border-radius: 11px;
+    box-shadow: 0 1px 2px rgba(25,40,83,0.05);
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   }
   .modern-date:focus-within {
-    border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+    border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent);
     transform: translateY(-1px);
   }
   .modern-date > i { color: var(--primary); font-size: 17px; }
@@ -348,12 +430,20 @@
   }
   .chart-card {
     background: var(--card);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     padding: 20px;
   }
-  .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-secondary); }
+  .chart-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--primary);
+    margin-bottom: 16px;
+  }
   .chart-card canvas { max-height: 260px; }
+  .chart-fallback { font-size: 12px; color: var(--text-secondary); padding: 18px 0; line-height: 1.5; }
 
   /* Architecture Diagram */
   .arch-grid {
@@ -447,8 +537,8 @@
   .modal-footer .btn { padding: 8px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
   .modal-footer .btn-primary { background: var(--primary); color: #fff; }
   .modal-footer .btn-primary:hover { background: var(--primary-dark); }
-  .modal-footer .btn-cancel { background: var(--border); color: var(--text); }
-  .modal-footer .btn-cancel:hover { background: #d1d5db; }
+  .modal-footer .btn-cancel { background: var(--primary-light); color: var(--primary); }
+  .modal-footer .btn-cancel:hover { background: var(--accent); color: var(--primary); }
 
   /* Toast */
   .toast-container {
@@ -471,33 +561,65 @@
   .toast.error { border-left-color: var(--danger); }
   .toast.warning { border-left-color: var(--warning); }
   .toast i { font-size: 18px; }
-  .toast.success i { color: var(--accent); }
+  .toast.success i { color: var(--success); }
   .toast.error i { color: var(--danger); }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-  /* Responsive */
+  /* Responsive: the sidebar becomes an accessible drawer on narrow screens */
   @media (max-width: 768px) {
-    .sidebar { width: 64px; }
-    .sidebar-brand span, .sidebar-nav a span, .sidebar-footer, .sidebar-nav .section-label { display: none; }
-    .sidebar-nav a { justify-content: center; padding: 12px; margin: 2px 6px; }
-    .sidebar-brand { justify-content: center; padding: 12px; }
-    .main { margin-left: 64px; }
+    .mobile-menu-btn { display: inline-flex; }
+    .sidebar { width: 260px; transform: translateX(-100%); transition: transform .2s ease; }
+    .sidebar.drawer-open { transform: translateX(0); }
+    .sidebar-brand span, .sidebar-nav a span, .sidebar-footer { display: block; }
+    .sidebar-nav .section-label { display: flex; }
+    .sidebar-nav a { justify-content: flex-start; padding: 11px 20px; margin: 2px 10px; }
+    .sidebar-brand { justify-content: flex-start; padding: 18px 20px; }
+    .main { margin-left: 0; }
     .content { padding: 16px; }
     .chart-row { grid-template-columns: 1fr; }
     .header { padding: 0 16px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ============================================================
+     DESIGN SYSTEM POLISH (unique rules only)
+     Palette: #FFE14F gargoyle gas / #192853 navy / #ECF4F7 pale blue
+     Base rules above are authoritative for shared selectors.
+     ============================================================ */
+  .mobile-menu-btn {
+    display: none; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border: 0; border-radius: 9px;
+    background: var(--primary); color: var(--accent); cursor: pointer;
+  }
+  .mobile-menu-btn:focus-visible, .modal-close:focus-visible,
+  .sidebar-nav a:focus-visible, .controls-bar button:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+  .nav-overlay {
+    position: fixed; inset: 0; z-index: 90;
+    background: rgba(16,26,56,.45);
+  }
+
+  /* Supporting components are defined once in the base rules above. */
+
+  /* The two-up chart grid needs more room than the original 768 px breakpoint */
+  @media (max-width: 1100px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .chart-card canvas { max-width: 100%; }
   }
 </style>
 </head>
 <body>
 
 <!-- Sidebar -->
+<div class="nav-overlay" id="navOverlay" hidden></div>
+
 <aside class="sidebar">
   <div class="sidebar-brand">
     <div class="brand-icon"><i class="fas fa-user-check"></i></div>
     <span>Student Attendance</span>
   </div>
-  <nav class="sidebar-nav">
+  <nav class="sidebar-nav" id="sidebarNav">
     <div class="section-label">Overview</div>
     <a class="active" data-section="overview"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
     <a data-section="architecture"><i class="fas fa-sitemap"></i><span>Architecture</span></a>
@@ -521,6 +643,8 @@
 <div class="main">
   <header class="header">
     <div class="header-left">
+      <button class="mobile-menu-btn" id="menuToggle" aria-label="Open navigation"
+        aria-expanded="false" aria-controls="sidebarNav"><i class="fas fa-bars"></i></button>
       <h2 id="header-title">Dashboard</h2>
       <span class="badge"><i class="fas fa-circle" style="font-size:8px;color:var(--accent);margin-right:4px"></i>Live</span>
     </div>
@@ -544,8 +668,8 @@
       </div>
 
       <div class="chart-row">
-        <div class="chart-card"><h3><i class="fas fa-chart-bar"></i> Attendance Status (Today)</h3><canvas id="chart-status"></canvas></div>
-        <div class="chart-card"><h3><i class="fas fa-clock"></i> Class Distribution</h3><canvas id="chart-classes"></canvas></div>
+        <div class="chart-card"><h3><i class="fas fa-chart-bar"></i> Attendance Status (Today)</h3><canvas id="chart-status"></canvas><div class="chart-fallback" id="chart-status-fallback" hidden>Chart.js is unavailable; the counts are still shown in the KPI cards above.</div></div>
+        <div class="chart-card"><h3><i class="fas fa-clock"></i> Scheduled Classes by Subject</h3><canvas id="chart-classes"></canvas><div class="chart-fallback" id="chart-classes-fallback" hidden>Chart.js is unavailable; schedule details remain available below.</div></div>
       </div>
 
       <div class="card">
@@ -570,37 +694,37 @@
         <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
         <span class="flow-step"><i class="fas fa-check-double"></i> Two-Stage Logic</span>
         <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
-        <span class="flow-step" style="background:var(--accent-light);color:var(--accent)"><i class="fas fa-clipboard-check"></i> Attendance</span>
+        <span class="flow-step" style="background:var(--accent-light);color:var(--primary)"><i class="fas fa-clipboard-check"></i> Attendance</span>
       </div>
 
       <div class="arch-grid">
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#1a56db,#3b82f6)"><i class="fas fa-wifi"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#192853,#35509B)"><i class="fas fa-wifi"></i></div>
           <h4>Wi-Fi AP Detection</h4>
           <p>Scans classroom network via ARP to verify the student's device is physically present on the correct access point. Uses Npcap/Scapy.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#0e9f6e,#34d399)"><i class="fas fa-eye"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#E8B800,#FFE14F)"><i class="fas fa-eye" style="color:#192853"></i></div>
           <h4>Face Detection &amp; Recognition</h4>
           <p>YOLOv8-face detects faces, InsightFace ArcFace (buffalo_l) generates 512-D embeddings. Cosine similarity threshold: 0.5.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#e37400,#f59e0b)"><i class="fas fa-flag-checkered"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#8A4300,#C77917)"><i class="fas fa-flag-checkered"></i></div>
           <h4>Two-Stage Attendance</h4>
           <p>Start of class: status = "partial". End of class: finalizes to "verified" (Wi-Fi ok on both) or "face_only" (no Wi-Fi).</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)"><i class="fas fa-database"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#243A73,#4C68B0)"><i class="fas fa-database"></i></div>
           <h4>SQLite Database</h4>
           <p>Stores students, faces (embeddings), schedules, attendance records, and AP logs. Rollback-safe transaction logic.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#d93025,#ef4444)"><i class="fas fa-mobile-alt"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#98232B,#C4323C)"><i class="fas fa-mobile-alt"></i></div>
           <h4>Flutter Mobile App</h4>
           <p>Android/iOS app for student selfies. Captures face images via camera for enrollment and attendance check-in.</p>
         </div>
         <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#065f46,#0e9f6e)"><i class="fas fa-server"></i></div>
+          <div class="arch-icon" style="background:linear-gradient(135deg,#0C4C3E,#12624F)"><i class="fas fa-server"></i></div>
           <h4>FastAPI Backend</h4>
           <p>Python web server connecting all components. Endpoints for face operations, attendance logic, Wi-Fi scanning, and data export.</p>
         </div>
@@ -662,7 +786,7 @@
             <input type="date" id="sheet-date" onchange="loadStudents()">
           </div>
         </div>
-        <input type="text" id="student-search" placeholder="Search by NIM or name..." oninput="loadStudents()" style="min-width:240px">
+        <input type="text" id="student-search" placeholder="Search by NIM or name..." oninput="debouncedLoadStudents()" style="min-width:240px">
         <button class="btn" onclick="openStudentModal()"><i class="fas fa-plus"></i> Add Student</button>
         <button class="btn btn-secondary" onclick="document.getElementById('student-import-file').click()"><i class="fas fa-file-import"></i> Import CSV</button>
         <button class="btn btn-secondary" onclick="exportAttendanceSheet()"><i class="fas fa-file-excel"></i> Export Excel</button>
@@ -783,10 +907,6 @@
           </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-address-book"></i> Debug: All Stored Embeddings</h3></div>
-        <div class="card-body"><div class="table-wrap"><div id="debug-embeddings"><div class="empty-state"><i class="fas fa-database"></i><p>Loading embedding info...</p></div></div></div></div>
-      </div>
     </div>
 
   </div><!-- /.content -->
@@ -794,7 +914,7 @@
 
 
 <!-- ===== STUDENT MODAL ===== -->
-<div class="modal-overlay" id="student-modal">
+<div class="modal-overlay" id="student-modal" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
   <div class="modal">
     <div class="modal-header">
       <h3 id="student-modal-title">Add Student</h3>
@@ -805,20 +925,23 @@
       <div class="form-group"><label>Full Name</label><input type="text" id="student-name" placeholder="e.g. John Doe"></div>
       <div class="form-group"><label>NIM (Student ID)</label><input type="text" id="student-nim" placeholder="e.g. 1234567890"></div>
       <div class="form-group"><label>MAC Address (optional)</label><input type="text" id="student-mac" placeholder="e.g. AA:BB:CC:DD:EE:FF"></div>
+      <div class="form-group" id="student-edit-hint" hidden>
+        <small style="color:var(--text-secondary)">Only the MAC address can be changed here. Name and NIM are fixed after enrollment.</small>
+      </div>
       <input type="hidden" id="student-edit-id" value="">
     </div>
     <div class="modal-footer">
       <button class="btn btn-cancel" onclick="closeModal('student-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStudent()"><i class="fas fa-check"></i> Save</button>
+      <button class="btn btn-primary" onclick="saveStudent()"><i class="fas fa-check"></i> <span id="student-save-label">Save</span></button>
     </div>
   </div>
 </div>
 
 <!-- ===== FELIX 22.0 ATTENDANCE TIME DETAILS ===== -->
-<div class="modal-overlay" id="attendance-details-modal">
+<div class="modal-overlay" id="attendance-details-modal" role="dialog" aria-modal="true" aria-labelledby="attendance-details-title">
   <div class="modal">
     <div class="modal-header">
-      <h3><i class="fas fa-clock"></i> Attendance Time Details</h3>
+      <h3 id="attendance-details-title"><i class="fas fa-clock"></i> Attendance Time Details</h3>
       <button class="modal-close" onclick="closeModal('attendance-details-modal')">&times;</button>
     </div>
     <div class="modal-body">
@@ -836,7 +959,7 @@
 </div>
 
 <!-- ===== SCHEDULE MODAL ===== -->
-<div class="modal-overlay" id="schedule-modal">
+<div class="modal-overlay" id="schedule-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
   <div class="modal">
     <div class="modal-header">
       <h3 id="schedule-modal-title">Add Schedule</h3>
@@ -875,12 +998,17 @@ function fmtDate(d) { try { return new Date(d).toLocaleString(); } catch { retur
 function fmtTime(d) { if (!d) return '-'; try { return new Date(d).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); } catch { return d; } }
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
-function statusChip(s) {
-  const cls = ['verified','present','partial','face_only'].includes(s) ? s : 'default';
-  return `<span class="chip ${cls}">${s}</span>`;
+const STATUS_CLASSES = ['verified','present','partial','face_only','start','end','default'];
+const CHECK_CLASSES = ['start','end'];
+function allowlisted(value, values, fallback) {
+  return values.includes(value) ? value : fallback;
 }
-
-function checkChip(t) { return `<span class="chip ${t}">${t}</span>`; }
+function statusChip(s) {
+  return `<span class="chip ${allowlisted(s, STATUS_CLASSES, 'default')}">${esc(s)}</span>`;
+}
+function checkChip(t) {
+  return `<span class="chip ${allowlisted(t, CHECK_CLASSES, 'default')}">${esc(t)}</span>`;
+}
 
 function toast(msg, type='success') {
   const c = document.getElementById('toast-container');
@@ -898,7 +1026,41 @@ function apiError(err) {
   toast(msg, 'error');
 }
 
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+let modalTrigger = null;
+function openModal(id) {
+  modalTrigger = document.activeElement;
+  const el = document.getElementById(id);
+  el.classList.add('show');
+  const first = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
+    || el.querySelector('button');
+  if (first) first.focus();
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+  if (modalTrigger && document.contains(modalTrigger)) modalTrigger.focus();
+  modalTrigger = null;
+}
+
+// ===== MOBILE DRAWER =====
+const menuToggle = document.getElementById('menuToggle');
+const navOverlay = document.getElementById('navOverlay');
+const sidebarEl = document.querySelector('.sidebar');
+function setDrawer(open) {
+  sidebarEl.classList.toggle('drawer-open', open);
+  navOverlay.hidden = !open;
+  menuToggle.setAttribute('aria-expanded', String(open));
+  menuToggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+}
+menuToggle.addEventListener('click', () => setDrawer(!sidebarEl.classList.contains('drawer-open')));
+navOverlay.addEventListener('click', () => setDrawer(false));
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelector('.modal-overlay.show');
+  if (open) closeModal(open.id); else setDrawer(false);
+});
 
 // ===== NAVIGATION =====
 document.querySelectorAll('.sidebar-nav a').forEach(a => {
@@ -908,6 +1070,7 @@ document.querySelectorAll('.sidebar-nav a').forEach(a => {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('section-' + a.dataset.section).classList.add('active');
     document.getElementById('header-title').textContent = a.querySelector('span').textContent;
+    setDrawer(false);
   });
 });
 
@@ -936,6 +1099,9 @@ async function checkHealth() {
 }
 
 // ===== OVERVIEW =====
+let statusChart = null;
+let classChart = null;
+
 async function loadOverview() {
   try {
     const [students, attendance,] = await Promise.all([
@@ -947,9 +1113,14 @@ async function loadOverview() {
     document.getElementById('ov-partial').textContent = attendance.filter(r => r.status === 'partial').length;
     document.getElementById('ov-faceonly').textContent = attendance.filter(r => r.status === 'face_only').length;
 
-    // Status chart
-    const ctx1 = document.getElementById('chart-status').getContext('2d');
-    new Chart(ctx1, {
+    // Status chart — destroy the old instance before reusing this canvas.
+    if (statusChart) { statusChart.destroy(); statusChart = null; }
+    const chartStatusCanvas = document.getElementById('chart-status');
+    if (typeof Chart === 'undefined') { chartStatusCanvas.hidden = true; document.getElementById('chart-status-fallback').hidden = false; }
+    else {
+    chartStatusCanvas.hidden = false; document.getElementById('chart-status-fallback').hidden = true;
+    const ctx1 = chartStatusCanvas.getContext('2d');
+    statusChart = new Chart(ctx1, {
       type: 'doughnut',
       data: {
         labels: ['Verified','Partial','Face Only'],
@@ -957,10 +1128,11 @@ async function loadOverview() {
           attendance.filter(r => r.status==='verified'||r.status==='present').length,
           attendance.filter(r => r.status==='partial').length,
           attendance.filter(r => r.status==='face_only').length,
-        ], backgroundColor: ['#0e9f6e','#e37400','#d93025'], borderWidth: 0 }]
+        ], backgroundColor: ['#12624F','#B45309','#C4323C'], borderWidth: 0 }]
       },
       options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
+    }
 
     // Recent attendance
     const recent = attendance.slice(0, 20);
@@ -974,14 +1146,15 @@ async function loadOverview() {
           <td>${esc(r.student_name||'#'+r.student_id)}</td>
           <td>${esc(r.class_name||'-')}</td>
           <td>${checkChip(r.check_type)}</td>
-          <td>${r.wifi_verified ? '<span style="color:var(--accent)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
+          <td>${r.wifi_verified ? '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
           <td>${statusChip(r.status)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
     // Today's schedule
     const scheds = await api('GET','/schedules/');
-    const today = new Date().getDay();
+    // Backend day_of_week is Monday=0; Date.getDay() is Sunday=0.
+    const today = (new Date().getDay() + 6) % 7;
     const todayScheds = scheds.filter(s => s.day_of_week === today);
     if (!todayScheds.length) {
       document.getElementById('today-schedule').innerHTML = '<div class="empty-state"><i class="fas fa-calendar-day"></i><p>No classes scheduled for today.</p></div>';
@@ -996,23 +1169,35 @@ async function loadOverview() {
         </tr>`).join('')}</tbody></table>`;
     }
 
-    // Classes chart
-    const ctx2 = document.getElementById('chart-classes').getContext('2d');
+    // Classes chart — destroy the old instance before reusing this canvas.
+    if (classChart) { classChart.destroy(); classChart = null; }
+    const chartClassesCanvas = document.getElementById('chart-classes');
+    if (typeof Chart === 'undefined') { chartClassesCanvas.hidden = true; document.getElementById('chart-classes-fallback').hidden = false; }
+    else {
+    chartClassesCanvas.hidden = false; document.getElementById('chart-classes-fallback').hidden = true;
+    const ctx2 = chartClassesCanvas.getContext('2d');
     const classCounts = {};
     scheds.forEach(s => { classCounts[s.class_name] = (classCounts[s.class_name]||0) + 1; });
-    new Chart(ctx2, {
+    classChart = new Chart(ctx2, {
       type: 'bar',
       data: {
         labels: Object.keys(classCounts),
-        datasets: [{ data: Object.values(classCounts), backgroundColor: '#1a56db', borderRadius: 4 }]
+        datasets: [{ data: Object.values(classCounts), backgroundColor: '#192853', borderRadius: 4 }]
       },
       options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });
+    }
 
   } catch (e) { apiError(e); }
 }
 
 // ===== STUDENTS =====
+let studentsTimer = null;
+let studentsSeq = 0;
+function debouncedLoadStudents() {
+  clearTimeout(studentsTimer);
+  studentsTimer = setTimeout(loadStudents, 250);
+}
 let allStudents = [];
 let allSheetStudents = [];
 let currentSheet = null;
@@ -1037,11 +1222,13 @@ function populateFaceEnrollmentStudents() {
 }
 
 async function loadStudents() {
+  const seq = ++studentsSeq;
   try {
     const scheduleId = document.getElementById('sheet-schedule').value;
     const date = document.getElementById('sheet-date').value;
     const search = document.getElementById('student-search').value;
     allStudents = await api('GET','/students/');
+    if (seq !== studentsSeq) return;
     populateFaceEnrollmentStudents();
     if (!scheduleId) {
       currentSheet = null;
@@ -1052,6 +1239,7 @@ async function loadStudents() {
     }
 
     currentSheet = await api('GET', `/students/attendance-sheet?schedule_id=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`);
+    if (seq !== studentsSeq) return;
     allSheetStudents = currentSheet.students;
     let list = allSheetStudents;
     if (search) {
@@ -1094,18 +1282,31 @@ async function loadStudents() {
 }
 
 function openStudentModal(data) {
-  document.getElementById('student-modal-title').textContent = data ? 'Edit Student' : 'Add Student';
+  const editing = Boolean(data);
+  document.getElementById('student-modal-title').textContent = editing ? 'Edit MAC Address' : 'Add Student';
   document.getElementById('student-schedule').value = document.getElementById('sheet-schedule').value;
   document.getElementById('student-name').value = data?.name || '';
   document.getElementById('student-nim').value = data?.nim || '';
   document.getElementById('student-mac').value = data?.mac_address || '';
   document.getElementById('student-edit-id').value = data?.id || '';
-  document.getElementById('student-modal').classList.add('show');
+  // PUT /students/{id}/mac is the only student update the backend exposes.
+  // Disable the fields it cannot persist instead of implying they were saved.
+  ['student-name','student-nim'].forEach(id => { document.getElementById(id).disabled = editing; });
+  document.getElementById('student-edit-hint').hidden = !editing;
+  document.getElementById('student-save-label').textContent = editing ? 'Update MAC' : 'Save';
+  openModal('student-modal');
 }
 
 function editStudent(id) {
   const s = allStudents.find(x => x.id === id);
   if (s) openStudentModal(s);
+}
+
+function getLocalDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function saveStudent() {
@@ -1119,9 +1320,10 @@ async function saveStudent() {
   };
   try {
     if (id) {
-      // Update not supported via PUT/students/{id}/mac only; simulate by delete+create or just use mac update
-      await api('PUT', `/students/${id}/mac`, body.mac_address);
-      toast('Student updated', 'success');
+      // The backend only persists mac_address here; never claim name/NIM changed.
+      const mac = document.getElementById('student-mac').value.trim();
+
+      toast('MAC address updated', 'success');
     } else {
       await api('POST', `/students/?schedule_id=${encodeURIComponent(scheduleId)}`, body);
       toast('Student added to the class roster', 'success');
@@ -1148,7 +1350,7 @@ function openAttendanceDetails(id) {
   document.getElementById('details-student-meta').textContent = `${student.nim} • ${currentSheet.schedule.class_name} • ${currentSheet.date}`;
   document.getElementById('details-start-time').textContent = fmtTime(student.start_time);
   document.getElementById('details-end-time').textContent = fmtTime(student.end_time);
-  document.getElementById('attendance-details-modal').classList.add('show');
+  openModal('attendance-details-modal');
 }
 
 async function importStudentList(event) {
@@ -1272,7 +1474,7 @@ function openScheduleModal(data) {
   document.getElementById('schedule-room').value = data?.room || '';
   document.getElementById('schedule-bssid').value = data?.ap_bssid || '';
   document.getElementById('schedule-edit-id').value = data?.id || '';
-  document.getElementById('schedule-modal').classList.add('show');
+  openModal('schedule-modal');
 }
 
 function editSchedule(id) {
@@ -1323,7 +1525,7 @@ async function enrollFace() {
   try {
     const r = await api('POST', `/faces/enroll?student_id=${sid}`, fd);
     document.getElementById('enroll-result').innerHTML =
-      `<span style="color:var(--accent)"><i class="fas fa-check-circle"></i> ${r.message} (${r.face_count} face(s), total ${r.total_embeddings} samples)</span>`;
+      `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> ${esc(r.message)} (${esc(r.face_count)} face(s), total ${esc(r.total_embeddings)} samples)</span>`;
     toast(`Enrolled ${r.face_count} face(s) for student #${sid}`, 'success');
     loadEnrolledStatus();
   } catch (e) { apiError(e); document.getElementById('enroll-result').innerHTML = `<span style="color:var(--danger)">Failed: ${e.message}</span>`; }
@@ -1365,7 +1567,7 @@ async function loadAttendance() {
           <td>${esc(r.student_name||'#'+r.student_id)}</td>
           <td>${esc(r.class_name||'-')}</td>
           <td>${checkChip(r.check_type)}</td>
-          <td>${r.wifi_verified ? '<span style="color:var(--accent)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
+          <td>${r.wifi_verified ? '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
           <td>${r.confidence != null ? (r.confidence*100).toFixed(1)+'%' : '-'}</td>
           <td>${statusChip(r.status)}</td>
         </tr>`).join('')}</tbody></table>`;
@@ -1398,7 +1600,7 @@ async function scanWifi() {
     document.getElementById('wifi-subnet').textContent = r.subnet;
     document.getElementById('wifi-bssid').textContent = r.bssid || 'N/A';
     document.getElementById('wifi-timestamp').textContent = fmtTime(r.timestamp);
-    document.getElementById('wifi-status').innerHTML = '<span style="color:var(--accent)"><i class="fas fa-check-circle"></i> Scan complete</span>';
+    document.getElementById('wifi-status').innerHTML = '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Scan complete</span>';
 
     if (!r.devices.length) {
       document.getElementById('wifi-table').innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>No devices found. Ensure Npcap is installed and try again.</p></div>';
@@ -1428,7 +1630,7 @@ async function recognizeFace() {
     const r = await api('POST', '/faces/recognize', fd);
     if (r.recognized) {
       resultDiv.innerHTML = `<div style="background:var(--accent-light);border-radius:10px;padding:16px 20px">
-        <span style="color:var(--accent);font-size:18px"><i class="fas fa-check-circle"></i> Recognized!</span>
+        <span style="color:var(--success);font-size:18px"><i class="fas fa-check-circle"></i> Recognized!</span>
         <div style="margin-top:8px;font-size:14px">
           <strong>Student:</strong> ${esc(r.student_name)} (ID: ${r.student_id})<br>
           <strong>Confidence:</strong> ${(r.confidence*100).toFixed(2)}%
@@ -1437,7 +1639,7 @@ async function recognizeFace() {
     } else {
       resultDiv.innerHTML = `<div style="background:var(--danger-light);border-radius:10px;padding:16px 20px">
         <span style="color:var(--danger);font-size:16px"><i class="fas fa-times-circle"></i> Not recognized</span>
-        <div style="margin-top:4px;font-size:13px;color:var(--text-secondary)">${r.reason || 'No matching face found in database.'}</div>
+        <div style="margin-top:4px;font-size:13px;color:var(--text-secondary)">${esc(r.reason || 'No matching face found in database.')}</div>
       </div>`;
     }
   } catch (e) {
@@ -1446,25 +1648,28 @@ async function recognizeFace() {
 }
 
 // ===== REFRESH =====
+let refreshing = false;
 function refreshCurrent() {
+  if (refreshing) return;
   const active = document.querySelector('.section.active');
   if (!active) return;
   const id = active.id.replace('section-','');
+  let request = null;
   switch(id) {
-    case 'overview': loadOverview(); break;
-    case 'students': loadStudents(); break;
-    case 'schedules': loadSchedules(); break;
-    case 'attendance': loadAttendance(); break;
-    case 'enroll': loadEnrolledStatus(); break;
-    case 'architecture': break;
+    case 'overview': request = loadOverview(); break;
+    case 'students': request = loadStudents(); break;
+    case 'schedules': request = loadSchedules(); break;
+    case 'attendance': request = loadAttendance(); break;
+    case 'enroll': request = loadEnrolledStatus(); break;
     default: break;
   }
+  if (request) { refreshing = true; request.finally(() => { refreshing = false; }); }
 }
 
 // ===== INIT =====
 async function init() {
   await checkHealth();
-  document.getElementById('sheet-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('sheet-date').value = getLocalDateInputValue();
   await loadSchedules();
   await Promise.all([
     loadOverview(),

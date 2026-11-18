@@ -1,0 +1,50 @@
+# probe_corrupt.py — attendance.db replaced with 30 KB of non-SQLite bytes
+# Port 8012, isolated DATABASE_PATH, uvicorn started exactly as in production.
+started pid 21132
+t=1.0s no-response ConnectTimeout
+t=4.2s no-response ConnectTimeout
+t=7.2s no-response ConnectTimeout
+t=10.2s no-response ConnectTimeout
+t=13.3s no-response ConnectTimeout
+t=16.2s no-response ConnectTimeout
+t=19.2s no-response ConnectTimeout
+t=22.0s no-response ConnectTimeout
+t=24.9s no-response ConnectTimeout
+t=27.9s no-response ConnectTimeout
+t=30.8s no-response ConnectTimeout
+t=33.7s no-response ConnectTimeout
+t=36.6s no-response ConnectTimeout
+t=39.6s no-response ConnectTimeout
+t=42.8s no-response ConnectTimeout
+t=45.7s no-response ConnectTimeout
+t=48.5s no-response ConnectTimeout
+t=51.5s no-response ConnectTimeout
+t=54.5s no-response ConnectTimeout
+t=57.5s no-response ConnectTimeout
+t=60.4s no-response ConnectTimeout
+t=63.3s no-response ConnectTimeout
+t=66.3s no-response ConnectTimeout
+t=69.4s no-response ConnectTimeout
+t=72.4s no-response ConnectTimeout
+t=75.4s no-response ConnectTimeout
+t=78.2s no-response ConnectTimeout
+t=81.2s no-response ConnectTimeout
+t=84.2s no-response ConnectTimeout
+t=87.3s no-response ConnectTimeout
+still alive after 60s -> terminating
+killed, code 1
+--- last 6 log lines ---
+  File "...\aiosqlite\core.py", line 115, in run
+    result = function()
+         ^^^^^^^^^^
+sqlite3.DatabaseError: file is not a database
+
+ERROR:    Application startup failed. Exiting.
+
+# Interpretation (recorded, not fixed here — models/database.py is A-owned):
+# - the failure is loud and correct: the operator sees the sqlite3 error, not a silent empty DB;
+# - but the OS process is NOT gone ~87 s later: poll() still returns None and the port stays
+#   closed. An operator who "just restarts it" ends up with a second process. The obvious
+#   cause is the aiosqlite connection opened in init_db() not being closed when the first
+#   PRAGMA/CREATE raises, but that needs a fix in models/database.py (A) and was not changed
+#   by B.

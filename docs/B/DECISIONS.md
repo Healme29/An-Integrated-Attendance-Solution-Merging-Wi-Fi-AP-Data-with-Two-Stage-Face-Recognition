@@ -262,3 +262,122 @@
 - **Revisit by:** only if a macOS machine becomes a demo target; otherwise closed.
 - **Evidence files:** `backend/services/wifi_scanner.py` (`_ping_command`),
   `backend/tests/test_wifi_subnet.py` (`TestPingCommand`).
+
+### D-011 — Windows netmask parsing must not depend on the display language (G5)
+- **Date:** 2026-11-13 · **Stage:** M2 / G5 (Windows demo-laptop run)
+- **Problem:** the Windows branch of `detect_local_network()` found the netmask by searching
+  for the English label `Subnet Mask`. A localized Windows (Chinese, French, …) prints a
+  translated label, so the mask was not found and subnet detection degraded to a guessed /24
+  — the scanner would then report and sweep a range that is not the machine's real network.
+  The failure is silent, which is the worst property for a Wi-Fi gate.
+- **Options:** (1) keep the English label and require an English Windows — free, but the
+  demo laptop's language is not something the project controls; (2) keep the English fast
+  path and add an order-based fallback: after the adapter's IPv4 address line, take the
+  first netmask-shaped token and require it to be a contiguous mask; (3) shell out to
+  PowerShell `Get-NetIPAddress -PrefixLength`; (4) use a library — `psutil` exposes addresses
+  but not netmasks on Windows, so this is not available without a new dependency.
+- **Evidence:** on this laptop `ipconfig` is English (`Subnet Mask . . . : 255.255.128.0`),
+  and the server detected `10.163.128.0/17`, then logged
+  `Interface network 10.163.128.0/17 is wider than /24; sweeping only 10.163.158.0/24`
+  and returned exactly `10.163.158.0/24` as `subnet` (`measurements-g1.txt` §3). New unit
+  tests feed captured Chinese (`子网掩码`) and French (`Masque de sous-réseau`) blocks,
+  an `(Preferred)` suffix and a non-contiguous `255.0.255.0`, which must be rejected;
+  suite goes from 205 to **209 passed**.
+- **Decision:** option 2. A netmask that is not a run of ones followed by zeros cannot be a
+  CIDR prefix, so it is rejected instead of silently converted. Option 3 was kept as a
+  mental fallback but not implemented: it would add a subprocess whose output format also
+  changes with PowerShell versions.
+- **Consequences:** the fallback depends on `ipconfig` printing the mask near the address
+  line; that order is pinned by a captured fixture, and `WI_FI_SUBNET` remains the explicit
+  escape hatch (already in the troubleshooting table). A future Windows build that reorders
+  the output would make detection fall back to "nothing found", which is loud (no wrong
+  subnet is claimed).
+- **Revisit by:** the first run on the actual demo laptop if its Windows language is not
+  English; or if Windows changes `ipconfig` output.
+- **Evidence files:** `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`,
+  `_prefix_from_netmask`), `backend/tests/test_wifi_subnet.py` (locale cases).
+
+### D-012 — Reference interpreter is Python 3.12, and the YOLO checkpoint needs `dill`
+- **Date:** 2026-11-13 · **Stage:** M2 / G1 (clean install on the Windows laptop) + M3 hygiene
+- **Problem:** which Python version and dependency set lets a **fresh** machine actually
+  recognise a face? The pinned requirements were assumed to be sufficient; the clean-install
+  run proved otherwise.
+- **Options:** (1) move to Python 3.13 and unpin `numpy`/`onnxruntime`/`opencv-python` —
+  A's threshold and G3 numbers were measured on the pinned versions, so this silently
+  invalidates existing evidence; (2) pin Python 3.12 and add the one missing runtime
+  dependency (`dill`) to the install steps; (3) produce a hash-pinned lock file — correct
+  long-term, disproportionate two weeks before the presentation.
+- **Evidence:** system Python **3.13.5** cannot install the pinned set (no cp313 wheels for
+  `numpy==1.26.4`, `onnxruntime==1.18.1`, `opencv-python==4.10.0.84`; pip falls back to
+  source builds and fails). Python **3.12.10** installs in **577 s**
+  (`INSTALL_STARTED/FINISHED` in `.venv/pip_install.log`, Tsinghua mirror). With the model
+  file present, `/faces/recognize` still returned **500**: `torch.load` of
+  `yolov8m-face.pt` raises `ModuleNotFoundError: No module named 'dill'`
+  (`measurements-g1.txt` §5, full traceback in `run2/s1.log`). After
+  `pip install dill==0.3.8`: `/faces/recognize` → 200, cold 13.4 s, warm 1.5–1.6 s, smoke
+  **15/15** (`measurements-smoke.txt`).
+- **Decision:** option 2. Python 3.12 is the reference interpreter; the Dockerfile stays on
+  `python:3.11-slim` (also supported). B adds `pip install dill==0.3.8` to
+  `deployment_guide.md` §5b immediately and **asks A to add `dill==0.3.8` to
+  `backend/requirements.txt`** (`requirements.txt` is A-owned, so B does not edit it).
+- **Consequences:** until A makes that one-line change, a machine that follows only
+  `requirements.txt` gets a 500 on the first recognition; the guide, the runbook pre-flight
+  and the troubleshooting table now name the symptom and the fix. The Docker path has the
+  same hole because the checkpoint is mounted, not installed.
+- **Revisit by:** when `requirements.txt` is updated (then delete the extra command), or if
+  the model file is replaced by a checkpoint that is not dill-pickled.
+- **Evidence files:** `.venv/pip_install.log`, `docs/B/evidence/2026-11-13-windows/`,
+  `docs/B/deployment_guide.md` §5b/§7/§9.
+
+### D-013 — Demo security posture: open API + no TLS, constrained to a controlled hotspot
+- **Date:** 2026-11-13 · **Stage:** M2 / G12 input, M3 backlog
+- **Problem:** the backend has no authentication, no transport encryption and no rate
+  limiting (`hardening_checklist.md` §3, §4, §6). Is that acceptable for the November demo,
+  and what must be true on the day?
+- **Options:** (1) add an API key or teacher login plus TLS before the demo — touches A's
+  routers and C's device-tested APK two weeks before the presentation, with a real chance of
+  breaking the demo; (2) keep the open API but shrink the blast radius: run only on a
+  password-protected hotspot the team controls, scope the firewall rule to the hotspot
+  subnet, one CORS origin, strict Wi-Fi mode on, stop the server after the demo; (3) demo
+  only seeded dashboard data with the radio off — safest, but it cannot show the
+  three-condition check-in that is the project's claim.
+- **Evidence:** every endpoint answers without credentials, over plain HTTP (observed in all
+  runs above; there is no auth dependency in any router). The demo network is a
+  laptop/phone hotspot, not the campus SSID — on campus the scanner sees only the gateway
+  anyway (F2), so the campus network is not a viable demo path. `REQUIRE_CLASSROOM_WIFI=true`
+  turns the Wi-Fi condition into a visible 403 instead of a silent `face_only`.
+- **Decision:** option 2 for the November demo. The controls are written into
+  `demo_runbook.md` §2/§5 and stated as a limitation on the slides. Option 1 remains the M3
+  plan (API key vs teacher login is still open, `hardening_checklist.md` §11).
+- **Consequences:** the demo must never be reachable from the campus VLAN or the internet;
+  the presenter's phone MAC is registered as a student, so one phone is both client and
+  attendance device — acceptable for a pilot, to be said out loud in the report. Any public
+  deployment in this state would be a serious fault, which is why the limitation is explicit.
+- **Revisit by:** before any pilot where people outside the team can reach the server, or as
+  soon as C's APK needs a token.
+
+### D-014 — Warm the models with one deliberate call; do not load them at startup
+- **Date:** 2026-11-13 · **Stage:** M2 / G12 (demo readiness)
+- **Problem:** the first recognition after a cold start costs ~13 s (YOLO weights) and the
+  first ArcFace use adds ~3 s and 341 MB of model files. Where should that cost be paid:
+  at startup, in the background, or at the first real request?
+- **Options:** (1) keep the lazy load and require one throwaway `/faces/recognize` before the
+  audience arrives; (2) eager load in `lifespan` — startup grows by ~13 s and the server
+  refuses to start on a machine with a missing model, a new hard dependency on demo day;
+  (3) preload on a background thread — hides the cost but changes A's `main.py` and makes
+  startup behaviour nondeterministic.
+- **Evidence:** `/health` is ready in **17.3 s** without touching the models; the first
+  `/faces/recognize` took **13,435 ms**, then **1,637 / 1,535 ms**; the smoke warm-up call
+  after a fresh start took **8,282 ms** (page cache warm); ArcFace loads in **2.8–3.0 s** and
+  the process holds **1,001 MB RSS** with both models resident; a missing `.pt` produces a
+  500 `FileNotFoundError` on every recognition (`measurements-g1.txt` §5). With warm-up
+  done, the full smoke test runs in **10.4 s**.
+- **Decision:** option 1. `demo_runbook.md` §2 step 8 requires one throwaway recognition call
+  after startup, and the pre-flight check verifies the `.pt` file is ~52 MB. `main.py` stays
+  untouched (A-owned).
+- **Consequences:** forgetting the warm-up costs ~13 s on the first live check-in (visible,
+  not fatal); the demo laptop needs ~1 GB of free RAM for the backend process on top of the
+  browser and OS. A machine without the model fails loudly with 500s, which the
+  troubleshooting table now maps to "download the model / install dill".
+- **Revisit by:** M3 — a deep health probe or an env-flag eager load, once A agrees to touch
+  the startup path.

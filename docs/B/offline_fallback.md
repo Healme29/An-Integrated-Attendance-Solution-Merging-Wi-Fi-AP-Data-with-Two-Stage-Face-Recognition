@@ -11,12 +11,27 @@
 
 | Needs internet | Do this once, while online | Proof it is local afterwards |
 |---|---|---|
-| YOLO weights (52 MB) | `backend/data/models/yolov8m-face.pt` exists | `ls -lh` shows the file; `/faces/recognize` does not hit the network |
-| InsightFace `buffalo_l` (~330 MB) | one warm-up `/faces/recognize` call, models cached in `DATA_DIR` | second call works with the Wi-Fi adapter disabled |
-| Python packages / APK | `pip install -r backend/requirements.txt`, APK already installed on the phone | `python -m uvicorn` starts, app opens |
+| YOLO weights — **52,028,566 bytes** (≈ 49.6 MiB) | download to `backend/data/models/yolov8m-face.pt` | `Get-Item backend\data\models\yolov8m-face.pt` shows the size; `/faces/recognize` does not hit the network |
+| InsightFace `buffalo_l` — **341,268,726 bytes unpacked**, 5 `.onnx` files | one warm-up `/faces/recognize` call; InsightFace downloads and caches it itself | `%USERPROFILE%\.insightface\models\buffalo_l` exists; a second call works with the Wi-Fi adapter disabled |
+| Python packages / APK | `pip install -r backend/requirements.txt` + `pip install dill==0.3.8` (see the note below), APK already installed on the phone | `python -m uvicorn` starts, app opens |
 
 Nothing else in the backend calls the internet. `TIMEZONE` needs the `tzdata` package
 (installed by requirements), not a network lookup.
+
+**The cache path is not `DATA_DIR`.** `insightface==2.1` hard-codes `~/.insightface`, so the
+models live in `%USERPROFILE%\.insightface\models\buffalo_l` on Windows
+(`~/.insightface/...` on Linux) no matter what `DATA_DIR` says. Back up **that** folder, not
+only `backend/data/`. Decision: D-012.
+
+**Both models load lazily on the first face request, not at startup.** Measured on the
+Windows demo laptop (2026-11-13): cold `/faces/recognize` **13.4 s**, the same call warm
+**1.5–1.6 s**, and the deliberate warm-up call the server makes for itself **8.3 s**. That is
+why the pre-flight in §5 warms them before the audience arrives — a cold first selfie on
+stage would look like a hang.
+
+**`dill` is not in `backend/requirements.txt` yet** (A-owned file). Loading
+`yolov8m-face.pt` fails with `ModuleNotFoundError: No module named 'dill'` without it, so the
+install step above is two commands until A adds `dill==0.3.8` (hardening item 7).
 
 ---
 
@@ -26,12 +41,17 @@ Nothing else in the backend calls the internet. `TIMEZONE` needs the `tzdata` pa
 |---|---|---|---|
 | **1. Native backend, hotspot, no internet** | normal demo | phone + laptop on the same hotspot, server URL = laptop hotspot IP or `adb reverse` | — |
 | **2. Native backend, Wi-Fi unusable** | `/wifi/scan` sees no phones, check-ins become `face_only` | keep going: `face_only` **is** the documented behaviour when the network isolates clients. Say the sentence in §4 and show the dashboard | 0 s |
-| **3. Recognition fails** (no model, camera trouble) | check-in returns an error | switch to seeded data: `python backend/scripts/seed_demo.py --reset --students 5`, show dashboard + CSV export | ~10 s |
-| **4. Backend will not start** | DB damaged, port taken, crash | `docs/B/deployment_guide.md` §8 (restore backup) — measured **6.2 s** to healthy; if no backup, `seed_demo.py --reset` | < 1 min |
+| **3. Recognition fails** (no model, camera trouble) | check-in returns an error | switch to seeded data: `python backend/scripts/seed_demo.py --reset --students 5` (measured **0.7 s**), show dashboard + CSV export | ~10 s |
+| **4. Backend will not start** | DB damaged, port taken, crash | `docs/B/deployment_guide.md` §8 (restore backup) — measured **13.9 s** from copy to healthy on the Windows laptop (6.2 s on the Linux one); if no backup, `seed_demo.py --reset` (measured **0.7 s**, 5 students) | < 1 min |
 | **5. Laptop unusable** | hardware failure | D plays the 30–60 s backup video; slides already contain the screenshots | 0 s |
 
 Every rung was chosen so the **claim** of the project ("three conditions, two-stage
 verification") stays honest: we never fake a `verified` row during a live demo.
+
+**Rung 4 trap, measured 2026-11-13:** with a corrupt `attendance.db` the server logs
+`sqlite3.DatabaseError: file is not a database` and `Application startup failed. Exiting.`,
+but the **process keeps running and never binds port 8000** — `/health` just times out. Do not
+wait for it to die and do not assume port 8000 is free: kill that window first, then restore.
 
 ---
 
@@ -53,8 +73,15 @@ curl.exe http://127.0.0.1:8000/wifi/scan
 
 > **Measured so far:** the hotspot rung itself is **not measured yet** (no second phone +
 > hotspot session on this machine). The campus-network numbers (only the gateway visible)
-> are in `docs/B/network_validation.md`. Record the hotspot result there when it is run:
-> devices found, seconds per scan, whether the phone MAC stays stable across rejoins.
+> are in `docs/B/network_validation.md` — Linux §2 and Windows §8. Record the hotspot result
+> there when it is run: devices found, seconds per scan, whether the phone MAC stays stable
+> across rejoins.
+>
+> On Windows the scanner does **not** need Npcap: it ping-sweeps and reads the ARP table
+> (`arp -a`), which the 2026-11-13 run confirmed on the campus LAN. A fresh 254-host sweep
+> measured **4.3 s**; a repeat within 10 s is cached at **29 ms**. If a scan takes longer
+> than ~10 s on stage, the sweep is touching more than one /24 — check `"subnet"` in the
+> response.
 
 ---
 
@@ -108,8 +135,10 @@ What to do, in order:
    skipped. Say that out loud, do not hide it.
 3. Do **not** hand-type a BSSID you copied from a phone. A wrong pin is worse than no pin.
 
-Measured on this laptop: reading the BSSID works through `nmcli` even though `iw` is not
-installed (`docs/B/network_validation.md` §7).
+Measured: on the Linux laptop reading the BSSID works through `nmcli` even though `iw` is not
+installed (`docs/B/network_validation.md` §7); on the Windows laptop it works through
+`netsh wlan show interfaces` (`78:2c:29:09:e2:f2`, §8). macOS has no probe at all
+(D-010), so there `ap_bssid` must be NULL.
 
 ---
 
@@ -117,14 +146,30 @@ installed (`docs/B/network_validation.md` §7).
 
 | # | Check | Command / action | Expected |
 |---|---|---|---|
-| 1 | Backend starts | `python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000` | `Uvicorn running on http://0.0.0.0:8000` |
-| 2 | Health | `curl http://127.0.0.1:8000/health` | `{"status":"ok","database":"ok"}` |
-| 3 | Models local | `/faces/recognize` with any photo | answer arrives in seconds, no download log |
-| 4 | Data present | `curl http://127.0.0.1:8000/attendance/today` | rows (seeded or real) |
-| 5 | Dashboard | open `/dashboard` | table + status colours render |
-| 6 | CSV | `/attendance/export/csv` | downloads, header `id,timestamp,...` |
-| 7 | Wi-Fi | `/wifi/scan` | phone MAC visible (or the §4 sentence ready) **and** `"bssid"` is not null (§4b) |
-| 8 | Backup | copy `attendance.db` to `backups\` + USB | file exists |
-| 9 | Clock | compare `/attendance/today` timestamps to the wall clock | same timezone (`Asia/Shanghai`) |
+| 1 | Backend starts | `python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000` | `Uvicorn running on http://0.0.0.0:8000` (cold start measured **17.3 s**) |
+| 2 | Health | `curl.exe http://127.0.0.1:8000/health` | `{"status":"ok","database":"ok"}` |
+| 3 | Models on disk | the two `Get-Item` checks below, with the network already off | both sizes match, 5 `.onnx` files present |
+| 4 | Models warm | `curl.exe -F "file=@<a phone photo>" http://127.0.0.1:8000/faces/recognize` | answer in **13.4 s** the first time, **1.5 s** the second; no download log |
+| 5 | Data present | `curl.exe http://127.0.0.1:8000/attendance/today` | rows (seeded or real) |
+| 6 | Dashboard | open `/dashboard` | table + status colours render |
+| 7 | CSV | `/attendance/export/csv` | downloads, header `id,timestamp,...` |
+| 8 | Wi-Fi | `/wifi/scan` | phone MAC visible (or the §4 sentence ready) **and** `"bssid"` is not null (§4b) |
+| 9 | Backup | copy `attendance.db` to `backups\` + USB | file exists (40 KB copy measured **1.2 ms**) |
+| 10 | Clock | compare `/attendance/today` timestamps to the wall clock | same timezone (`Asia/Shanghai`); a wrong `TIMEZONE` shifts them by 8 h |
+| 11 | Strict mode agreed | is `REQUIRE_CLASSROOM_WIFI` `true` or `false`? | decided **before** the first check-in; say which on stage |
+
+The model pre-flight (step 3), offline, in one block:
+
+```powershell
+Get-Item backend\data\models\yolov8m-face.pt | Select-Object Length   # 52028566
+Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l"        # 5 .onnx files
+Get-ChildItem "$env:USERPROFILE\.insightface\models\buffalo_l" | Measure-Object Length -Sum
+# Sum ≈ 341268726
+```
+
+If either is missing, do not improvise on stage: the face path is rung 3 (§1), seeded data
+plus the dashboard. A missing `.pt` fails loudly at check-in
+(`FileNotFoundError: YOLOv8-face model not found at ...`); a missing `buffalo_l` only fails
+once the network is gone, which is why step 3 exists.
 
 Print this page. Do not rely on reading it from the laptop that is running the demo.

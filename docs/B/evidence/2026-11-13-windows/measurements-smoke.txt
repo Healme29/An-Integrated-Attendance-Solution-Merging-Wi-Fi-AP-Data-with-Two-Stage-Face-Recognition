@@ -1,0 +1,28 @@
+healthy_after_ms 17104
+warmup_recognize status=200 ms=8282
+smoke_wall_s 10.4
+[PASS] GET / (health)
+[PASS] GET /dashboard
+[PASS] POST /students/ - nim=smoke94544608
+[PASS] GET /students/?nim= (login)
+[PASS] POST /schedules/ (active now)
+[PASS] POST /schedules/ rejects end<=start
+[PASS] GET /wifi/scan (real ARP scan) - 1 devices found
+[PASS] GET /wifi/check (unknown MAC -> False)
+[PASS] GET /wifi/check/{own-mac} - mac=00-FF-5F-12-8D-C6 on_network=False (may be False on isolated APs)
+[PASS] POST /faces/recognize (no face -> not recognized) - {'recognized': False, 'student_id': None, 'student_name': None, 'confidence': 0.0}
+[PASS] POST /attendance/check (no face -> 400) - {"detail":"Face not recognized: no_face_detected"}
+[PASS] POST /attendance/check (unknown schedule handled) - {"detail":"Face not recognized: no_face_detected"}
+[PASS] GET /attendance/today
+[PASS] GET /attendance/export/csv - CSV header OK
+[PASS] Cleanup (delete smoke student/schedule)
+
+15/15 checks passed
+Smoke test OK - backend is testable end-to-end.
+
+smoke_exit 0
+server_stopped
+
+# Context: this run was the same machine AFTER `pip install dill==0.3.8` and with
+# backend/data/models/yolov8m-face.pt present. The earlier 12/15 run (missing dill)
+# is in measurements-g1.txt section 5.

@@ -299,6 +299,53 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
+### 2026-11-13 — B: G1 measured on the Windows demo laptop; Windows locale bug fixed; hardening gaps quantified
+
+- **The demo machine changed, so G1 was re-measured instead of inherited.** Windows 11
+  `10.0.22621` AMD64, Python **3.12.10** in a fresh `.venv` (3.13 cannot install the pinned
+  wheels), native `uvicorn`, no Docker. Fresh `pip install -r backend/requirements.txt`
+  **577 s**, exit 0. Cold start → `/health` **17.3 s** (restart 25.3 s, dominated by the
+  `torch` import), `/health` / `/` / `/dashboard` **5.4 / 1.7 / 6.2 ms**, `TIMEZONE` delta
+  **8.0 h**, data persisted across restart, seed **0.7 s** (5 students, 5 rows, CSV 6 lines),
+  backup **1.2 ms** / restore **13.9 s**, fresh-DB start **14.7 s**. G1's pass condition is
+  met on the machine that will run the demo; a different laptop needs a re-run (procedure:
+  `guide_review.md` §5).
+- **Scanner works on Windows without Npcap**, BSSID via `netsh`: live `/wifi/scan`
+  **4,281 ms** fresh / **29 ms** cached, subnet `10.163.158.0/24` inside the real `/17`,
+  `ap_logs` 0 → 1 → 1 (dedupe). Only the gateway was visible — campus client isolation (F2),
+  same as Linux; the hotspot rung is still **not measured yet** (needs a second phone).
+- **Real bug caught by the new platform:** the Windows subnet parser matched the English
+  label `Subnet Mask`, which a localized `ipconfig` translates, silently degrading to a /24
+  guess. Fixed in `backend/services/wifi_scanner.py` (`parse_ipconfig_prefix`,
+  `_prefix_from_netmask`, non-contiguous masks rejected) with **4 new tests** (Chinese,
+  French, `(Preferred)`, invalid mask). Suite: **209 passed** (38.7 s). Decision D-011.
+- **Model path measured end to end:** `yolov8m-face.pt` 52,028,566 bytes (sha256
+  `219f490a…`), `buffalo_l` 341,268,726 bytes unpacked in 5 `.onnx` files under
+  `%USERPROFILE%\.insightface` — **not** `DATA_DIR`, because `insightface 2.1` hard-codes
+  `~/.insightface`. Cold `/faces/recognize` **13.4 s**, warm **1.5–1.6 s**, server warm-up
+  **8.3 s**, both models resident ≈ **1.0 GB RSS**. Loading the `.pt` needs `dill==0.3.8`,
+  which is **missing from the A-owned `requirements.txt`** → a fresh install returns `500` on
+  the first face call until A adds it (D-012, hardening item 7). Smoke test 12/15 → **15/15**
+  after the manual install.
+- **Hardening gaps are now numbers, not opinions** (`hardening_checklist.md` §2.1/§5/§7a):
+  24 parallel writes all 200 (wall 823 ms), 24 parallel reads all 200 (68 ms), zero
+  `database is locked`; upload cap is enforced on enroll (**413**) but **not** on
+  `/faces/recognize` (**200** with an 11 MB file); a missing model returns `500` instead of a
+  clean `503`; a corrupt DB logs `DatabaseError` and **keeps the process alive without
+  binding the port**, so the runbook now says kill it before restoring. Items 7–10 are A's,
+  listed with owners.
+- **Decisions:** D-011 (locale-independent netmask), D-012 (Python 3.12 + missing `dill` +
+  model location), D-013 (open API/no TLS only on a controlled hotspot — demo posture),
+  D-014 (lazy model load plus a deliberate warm-up call, not eager startup). Every entry has
+  an **Evidence files:** line.
+- **Docs:** `demo_environment.md` §7, `network_validation.md` §8 (+ cross-platform table),
+  `offline_fallback.md` §0/§5 (model paths and an offline pre-flight), `demo_runbook.md`
+  §2 (step 0 `dill`, measured start/warm-up/restore), `deployment_guide.md` §7/§9/§13,
+  `guide_review.md` §1/§2/§5, `review_response.md` findings 3/4 and §9. Raw output and
+  re-runnable scripts: `docs/B/evidence/2026-11-13-windows/`.
+- **Still honestly open:** hotspot rung with 1–2 phones, the outsider guide run, real-face
+  accepted check-in latency (no usable photo), Docker on the demo laptop (optional, D-002).
+
 ### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
 - **Replanning (drives this entry):** the team will be assessed at a presentation in about
   two weeks (≈ **Nov 23**) and a collection/demonstration at the end of November. The
