@@ -4,9 +4,14 @@ The schedule / Wi-Fi-AP layers of the old design were replaced by the QR
 session flow (see services/qr_service.py): presence is proven by scanning the
 teacher's rotating QR in the room, and network membership by the request
 originating from the school subnet.
+
+Passive liveness (S1) is checked after face detection: the cropped face is
+analysed for screen/print artefacts. A spoof result rejects the check-in before
+any embedding comparison.
 """
 from services.face_recognition import get_embedding, compare_faces, is_match, load_embeddings
 from services.face_detection import detect_faces_from_bytes, dedupe_faces, distinct_people
+from services.liveness import assess_liveness
 
 
 async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -> dict:
@@ -18,6 +23,10 @@ async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -
     never be used to check someone else in. When several faces are present the
     largest box is used, not the most confident one: a face close to the
     camera is the person taking the selfie.
+
+    Passive liveness is evaluated on the primary face crop. Spoofed faces
+    (photo of a photo / screen capture) are rejected with `liveness_failed`
+    before embedding comparison.
 
     Returns `faces_detected` (raw detector boxes) so callers can audit what the
     model saw.
@@ -43,6 +52,26 @@ async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -
         }
 
     primary = faces[0]
+    x1, y1, x2, y2 = primary["bbox"]
+    h, w = image.shape[:2]
+    # Add a small margin for the liveness crop
+    pad = 0.15
+    cx1 = max(0, int(x1 - (x2 - x1) * pad))
+    cy1 = max(0, int(y1 - (y2 - y1) * pad))
+    cx2 = min(w, int(x2 + (x2 - x1) * pad))
+    cy2 = min(h, int(y2 + (y2 - y1) * pad))
+    face_crop = image[cy1:cy2, cx1:cx2]
+
+    is_live, live_score, live_reason = assess_liveness(face_crop)
+    if not is_live:
+        return {
+            "recognized": False,
+            "reason": "liveness_failed",
+            "liveness_score": live_score,
+            "liveness_reason": live_reason,
+            "faces_detected": len(detected),
+        }
+
     embedding = get_embedding(image, primary["bbox"])
     if embedding is None:
         return {

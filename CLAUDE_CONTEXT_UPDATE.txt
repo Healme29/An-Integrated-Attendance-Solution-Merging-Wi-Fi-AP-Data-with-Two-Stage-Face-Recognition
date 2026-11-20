@@ -1,0 +1,148 @@
+# PROJECT CONTEXT UPDATE — Claude Assistant Reference
+
+> Append or replace the existing CLAUDE_CONTEXT.txt with this update.
+> This document captures all changes since the previous context (dated 2026-11-16).
+
+---
+
+## 1. REPOSITORY STATE (as of 2026-11-17)
+
+- **Default branch:** `main` (HEAD = `a317994` — "Felix 22.1: add attendance sheets and schedule CSV tools").
+- **Current working branch:** `felix-22.1-attendance-sheet` (HEAD = `ab4b47b` — "Docs: record room-level presence options and demo network status"), 2 commits ahead of main.
+- **Remote:** `https://github.com/Healme29/An-Integrated-Attendance-Solution-Merging-Wi-Fi-AP-Data-with-Two-Stage-Face-Recognition.git`
+- **Working tree:** `CLAUDE_CONTEXT.txt` is untracked (new file).
+- **All branches:** `main`, `felix-22.1-attendance-sheet`, `task-c`, `a`, `tugas-*` (archived).
+
+---
+
+## 2. NEW FEATURES MERGED (Felix 22.0 + Felix 22.1)
+
+### Felix 22.0 — Attendance Sheet (merged to main)
+
+Upgrades the Teacher Dashboard from a simple student list into a **class-based Attendance Sheet**:
+
+- **`schedule_students` table** added to DB: `schedule_id` → `schedules.id`, `student_id` → `students.id`, `enrolled_at`. PK = (schedule_id, student_id). ON DELETE CASCADE for both FKs.
+- **Migration**: on first run after adding the table, every existing student is enrolled in every existing schedule (`INSERT OR IGNORE`).
+- **GET `/students/attendance-sheet?schedule_id=&date=`** — Full class roster with attendance status (present/absent) for one class on one date.
+- **POST `/students/import/csv?schedule_id=`** — Bulk-import/roster students from CSV (name, nim, mac_address). Existing NIMs are reused and enrolled instead of duplicated.
+- **GET `/students/export/xlsx?schedule_id=&date=`** — Download full roster + attendance result as formatted `.xlsx` file.
+- **POST `/students/{id}/schedules/{sid}`** — Enroll student in a schedule.
+- **DELETE `/students/{id}/schedules/{sid}`** — Remove student from schedule roster (keeps global profile + history).
+- **GET `/schedules/export/csv`** — Export all schedules as CSV.
+- **POST `/schedules/import/csv`** — Import schedules from CSV (columns: class_name, day/day_of_week, start_time, end_time, room, ap_bssid).
+- Dashboard now has two tabs: **Student List** (full roster with green/red indicators) and **Attendance Record** (submitted attendance with start/end times dialog).
+
+### Felix 22.1 — Dashboard Efficiency + Schedule CSV Tools (merged to main)
+
+Refines the Attendance Sheet from Felix 22.0:
+
+- Removed duplicate attendance sheet labels and redundant card headers.
+- Added modern date control with calendar icon, focus/hover/border states.
+- Schedule import/export now on the Schedules page (Import CSV + Export CSV buttons beside Add Schedule).
+- Import validation: skips invalid rows, duplicates, and room/time conflicts; reports skipped rows.
+- Includes automated tests for all new features.
+
+---
+
+## 3. UPDATED API ENDPOINT TABLE (append these to Section 5)
+
+### Students (new endpoints)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/students/attendance-sheet?schedule_id=&date=` | Full class roster with attendance status (Felix 22.0) |
+| POST | `/students/import/csv?schedule_id=` | Bulk-import/roster from CSV (Felix 22.0) |
+| GET | `/students/export/xlsx?schedule_id=&date=` | Download roster + attendance as Excel (Felix 22.0) |
+| POST | `/students/{id}/schedules/{sid}` | Enroll student in schedule (Felix 22.0) |
+| DELETE | `/students/{id}/schedules/{sid}` | Remove from schedule roster (Felix 22.0) |
+| POST | `/students/?schedule_id=` | Create student now accepts optional `schedule_id` |
+
+### Schedules (new endpoints)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/schedules/export/csv` | Export all schedules as CSV (Felix 22.1) |
+| POST | `/schedules/import/csv` | Import schedules from CSV (Felix 22.1) |
+
+---
+
+## 4. UPDATED DATABASE SCHEMA (append to Section 4)
+
+New table: **schedule_students**
+- `schedule_id` → schedules.id (FK, ON DELETE CASCADE)
+- `student_id` → students.id (FK, ON DELETE CASCADE)
+- `enrolled_at` (timestamp)
+- Primary key: (schedule_id, student_id)
+
+Migration behavior: auto-enrolls all existing students into all existing schedules on first startup.
+
+---
+
+## 5. TEAM ROLE UPDATE (2026-11-16)
+
+- **Member B** shifts focus to application design.
+- **Current user (team lead, previously A)** takes over server and application technical work.
+- Dashboard ownership (`backend/static/dashboard.html`) + slides/backup-video: transferred from D to C (C-001).
+- G6 (auto check-in): deferred until after end-of-Nov presentation (C-002).
+- G4 (teacher confirmation): reassigned from D to C (C-003).
+
+---
+
+## 6. ROOM-LEVEL PRESENCE NOTES (2026-11-17)
+
+Documented in `docs/meetings/2026-11-17_room_level_presence_notes.md`:
+
+- Campus AP in actual classroom is preferred for demo (BSSID proves server is on scheduled AP).
+- Client isolation on campus network means student phones may not be visible on ARP scan.
+- Supervisor approved: "coverage area of scheduled AP" claim is acceptable (one AP ≈ one classroom, capacity argument).
+- What we do NOT claim: per-device AP association, RSSI-based distance, or "inside the room" — these require AP management plane (future work).
+- Fallback: own hotspot / portable router if campus network isolates devices.
+
+---
+
+## 7. UPDATED GATES STATUS
+
+| Gate | Status | Owner | Notes |
+|------|--------|-------|-------|
+| G1 | ✅ | B | Demo env alive |
+| G2 | ✅ | C | Mobile on 2nd phone |
+| G3 | ✅ | A | ML config locked |
+| G4 | ⏳ | C | Teacher date/roster (Felix 22.0 merged) |
+| G5 | ⏳ | B | Offline fallback, due Nov 22 |
+| G6 | deferred | C | Auto check-in, after demo |
+| G7–G16 | re-sequenced | — | Full pilot moved to December |
+
+---
+
+## 8. FILES CHANGED (Felix 22.0 + 22.1 commits)
+
+11 files changed, +1118 / -31 lines:
+
+- `backend/models/database.py` — schedule_students table, attendance-sheet query
+- `backend/routers/schedules.py` — CSV import/export endpoints, overlap validation
+- `backend/routers/students.py` — attendance-sheet, CSV import, Excel export, schedule enrollment
+- `backend/static/dashboard.html` — Attendance Sheet UI, date control, schedule import/export
+- `backend/tests/conftest.py` — test fixtures for new features
+- `backend/tests/test_routers.py` — tests for schedule import/export, attendance-sheet
+- `backend/requirements.txt` — openpyxl dependency for Excel export
+- `docs/FELIX_22_0.md` — Attendance Sheet documentation
+- `docs/FELIX_22_1.md` — Dashboard refinements documentation
+- `docs/PLAN_TIMELINE.md` — progress entries
+- `docs/meetings/2026-11-17_room_level_presence_notes.md` — room-level presence discussion
+
+---
+
+## 9. REMINDER: ORIGINAL CONTEXT RULES (still apply)
+
+All business rules from the original CLAUDE_CONTEXT.txt still apply unchanged:
+- Two-stage status flow (partial → verified/face_only)
+- Error response codes and messages
+- Strict classroom mode (`REQUIRE_CLASSROOM_WIFI`)
+- Face detection/recognition pipeline
+- Configuration env vars
+- Known limitations
+- Workflow rules
+
+Do not redesign any business rule in Section 3 of the original context. Build on top of them.
+
+---
+
+END OF UPDATE.

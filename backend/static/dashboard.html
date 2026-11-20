@@ -7,15 +7,15 @@
 <style>
   :root {
     --bg: #f3f4f6; --card: #ffffff; --primary: #1a56db; --primary-dark: #1e429f;
-    --green: #059669; --red: #dc2626; --orange: #d97706; --text: #111827; --muted: #6b7280;
-    --border: #e5e7eb;
+    --green: #059669; --red: #dc2626; --orange: #d97706; --amber: #f59e0b;
+    --text: #111827; --muted: #6b7280; --border: #e5e7eb;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
   header { background: var(--primary); color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
   header h1 { font-size: 20px; }
   header .status { font-size: 13px; opacity: .9; }
-  main { max-width: 960px; margin: 24px auto; padding: 0 16px; display: grid; gap: 16px; }
+  main { max-width: 1100px; margin: 24px auto; padding: 0 16px; display: grid; gap: 16px; }
   .card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
   .card h2 { font-size: 16px; margin-bottom: 12px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -23,16 +23,28 @@
   .btn-primary { background: var(--primary); color: #fff; }
   .btn-primary:hover { background: var(--primary-dark); }
   .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-warning { background: var(--amber); color: #111; }
+  .btn-warning:hover { background: #d97706; }
   .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: #f9fafb; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #047857; }
   input, select { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
   .qr-zone { text-align: center; padding: 10px; }
-  .qr-zone img { width: 320px; max-width: 80vw; height: auto; border: 8px solid #fff; box-shadow: 0 4px 18px rgba(0,0,0,.15); border-radius: 8px; }
+  .qr-zone img { width: 300px; max-width: 80vw; height: auto; border: 8px solid #fff; box-shadow: 0 4px 18px rgba(0,0,0,.15); border-radius: 8px; }
   .qr-token { font-family: ui-monospace, Consolas, monospace; font-size: 22px; letter-spacing: 4px; margin-top: 10px; }
   .qr-hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; background: var(--green); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; }
+  .badge-verified { background: var(--green); }
+  .badge-partial { background: var(--amber); color: #111; }
+  .badge-absent { background: var(--red); }
+  .badge-pending { background: var(--muted); }
+  .badge-manual { background: #6366f1; }
+  .badge::after { content: attr(data-manual) " manual"; font-size: 9px; opacity: .7; margin-left: 4px; }
   .muted { color: var(--muted); }
   .stats { display: flex; gap: 16px; flex-wrap: wrap; }
   .stat { flex: 1; min-width: 140px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
@@ -41,6 +53,11 @@
   .hidden { display: none; }
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
   #toast.show { opacity: 1; }
+  #loginModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; }
+  #loginModal .modal { background: #fff; border-radius: 12px; padding: 24px; max-width: 360px; width: 90%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 20px 40px rgba(0,0,0,.25); }
+  #loginModal h3 { margin-top: 0; font-size: 18px; }
+  #loginModal .row { margin-top: 16px; }
+  #loginModal button { width: 100%; }
   @media (min-width: 800px) { main { grid-template-columns: 1fr 1fr; } .full { grid-column: 1 / -1; } }
 </style>
 </head>
@@ -49,6 +66,21 @@
   <h1>📚 Face Attendance — Teacher Dashboard</h1>
   <div class="status" id="headerStatus">No active class session</div>
 </header>
+
+<!-- Teacher login modal (shown until logged in) -->
+<div id="loginModal">
+  <div class="modal">
+    <h3>Teacher Login</h3>
+    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">Enter teacher credentials to manage sessions.</p>
+    <div class="row">
+      <input id="tUsername" placeholder="Username" style="width:100%; margin-bottom:8px">
+      <input id="tPassword" type="password" placeholder="Password" style="width:100%">
+    </div>
+    <button class="btn-primary" id="btnTeacherLogin">Login</button>
+    <div id="loginError" class="muted" style="color:var(--red); font-size:12px; margin-top:8px; display:none;"></div>
+  </div>
+</div>
+
 <main>
   <!-- Class session control -->
   <section class="card full">
@@ -57,39 +89,51 @@
       <input id="className" placeholder="Class / subject (e.g. Mathematics)" style="flex:1; min-width: 220px">
       <input id="room" placeholder="Room (optional)" style="max-width: 180px">
       <button class="btn-primary" id="btnStart">▶ Start Class Session</button>
+      <button class="btn-warning hidden" id="btnFinal">⏸ Start Final Attendance</button>
       <button class="btn-danger hidden" id="btnEnd">⏹ End Session</button>
     </div>
     <div class="qr-zone hidden" id="qrZone">
       <img id="qrImage" alt="Class QR code" src="">
       <div class="qr-token" id="qrToken">------</div>
-      <div class="qr-hint">QR code rotates every 5 seconds — project this screen on the classroom LCD. Students scan it, then take a selfie.</div>
+      <div class="qr-phase" id="qrPhase" style="font-weight:600; margin-top:4px;"></div>
+      <div class="qr-hint">QR rotates every 5 seconds — project on the LCD. Students scan then take a selfie.</div>
     </div>
   </section>
 
   <!-- Live stats -->
   <div class="full stats">
-    <div class="stat"><div class="value" id="statPresent">0</div><div class="label">Checked in (this session)</div></div>
-    <div class="stat"><div class="value" id="statStudents">0</div><div class="label">Registered students</div></div>
-    <div class="stat"><div class="value" id="statAbsent">0</div><div class="label">Not checked in</div></div>
+    <div class="stat"><div class="value" id="statVerified">0</div><div class="label">Verified (start + end)</div></div>
+    <div class="stat"><div class="value" id="statPartial">0</div><div class="label">Partial (start only)</div></div>
+    <div class="stat"><div class="value" id="statAbsent">0</div><div class="label">Absent</div></div>
+    <div class="stat"><div class="value" id="statTotal">0</div><div class="label">Total in class</div></div>
   </div>
 
-  <!-- Live attendance -->
-  <section class="card">
-    <h2>Live Attendance — <span id="liveClass" class="muted">no session</span></h2>
-    <table>
-      <thead><tr><th>Time</th><th>NIM</th><th>Name</th><th>Confidence</th><th></th></tr></thead>
-      <tbody id="attendanceBody"><tr><td colspan="5" class="muted">No check-ins yet.</td></tr></tbody>
+  <!-- Class roster (primary view) -->
+  <section class="card full">
+    <h2 id="rosterTitle">Class Roster — <span id="liveClass" class="muted">no session</span></h2>
+    <div class="row" style="margin-bottom: 12px; gap: 8px;">
+      <button class="btn-outline" id="btnRefreshRoster" style="font-size:13px; padding:6px 12px;">↻ Refresh</button>
+      <button class="btn-outline" id="btnExportRoster" style="font-size:13px; padding:6px 12px;">📥 Export CSV</button>
+      <span class="muted" style="font-size:12px;">Status: <span class="badge badge-verified" style="padding:1px 6px;">Verified</span> <span class="badge badge-partial" style="padding:1px 6px;color:#111;">Partial</span> <span class="badge badge-absent">Absent</span></span>
+    </div>
+    <table id="rosterTable">
+      <thead>
+        <tr>
+          <th>NIM</th><th>Name</th><th>Status</th><th>Start Time</th><th>Start Conf</th><th>End Time</th><th>End Conf</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="rosterBody"><tr><td colspan="8" class="muted">Start a class session to see the roster.</td></tr></tbody>
     </table>
   </section>
 
-  <!-- Students + export -->
+  <!-- Students + export (legacy, kept for student management) -->
   <section class="card">
     <h2>Students</h2>
     <div class="row" style="margin-bottom: 12px">
       <input id="newName" placeholder="Name" style="flex:1">
       <input id="newNim" placeholder="NIM" style="flex:1">
       <button class="btn-outline" id="btnAddStudent">Add</button>
-      <button class="btn-outline" id="btnExport">📥 Export CSV</button>
+      <button class="btn-outline" id="btnExportRaw">📥 Export Raw CSV</button>
     </div>
     <table>
       <thead><tr><th>NIM</th><th>Name</th><th>Registered</th><th></th></tr></thead>
@@ -102,12 +146,19 @@
 <script>
 let activeSessionId = null;
 let pollTimer = null;
+let teacherToken = null;
 
 function toast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+function apiHeaders() {
+  const h = { "Content-Type": "application/json" };
+  if (teacherToken) h["Authorization"] = "Bearer " + teacherToken;
+  return h;
 }
 
 async function api(path, options) {
@@ -120,14 +171,45 @@ async function api(path, options) {
   return res.json();
 }
 
+function showLogin() {
+  document.getElementById("loginModal").style.display = "flex";
+}
+
+function hideLogin() {
+  document.getElementById("loginModal").style.display = "none";
+}
+
+async function teacherLogin() {
+  const u = document.getElementById("tUsername").value.trim();
+  const p = document.getElementById("tPassword").value.trim();
+  const err = document.getElementById("loginError");
+  if (!u || !p) { err.textContent = "Enter username and password"; err.style.display = "block"; return; }
+  try {
+    const r = await api("/teachers/login", {
+      method: "POST",
+      body: JSON.stringify({ username: u, password: p }),
+    });
+    teacherToken = r.token;
+    hideLogin();
+    err.style.display = "none";
+    toast("Logged in as " + r.teacher);
+    pollSession();
+  } catch (e) { err.textContent = e.message; err.style.display = "block"; }
+}
+
+document.getElementById("btnTeacherLogin").onclick = teacherLogin;
+
 function renderSession(active) {
   const start = document.getElementById("btnStart");
+  const final = document.getElementById("btnFinal");
   const end = document.getElementById("btnEnd");
   const zone = document.getElementById("qrZone");
   const header = document.getElementById("headerStatus");
+  const phaseEl = document.getElementById("qrPhase");
   if (!active || !active.active) {
     activeSessionId = null;
     start.classList.remove("hidden");
+    final.classList.add("hidden");
     end.classList.add("hidden");
     zone.classList.add("hidden");
     header.textContent = "No active class session";
@@ -136,56 +218,114 @@ function renderSession(active) {
   }
   activeSessionId = active.session_id;
   start.classList.add("hidden");
-  end.classList.remove("hidden");
   zone.classList.remove("hidden");
   document.getElementById("qrImage").src = "/qr-sessions/active/qr.png";
   document.getElementById("qrToken").textContent = active.token;
+  const phase = active.phase || "start";
   document.getElementById("liveClass").textContent = active.class_name + (active.room ? " — " + active.room : "");
   header.textContent = "Active: " + active.class_name + (active.room ? " (Room " + active.room + ")" : "") +
-    " — started " + (active.started_at || "");
+    " — phase: " + phase.toUpperCase() + " — started " + (active.started_at || "");
+
+  // Phase-aware buttons
+  if (phase === "start") {
+    final.classList.remove("hidden");
+    end.classList.add("hidden");
+    phaseEl.textContent = "PHASE: START — students scan for start selfie";
+    phaseEl.style.color = "var(--amber)";
+  } else if (phase === "end") {
+    final.classList.add("hidden");
+    end.classList.remove("hidden");
+    phaseEl.textContent = "PHASE: END — students scan for end selfie";
+    phaseEl.style.color = "var(--green)";
+  } else {
+    final.classList.add("hidden");
+    end.classList.remove("hidden");
+    phaseEl.textContent = "PHASE: CLOSED — no more check-ins";
+    phaseEl.style.color = "var(--red)";
+  }
 }
 
 async function pollSession() {
   try {
     const active = await api("/qr-sessions/active");
     renderSession(active);
-    refreshAttendance();
-  } catch (e) { /* transient network error: keep polling */ }
+    if (active && active.active) refreshRoster();
+  } catch (e) { /* transient */ }
+}
+
+async function refreshRoster() {
+  if (activeSessionId == null) return;
+  try {
+    const rows = await api("/attendance/roster?qr_session_id=" + activeSessionId);
+    const body = document.getElementById("rosterBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No students in class roster.</td></tr>';
+    } else {
+      body.innerHTML = rows.map(r => {
+        const badgeClass = r.status === "verified" ? "badge-verified" :
+                           r.status === "partial" ? "badge-partial" :
+                           r.status === "absent" ? "badge-absent" : "badge-pending";
+        const manualTag = r.manual ? ' data-manual="✓"' : "";
+        const startConf = r.start_confidence != null ? (r.start_confidence * 100).toFixed(1) + "%" : "-";
+        const endConf = r.end_confidence != null ? (r.end_confidence * 100).toFixed(1) + "%" : "-";
+        const startTime = r.start_time ? r.start_time.split(" ")[1] : "-";
+        const endTime = r.end_time ? r.end_time.split(" ")[1] : "-";
+        const manualBtn = (!r.manual && (r.status === "absent" || r.status === "partial"))
+          ? `<button class="btn-success btn-sm" onclick="markManual(${r.student_id})">Mark Present</button>`
+          : "";
+        return `
+          <tr>
+            <td>${r.student_nim}</td>
+            <td>${r.student_name}</td>
+            <td><span class="badge ${badgeClass}"${manualTag}>${r.status}</span></td>
+            <td>${startTime}</td>
+            <td>${startConf}</td>
+            <td>${endTime}</td>
+            <td>${endConf}</td>
+            <td>${manualBtn}</td>
+          </tr>`;
+      }).join("");
+    }
+    // Stats
+    const v = rows.filter(r => r.status === "verified").length;
+    const p = rows.filter(r => r.status === "partial").length;
+    const a = rows.filter(r => r.status === "absent").length;
+    document.getElementById("statVerified").textContent = v;
+    document.getElementById("statPartial").textContent = p;
+    document.getElementById("statAbsent").textContent = a;
+    document.getElementById("statTotal").textContent = rows.length;
+  } catch (e) { toast("Roster load failed: " + e.message); }
 }
 
 async function refreshAttendance() {
-  let url = "/attendance/today";
-  if (activeSessionId != null) url += "?qr_session_id=" + activeSessionId;
-  const rows = await api(url);
-  const body = document.getElementById("attendanceBody");
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5" class="muted">No check-ins yet.</td></tr>';
-  } else {
-    body.innerHTML = rows.map(r => `
-      <tr>
-        <td>${(r.timestamp || "").split(" ")[1] || r.timestamp}</td>
-        <td>${r.nim ?? ""}</td>
-        <td>${r.student_name ?? ""}</td>
-        <td>${r.confidence != null ? (r.confidence * 100).toFixed(1) + "%" : "-"}</td>
-        <td><span class="badge">${r.status || "verified"}</span></td>
-      </tr>`).join("");
-  }
-  document.getElementById("statPresent").textContent = rows.length;
+  if (activeSessionId == null) return;
+  try {
+    const rows = await api("/attendance/today?qr_session_id=" + activeSessionId);
+    const body = document.getElementById("attendanceBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="5" class="muted">No check-ins yet.</td></tr>';
+    } else {
+      body.innerHTML = rows.map(r => `
+        <tr>
+          <td>${(r.timestamp || "").split(" ")[1] || r.timestamp}</td>
+          <td>${r.nim ?? ""}</td>
+          <td>${r.student_name ?? ""}</td>
+          <td>${r.confidence != null ? (r.confidence * 100).toFixed(1) + "%" : "-"}</td>
+          <td><span class="badge badge-${r.status === 'verified' ? 'verified' : r.status === 'partial' ? 'partial' : 'absent'}">${r.status || "verified"}</span></td>
+        </tr>`).join("");
+    }
+  } catch (e) {}
 }
 
 async function refreshStudents() {
-  const students = await api("/students/");
-  document.getElementById("statStudents").textContent = students.length;
-  document.getElementById("statAbsent").textContent = Math.max(students.length - rowsPresentCount(), 0);
-  document.getElementById("studentsBody").innerHTML = students.map(s => `
-    <tr>
-      <td>${s.nim}</td><td>${s.name}</td><td>${(s.created_at || "").split(" ")[0]}</td>
-      <td><button class="btn-outline" onclick="deleteStudent(${s.id})">Delete</button></td>
-    </tr>`).join("");
-}
-
-function rowsPresentCount() {
-  return parseInt(document.getElementById("statPresent").textContent, 10) || 0;
+  try {
+    const students = await api("/students/");
+    document.getElementById("studentsBody").innerHTML = students.map(s => `
+      <tr>
+        <td>${s.nim}</td><td>${s.name}</td><td>${(s.created_at || "").split(" ")[0]}</td>
+        <td><button class="btn-outline" onclick="deleteStudent(${s.id})">Delete</button></td>
+      </tr>`).join("");
+  } catch (e) {}
 }
 
 async function startSession() {
@@ -195,25 +335,52 @@ async function startSession() {
   try {
     await api("/qr-sessions/start", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_name: className, room: room || null, created_by: "teacher" }),
+      headers: apiHeaders(),
+      body: JSON.stringify({ class_name: className, room: room || null, created_by: teacherToken ? "teacher" : null }),
     });
-    toast("Class session started");
+    toast("Class session started (START phase)");
+    pollSession();
+  } catch (e) { toast(e.message); }
+}
+
+async function startFinal() {
+  if (!confirm("Start Final Attendance?\nStudents must scan the NEW QR and take an end selfie.\nThis rotates the QR code.")) return;
+  try {
+    const updated = await api("/qr-sessions/phase", {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ phase: "end" }),
+    });
+    toast("Final attendance started — QR rotated");
     pollSession();
   } catch (e) { toast(e.message); }
 }
 
 async function endSession() {
-  if (!confirm("End the class session? Students can no longer check in.")) return;
+  if (!confirm("End the class session? No more check-ins will be accepted.")) return;
   try {
     const result = await api("/qr-sessions/end", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(),
       body: JSON.stringify(activeSessionId != null ? { session_id: activeSessionId } : {}),
     });
-    toast("Session ended — " + result.total_attendance + " checked in");
+    toast("Session ended — " + result.total_attendance + " records");
     renderSession({ active: false });
-    refreshAttendance();
+    refreshRoster();
+  } catch (e) { toast(e.message); }
+}
+
+async function markManual(studentId) {
+  if (!teacherToken) { showLogin(); toast("Please log in first"); return; }
+  if (!confirm("Mark this student as present (manual)? This records them as Verified without a selfie.")) return;
+  try {
+    await api("/attendance/manual", {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ student_id: studentId, reason: "" }),
+    });
+    toast("Marked present (manual)");
+    refreshRoster();
   } catch (e) { toast(e.message); }
 }
 
@@ -224,7 +391,7 @@ async function addStudent() {
   try {
     await api("/students/", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(),
       body: JSON.stringify({ name, nim }),
     });
     document.getElementById("newName").value = "";
@@ -235,17 +402,23 @@ async function addStudent() {
 }
 
 async function deleteStudent(id) {
-  if (!confirm("Delete this student (including their face enrollment)?")) return;
+  if (!confirm("Delete this student (including face enrollment)?")) return;
   try {
-    await api("/students/" + id, { method: "DELETE" });
+    await api("/students/" + id, { method: "DELETE", headers: apiHeaders() });
     refreshStudents();
   } catch (e) { toast(e.message); }
 }
 
 document.getElementById("btnStart").onclick = startSession;
+document.getElementById("btnFinal").onclick = startFinal;
 document.getElementById("btnEnd").onclick = endSession;
+document.getElementById("btnRefreshRoster").onclick = refreshRoster;
+document.getElementById("btnExportRoster").onclick = () => {
+  if (activeSessionId == null) { toast("No active session"); return; }
+  window.open("/attendance/export/csv?qr_session_id=" + activeSessionId, "_blank");
+};
 document.getElementById("btnAddStudent").onclick = addStudent;
-document.getElementById("btnExport").onclick = () => {
+document.getElementById("btnExportRaw").onclick = () => {
   let url = "/attendance/export/csv";
   if (activeSessionId != null) url += "?qr_session_id=" + activeSessionId;
   window.open(url, "_blank");
@@ -254,14 +427,13 @@ document.getElementById("btnExport").onclick = () => {
 (async function init() {
   await pollSession().catch(() => {});
   await refreshStudents().catch(() => {});
-  // Rotate the QR + refresh lists every 5 seconds while a session is active.
   pollTimer = setInterval(async () => {
     const active = await api("/qr-sessions/active").catch(() => null);
     renderSession(active || { active: false });
     if (active && active.active) {
-      // Keep the QR image fresh (it encodes the current rotating token).
       document.getElementById("qrImage").src = "/qr-sessions/active/qr.png?v=" + Date.now();
       document.getElementById("qrToken").textContent = active.token;
+      refreshRoster().catch(() => {});
       refreshAttendance().catch(() => {});
     }
   }, 5000);

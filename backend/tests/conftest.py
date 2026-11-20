@@ -44,27 +44,50 @@ async def create_test_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS classes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_name TEXT NOT NULL,
+            room TEXT,
+            created_by TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS class_students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+            UNIQUE(class_id, student_id)
+        );
         CREATE TABLE IF NOT EXISTS qr_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             token TEXT NOT NULL,
             prev_token TEXT,
             token_rotated_at TIMESTAMP NOT NULL,
             created_by TEXT,
+            class_id INTEGER,
             class_name TEXT NOT NULL,
             room TEXT,
             started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             ended_at TIMESTAMP,
-            is_active INTEGER NOT NULL DEFAULT 1
+            is_active INTEGER NOT NULL DEFAULT 1,
+            phase TEXT NOT NULL DEFAULT 'start',
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
         );
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER NOT NULL,
             qr_session_id INTEGER NOT NULL,
+            check_type TEXT NOT NULL DEFAULT 'qr',
             confidence REAL,
             ip_address TEXT,
             status TEXT NOT NULL DEFAULT 'verified',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             faces_detected INTEGER DEFAULT 0,
+            manual_by TEXT,
+            manual_at TIMESTAMP,
+            manual_reason TEXT,
             FOREIGN KEY (student_id) REFERENCES students(id),
             FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
         );
