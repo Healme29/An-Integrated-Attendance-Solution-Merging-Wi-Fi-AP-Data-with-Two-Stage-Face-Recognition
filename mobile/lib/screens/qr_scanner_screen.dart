@@ -89,6 +89,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             qrToken: token,
             qrSessionId: result.sessionId,
             className: result.className,
+            phase: result.phase,
           ),
         ),
       );
@@ -119,6 +120,17 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             controller: _controller,
             onDetect: _onDetect,
           ),
+          Center(
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 3),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+              ),
+            ),
+          ),
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -129,7 +141,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                "Point the camera at the QR code shown in class",
+                "Fit the classroom QR inside the square.\nHold still until it is detected.",
+                textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white),
               ),
             ),

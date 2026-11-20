@@ -90,7 +90,8 @@ class FaceEnrollResponse(BaseModel):
 
 
 class QRSessionStart(BaseModel):
-    class_name: str
+    class_id: int
+    class_name: Optional[str] = None  # legacy fallback; class_id is canonical
     room: Optional[str] = None
     created_by: Optional[str] = None
 
@@ -105,6 +106,8 @@ class QRSessionResponse(BaseModel):
     ended_at: Optional[datetime] = None
     is_active: bool
     phase: Optional[str] = "start"
+    class_id: Optional[int] = None
+    spot_round: int = 0
 
     class Config:
         from_attributes = True
@@ -128,6 +131,8 @@ class QRValidateResponse(BaseModel):
     class_name: Optional[str] = None
     room: Optional[str] = None
     message: Optional[str] = None
+    phase: Optional[str] = None
+    spot_round: int = 0
 
 
 class AttendanceResponse(BaseModel):
@@ -144,6 +149,8 @@ class AttendanceResponse(BaseModel):
     # Raw YOLO box count at check-in. Kept for audit: a value > 1 means the
     # detector saw more than one box, even when it was one face duplicated.
     faces_detected: int = 0
+    check_type: Optional[str] = None
+    spot_round: int = 0
 
     class Config:
         from_attributes = True
@@ -173,6 +180,7 @@ class RosterStudent(BaseModel):
     faces_detected_start: int = 0
     faces_detected_end: int = 0
     manual: bool = False
+    spot_checks: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -181,4 +189,5 @@ class RosterStudent(BaseModel):
 
 class ManualAttendanceRequest(BaseModel):
     student_id: int
+    qr_session_id: int
     reason: Optional[str] = None

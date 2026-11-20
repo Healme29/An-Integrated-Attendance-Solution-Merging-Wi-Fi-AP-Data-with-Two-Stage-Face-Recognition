@@ -21,7 +21,8 @@ class ApiService {
   /// (`adb reverse tcp:8000 tcp:8000`) override in Settings with
   /// http://127.0.0.1:8000 instead.
   static const String _defaultBaseUrl = "http://192.168.137.1:8000";
-  static const Duration _timeout = Duration(seconds: 15);
+  static const Duration _timeout = Duration(seconds: 20);
+  static const Duration _uploadTimeout = Duration(seconds: 60);
 
   static String baseUrl = _defaultBaseUrl;
 
@@ -67,7 +68,7 @@ class ApiService {
       if (imageFile != null) {
         final request = http.MultipartRequest("POST", Uri.parse("$baseUrl$path"));
         request.files.add(await http.MultipartFile.fromPath("file", imageFile.path));
-        final streamed = await request.send().timeout(_timeout);
+        final streamed = await request.send().timeout(_uploadTimeout);
         response = await http.Response.fromStream(streamed);
       } else {
         final request = http.Request(method, Uri.parse("$baseUrl$path"));
@@ -137,6 +138,8 @@ class ApiService {
       token: data["token"],
       className: data["class_name"] ?? "Class",
       room: data["room"],
+      phase: data["phase"] ?? "start",
+      spotRound: data["spot_round"] ?? 0,
     );
   }
 

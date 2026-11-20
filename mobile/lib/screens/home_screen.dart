@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:face_attendance/models/student.dart';
 import 'package:face_attendance/services/session_service.dart';
@@ -21,27 +23,43 @@ class _HomeScreenState extends State<HomeScreen> {
   QRSessionInfo? _activeSession;
   bool _isLoadingSession = true;
   String? _sessionError;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadActiveSession();
+    // Lightweight notification for the demo: when the teacher changes phase,
+    // the open app updates its instructions within a few seconds.
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadActiveSession(silent: true),
+    );
   }
 
-  Future<void> _loadActiveSession() async {
-    setState(() {
-      _isLoadingSession = true;
-      _sessionError = null;
-    });
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadActiveSession({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() {
+        _isLoadingSession = true;
+        _sessionError = null;
+      });
+    }
     try {
       final session = await ApiService.getActiveSession();
       if (!mounted) return;
       setState(() {
         _activeSession = session;
         _isLoadingSession = false;
+        _sessionError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || silent) return;
       setState(() {
         _activeSession = null;
         _isLoadingSession = false;
@@ -83,6 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _scanQr() {
+    final session = _activeSession;
+    if (session == null) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -93,156 +113,153 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Widget _sessionCard() {
+    if (_isLoadingSession) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_sessionError != null) {
+      return _messageCard(
+        icon: Icons.cloud_off,
+        title: 'Cannot load the class session',
+        detail: _sessionError!,
+        action: TextButton.icon(
+          onPressed: _loadActiveSession,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Retry'),
+        ),
+      );
+    }
+    final session = _activeSession;
+    if (session == null) {
+      return _messageCard(
+        icon: Icons.event_available,
+        title: 'No active class session',
+        detail: 'Your teacher has not opened attendance yet. This page updates automatically.',
+      );
+    }
+
+    final isFinal = session.phase == 'end';
+    final isSpot = session.phase == 'spot';
+    final color = isFinal ? Colors.green.shade700 : isSpot ? Colors.deepPurple : Colors.orange.shade800;
+    final instruction = isFinal
+        ? 'Scan the NEW final QR, then take your final selfie. Start + final selfies make your attendance Verified.'
+        : isSpot
+            ? 'Your teacher opened a spot check. Scan the QR and take another selfie to confirm you are still in class.'
+            : 'Scan the start QR and take your first selfie. Your status will be Partial until the final check-in.';
+
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        children: [
+          Icon(isFinal ? Icons.verified : isSpot ? Icons.fact_check : Icons.qr_code_2,
+              size: 46, color: color),
+          const SizedBox(height: 10),
+          Text(
+            session.phaseTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${session.className}${session.room != null ? ' · Room ${session.room}' : ''}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            instruction,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54, height: 1.35),
+          ),
+          if (isSpot) ...[
+            const SizedBox(height: 6),
+            Text('Spot check #${session.spotRound}', style: const TextStyle(color: Colors.black45)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _messageCard({
+    required IconData icon,
+    required String title,
+    required String detail,
+    Widget? action,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        children: [
+          Icon(icon, size: 46, color: Colors.grey),
+          const SizedBox(height: 10),
+          Text(title, textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text(detail, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+          if (action != null) action,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final session = _activeSession;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Student Attendance"),
+        title: const Text('Student Attendance'),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
-            tooltip: "My Attendance",
+            tooltip: 'My Attendance',
             onPressed: _openHistory,
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
-              switch (value) {
-                case "enroll":
-                  _openEnroll();
-                  break;
-                case "settings":
-                  _openSettings();
-                  break;
-                case "logout":
-                  _logout();
-                  break;
-              }
+              if (value == 'enroll') _openEnroll();
+              if (value == 'settings') _openSettings();
+              if (value == 'logout') _logout();
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: "enroll", child: ListTile(
-                leading: Icon(Icons.face),
-                title: Text("Enroll Face"),
-              )),
-              PopupMenuItem(value: "settings", child: ListTile(
-                leading: Icon(Icons.settings),
-                title: Text("Settings"),
-              )),
-              PopupMenuItem(value: "logout", child: ListTile(
-                leading: Icon(Icons.logout),
-                title: Text("Log Out"),
-              )),
+              PopupMenuItem(value: 'enroll', child: ListTile(leading: Icon(Icons.face), title: Text('Enroll Face'))),
+              PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings), title: Text('Settings'))),
+              PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('Log Out'))),
             ],
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: _loadActiveSession,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      child: Icon(Icons.person),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.student.name,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            "NIM: ${widget.student.nim}",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person)),
+                title: Text(widget.student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('NIM: ${widget.student.nim}'),
               ),
             ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: _isLoadingSession
-                    ? const Center(child: CircularProgressIndicator())
-                    : _sessionError != null
-                        ? Column(
-                            children: [
-                              const Icon(Icons.cloud_off, size: 44, color: Colors.grey),
-                              const SizedBox(height: 8),
-                              const Text(
-                                "Cannot load the class session",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _sessionError!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                              TextButton(
-                                onPressed: _loadActiveSession,
-                                child: const Text("Retry"),
-                              ),
-                            ],
-                          )
-                        : _activeSession == null
-                        ? const Column(
-                            children: [
-                              Icon(Icons.event_busy, size: 44, color: Colors.grey),
-                              SizedBox(height: 8),
-                              Text(
-                                "No active class session right now",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                "Ask your teacher to start a class session, then scan the QR code shown in class.",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.qr_code, size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    "Class in progress",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "${_activeSession!.className}"
-                                "${_activeSession!.room != null ? ' — Room ${_activeSession!.room}' : ''}",
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          ),
+            const SizedBox(height: 12),
+            Card(child: _sessionCard()),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: session == null ? null : _scanQr,
+              icon: const Icon(Icons.qr_code_scanner, size: 28),
+              label: Text(
+                session?.scanButtonLabel ?? 'Waiting for teacher',
+                style: const TextStyle(fontSize: 18),
               ),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 20)),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _scanQr,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text("Scan QR Code", style: TextStyle(fontSize: 18)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-              ),
+            const SizedBox(height: 10),
+            const Text(
+              'Two steps: start QR + selfie now, final QR + selfie before class ends.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black45, fontSize: 12),
             ),
           ],
         ),

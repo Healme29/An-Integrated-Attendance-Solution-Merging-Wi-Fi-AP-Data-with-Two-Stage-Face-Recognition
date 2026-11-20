@@ -10,6 +10,7 @@ class CameraScreen extends StatefulWidget {
   final String qrToken;
   final int? qrSessionId;
   final String? className;
+  final String phase;
 
   const CameraScreen({
     super.key,
@@ -17,6 +18,7 @@ class CameraScreen extends StatefulWidget {
     required this.qrToken,
     this.qrSessionId,
     this.className,
+    this.phase = 'start',
   });
 
   @override
@@ -107,7 +109,13 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Face Check-in")),
+      appBar: AppBar(
+        title: Text(switch (widget.phase) {
+          'end' => 'Final Selfie',
+          'spot' => 'Spot-Check Selfie',
+          _ => 'Start Selfie',
+        }),
+      ),
       body: FutureBuilder<void>(
         future: _initFuture,
         builder: (context, snapshot) {
@@ -189,6 +197,23 @@ class _CameraScreenState extends State<CameraScreen> {
                 alignment: Alignment.bottomCenter,
                 children: [
                   CameraPreview(_controller!),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.black54,
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        widget.phase == 'end'
+                            ? 'Take a fresh final selfie to complete your attendance.'
+                            : widget.phase == 'spot'
+                                ? 'Take a selfie for this spot check.'
+                                : 'Center your face and take your first selfie.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
                   if (_isProcessing)
                     const Padding(
                       padding: EdgeInsets.all(16),

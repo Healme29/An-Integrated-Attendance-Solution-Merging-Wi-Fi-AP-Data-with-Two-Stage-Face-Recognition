@@ -40,8 +40,8 @@ def parse_args() -> argparse.Namespace:
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--reset", action="store_true",
                         help="delete all existing students/attendance first")
-    parser.add_argument("--students", type=int, default=3,
-                        help="number of demo students to create (default: 3, max 99)")
+    parser.add_argument("--students", type=int, default=30,
+                        help="number of demo students to create (default: 30, max 99)")
     parser.add_argument("--db", default=None,
                         help="database path (default: value of DATABASE_PATH / backend/attendance.db)")
     return parser.parse_args()
@@ -101,10 +101,12 @@ def main() -> int:
             removed_artifacts = remove_stale_artifacts(old_ids)
             cursor.execute("DELETE FROM attendance")
             cursor.execute("DELETE FROM faces")
+            cursor.execute("DELETE FROM class_students")
+            cursor.execute("DELETE FROM classes")
             cursor.execute("DELETE FROM students")
             cursor.execute("DELETE FROM qr_sessions")
             # Restart ids at 1 so screenshots stay tidy.
-            for table in ("students", "attendance", "faces", "qr_sessions"):
+            for table in ("students", "attendance", "faces", "qr_sessions", "classes", "class_students"):
                 cursor.execute("DELETE FROM sqlite_sequence WHERE name = ?", (table,))
             conn.commit()
             print("reset: all students, faces, attendance and qr_sessions deleted")
@@ -132,20 +134,33 @@ def main() -> int:
         conn.commit()
         print(f"students ready: {len(student_ids)}")
 
-        # --- QR session active now ------------------------------------------
+        # --- class roster + QR session active now ---------------------------
+        cursor.execute(
+            "INSERT INTO classes (class_name, room, created_by) VALUES (?, ?, ?)",
+            ("Demo Class", "Demo Room A", "demo"),
+        )
+        class_id = cursor.lastrowid
+        for student_id, _name in student_ids:
+            cursor.execute(
+                "INSERT INTO class_students (class_id, student_id) VALUES (?, ?)",
+                (class_id, student_id),
+            )
+
         now = now_local()
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-        # Close any session a previous run left open: one active session max.
         cursor.execute(
-            "UPDATE qr_sessions SET is_active = 0, ended_at = ? WHERE is_active = 1 AND ended_at IS NULL",
+            "UPDATE qr_sessions SET is_active = 0, ended_at = ?, phase = 'closed' "
+            "WHERE is_active = 1 AND ended_at IS NULL",
             (timestamp,))
         cursor.execute(
-            "INSERT INTO qr_sessions (token, token_rotated_at, created_by, class_name, room, "
-            "started_at, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)",
-            (demo_token(), timestamp, "demo", "Demo Class", "Demo Room A", timestamp))
+            "INSERT INTO qr_sessions (token, token_rotated_at, created_by, class_id, class_name, room, "
+            "started_at, phase_started_at, is_active, phase, spot_round) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'start', 0)",
+            (demo_token(), timestamp, "demo", class_id, "Demo Class", "Demo Room A", timestamp, timestamp))
         session_id = cursor.lastrowid
         conn.commit()
-        print(f"qr session created: id={session_id} 'Demo Class' (open now, rotating token)")
+        print(f"class created: id={class_id} with {len(student_ids)} enrolled students")
+        print(f"qr session created: id={session_id} 'Demo Class' (START phase, rotating token)")
 
         # --- sample attendance rows ----------------------------------------
         demo_confidences = [0.86, 0.81, 0.73][: len(student_ids)]
@@ -153,8 +168,8 @@ def main() -> int:
         for (student_id, _name), confidence in zip(student_ids, demo_confidences):
             check_time = (now - timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
-                "INSERT INTO attendance (student_id, qr_session_id, confidence, ip_address, "
-                "status, timestamp, faces_detected) VALUES (?, ?, ?, ?, 'verified', ?, 1)",
+                "INSERT INTO attendance (student_id, qr_session_id, check_type, confidence, ip_address, "
+                "status, timestamp, faces_detected) VALUES (?, ?, 'start', ?, ?, 'verified', ?, 1)",
                 (student_id, session_id, confidence, "192.168.1.50", check_time))
             rows_added += 1
         conn.commit()

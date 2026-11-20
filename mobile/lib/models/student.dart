@@ -24,13 +24,39 @@ class QRSessionInfo {
   final String token;
   final String className;
   final String? room;
+  final String phase;
+  final int spotRound;
 
   QRSessionInfo({
     required this.sessionId,
     required this.token,
     required this.className,
     this.room,
+    this.phase = 'start',
+    this.spotRound = 0,
   });
+
+  String get phaseTitle {
+    switch (phase) {
+      case 'end':
+        return 'Final attendance is open';
+      case 'spot':
+        return 'Spot check is open';
+      default:
+        return 'Start attendance is open';
+    }
+  }
+
+  String get scanButtonLabel {
+    switch (phase) {
+      case 'end':
+        return 'Scan Final QR';
+      case 'spot':
+        return 'Scan Spot-Check QR';
+      default:
+        return 'Scan Start QR';
+    }
+  }
 }
 
 class QRValidateResult {
@@ -39,6 +65,8 @@ class QRValidateResult {
   final String? className;
   final String? room;
   final String? message;
+  final String phase;
+  final int spotRound;
 
   QRValidateResult({
     required this.valid,
@@ -46,6 +74,8 @@ class QRValidateResult {
     this.className,
     this.room,
     this.message,
+    this.phase = 'start',
+    this.spotRound = 0,
   });
 
   factory QRValidateResult.fromJson(Map<String, dynamic> json) {
@@ -55,6 +85,8 @@ class QRValidateResult {
       className: json['class_name'],
       room: json['room'],
       message: json['message'],
+      phase: json['phase'] ?? 'start',
+      spotRound: json['spot_round'] ?? 0,
     );
   }
 }
@@ -69,6 +101,8 @@ class AttendanceResult {
   final String timestamp;
   final String? className;
   final String? room;
+  final String checkType;
+  final int spotRound;
 
   AttendanceResult({
     required this.id,
@@ -80,6 +114,8 @@ class AttendanceResult {
     required this.timestamp,
     this.className,
     this.room,
+    this.checkType = 'start',
+    this.spotRound = 0,
   });
 
   factory AttendanceResult.fromJson(Map<String, dynamic> json) {
@@ -93,9 +129,11 @@ class AttendanceResult {
       timestamp: json['timestamp'] ?? '',
       className: json['class_name'],
       room: json['room'],
+      checkType: json['check_type'] ?? 'start',
+      spotRound: json['spot_round'] ?? 0,
     );
   }
 
-  /// Attendance confirmed: QR session valid + face matched.
   bool get isVerified => status == 'verified' || status == 'present';
+  bool get isPartial => status == 'partial';
 }

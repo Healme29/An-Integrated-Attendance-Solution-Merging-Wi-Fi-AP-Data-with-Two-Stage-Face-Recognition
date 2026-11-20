@@ -29,15 +29,13 @@ def fingerprint(contents: bytes) -> str:
 
 
 def assert_not_replayed(sha: str, student_id: int) -> None:
-    """Raise ValueError('photo_replay') when the exact same photo file was
-    already accepted TODAY by a DIFFERENT student — that means one person
-    is checking in for another (shared-file identity swap).
+    """Reject an exact image file already accepted today.
 
-    The same student reusing identical bytes passes here: repeating a stage
-    is already blocked by the duplicate-check-in rule, and two stages with
-    identical bytes are tolerable for the first version of this guard."""
+    Start and end attendance must use two fresh captures, so reuse is blocked
+    for the same student as well as for identity swaps between students.
+    """
     record = _used.get(sha)
-    if record and record[0] == now_local().strftime("%Y-%m-%d") and record[1] != student_id:
+    if record and record[0] == now_local().strftime("%Y-%m-%d"):
         raise ValueError("photo_replay")
 
 

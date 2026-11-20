@@ -42,7 +42,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _testConnection() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter the server URL first"), backgroundColor: Colors.red),
+      );
+      return;
+    }
     setState(() => _isTesting = true);
+    // Test exactly what the teacher/student typed, then keep it if it works.
+    await ApiService.setBaseUrl(url);
     final ok = await ApiService.pingServer();
     if (mounted) {
       setState(() => _lastPingOk = ok);

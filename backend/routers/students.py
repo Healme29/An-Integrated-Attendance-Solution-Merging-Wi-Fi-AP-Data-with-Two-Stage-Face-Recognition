@@ -1,8 +1,9 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from models.schemas import StudentCreate, StudentResponse
 from models.database import get_db
+from routers.teachers import require_teacher
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -21,7 +22,7 @@ async def list_students(nim: Optional[str] = None):
 
 
 @router.post("/", response_model=StudentResponse)
-async def create_student(data: StudentCreate):
+async def create_student(data: StudentCreate, teacher: str = Depends(require_teacher)):
     db = await get_db()
     try:
         await db.execute(
@@ -50,13 +51,14 @@ async def get_student(student_id: int):
 
 
 @router.delete("/{student_id}")
-async def delete_student(student_id: int):
+async def delete_student(student_id: int, teacher: str = Depends(require_teacher)):
     db = await get_db()
     cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
     if not await cursor.fetchone():
         await db.close()
         raise HTTPException(status_code=404, detail="Student not found")
     await db.execute("DELETE FROM attendance WHERE student_id = ?", (student_id,))
+    await db.execute("DELETE FROM class_students WHERE student_id = ?", (student_id,))
     await db.execute("DELETE FROM faces WHERE student_id = ?", (student_id,))
     await db.execute("DELETE FROM students WHERE id = ?", (student_id,))
     await db.commit()

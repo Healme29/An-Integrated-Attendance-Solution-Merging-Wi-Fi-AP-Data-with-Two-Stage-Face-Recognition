@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Face Attendance API",
     description="Integrated attendance system with face recognition and rotating QR code verification",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan
 )
 
@@ -74,4 +74,9 @@ async def health():
 
 @app.get("/dashboard", include_in_schema=False)
 async def dashboard():
-    return FileResponse(DASHBOARD_FILE, media_type="text/html")
+    # Never let the browser reuse the previous single-check-in dashboard.
+    return FileResponse(
+        DASHBOARD_FILE,
+        media_type="text/html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
