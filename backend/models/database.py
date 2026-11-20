@@ -10,10 +10,6 @@ async def get_db() -> aiosqlite.Connection:
 
 async def init_db():
     db = await aiosqlite.connect(str(DATABASE_PATH))
-    cursor = await db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schedule_students'"
-    )
-    had_schedule_students = await cursor.fetchone() is not None
     await db.executescript("""
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,74 +28,68 @@ async def init_db():
             FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS schedules (
+        -- One teacher-driven class session at a time. The teacher starts the
+        -- session from the dashboard; a rotating QR token is projected on the
+        -- classroom LCD and refreshed every QR_ROTATION_SECONDS.
+        CREATE TABLE IF NOT EXISTS qr_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT NOT NULL,
+            prev_token TEXT,
+            token_rotated_at TIMESTAMP NOT NULL,
+            created_by TEXT,
             class_name TEXT NOT NULL,
-            day_of_week INTEGER NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            ap_bssid TEXT,
             room TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            is_active INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER NOT NULL,
-            schedule_id INTEGER NOT NULL,
-            check_type TEXT NOT NULL CHECK(check_type IN ('start', 'end')),
+            qr_session_id INTEGER NOT NULL,
             confidence REAL,
-            wifi_verified INTEGER DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'pending',
+            ip_address TEXT,
+            status TEXT NOT NULL DEFAULT 'verified',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             faces_detected INTEGER DEFAULT 0,
             FOREIGN KEY (student_id) REFERENCES students(id),
-            FOREIGN KEY (schedule_id) REFERENCES schedules(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS schedule_students (
-            schedule_id INTEGER NOT NULL,
-            student_id INTEGER NOT NULL,
-            enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (schedule_id, student_id),
-            FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
-            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS ap_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mac_address TEXT NOT NULL,
-            ip_address TEXT,
-            bssid TEXT,
-            ssid TEXT,
-            scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
         );
     """)
-    # Felix 22.0 migration: preserve the old global roster by enrolling every
-    # existing student in every existing schedule once. New schedules remain
-    # empty until the teacher adds or imports their class roster.
-    if not had_schedule_students:
-        await db.execute(
-            """
-            INSERT OR IGNORE INTO schedule_students (schedule_id, student_id)
-            SELECT schedules.id, students.id FROM schedules CROSS JOIN students
-            """
-        )
-        await db.commit()
-    # Migration: very first schemas had no schedules.created_at; the dashboard
-    # reads it, so add it for databases created before this change. The INSERT
-    # path writes a CST (locale) timestamp explicitly.
-    try:
-        await db.execute("ALTER TABLE schedules ADD COLUMN created_at TIMESTAMP")
-        await db.commit()
-    except Exception:
-        pass  # column already exists
-
-    # Migration: attendance.faces_detected was added with the identity-binding
-    # fix (D-003) so the detector box count is auditable per check-in.
-    try:
-        await db.execute("ALTER TABLE attendance ADD COLUMN faces_detected INTEGER DEFAULT 0")
-        await db.commit()
-    except Exception:
-        pass  # column already exists
+    # Migration: the pre-QR attendance table was schedule-based (schedule_id,
+    # check_type, wifi_verified). SQLite cannot drop old columns portably, so
+    # an outdated table is rebuilt: student_id / confidence / status /
+    # timestamp / faces_detected survive with qr_session_id = 0 and NULL ip.
+    cursor = await db.execute("PRAGMA table_info(attendance)")
+    columns = {row[1] for row in await cursor.fetchall()}
+    if "schedule_id" in columns:
+        await db.executescript("""
+            DROP TABLE IF EXISTS attendance_legacy;
+            ALTER TABLE attendance RENAME TO attendance_legacy;
+            CREATE TABLE attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                qr_session_id INTEGER NOT NULL,
+                confidence REAL,
+                ip_address TEXT,
+                status TEXT NOT NULL DEFAULT 'verified',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                faces_detected INTEGER DEFAULT 0,
+                FOREIGN KEY (student_id) REFERENCES students(id),
+                FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
+            );
+            INSERT INTO attendance (student_id, qr_session_id, confidence, status, timestamp, faces_detected)
+            SELECT student_id, 0, confidence, status, timestamp, faces_detected
+            FROM attendance_legacy;
+            DROP TABLE attendance_legacy;
+        """)
+    # Legacy schedule-based tables are no longer part of the attendance flow;
+    # drop them so stale rosters/AP logs cannot be mistaken for live data.
+    await db.executescript("""
+        DROP TABLE IF EXISTS schedule_students;
+        DROP TABLE IF EXISTS schedules;
+        DROP TABLE IF EXISTS ap_logs;
+    """)
+    await db.commit()
     await db.close()

@@ -109,9 +109,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 child: Icon(
                                   status == "verified" || status == "present"
                                       ? Icons.check
-                                      : status == "partial"
-                                          ? Icons.access_time
-                                          : Icons.wifi_off,
+                                      : Icons.access_time,
                                   color: Colors.white,
                                 ),
                               ),
@@ -121,8 +119,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               subtitle: Text(
                                 "${_formatTimestamp(record["timestamp"]?.toString() ?? "")}\n"
-                                "${record["check_type"]?.toString().toUpperCase()} - "
-                                "Wi-Fi: ${record["wifi_verified"] == 1 || record["wifi_verified"] == true ? "Yes" : "No"} - "
                                 "Confidence: ${confidence.toStringAsFixed(1)}%",
                               ),
                               isThreeLine: true,

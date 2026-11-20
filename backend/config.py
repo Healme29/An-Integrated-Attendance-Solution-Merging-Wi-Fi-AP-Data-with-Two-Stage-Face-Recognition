@@ -28,18 +28,18 @@ MULTIPLE_FACES_MIN_RELATIVE_AREA = float(os.getenv("MULTIPLE_FACES_MIN_RELATIVE_
 INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")
 FACE_SIMILARITY_THRESHOLD = float(os.getenv("FACE_SIMILARITY_THRESHOLD", "0.5"))
 
-WI_FI_SCAN_TIMEOUT = int(os.getenv("WI_FI_SCAN_TIMEOUT", "3"))
-WI_FI_SUBNET = os.getenv("WI_FI_SUBNET")  # None -> auto-detect local subnet at scan time
+# School network check: a check-in is only accepted when the student's phone
+# reaches this server from the school Wi-Fi subnet (private ranges by default).
+# The QR code already pins the student to the room; this layer just proves the
+# device is on the school network.
+SCHOOL_SUBNET = os.getenv("SCHOOL_SUBNET", "192.168.0.0/16")
 
-ATTENDANCE_CHECK_WINDOW_MINUTES = int(os.getenv("ATTENDANCE_CHECK_WINDOW_MINUTES", "15"))
-
-# Strict classroom mode: when true, a check-in is refused (403) unless the
-# student's device MAC is visible on the classroom network and the server is
-# associated with the schedule's AP (when one is pinned). Off by default so
-# existing deployments keep the historical "face_only" fallback.
-REQUIRE_CLASSROOM_WIFI = os.getenv("REQUIRE_CLASSROOM_WIFI", "false").strip().lower() in (
-    "1", "true", "yes", "on",
-)
+# Rotating QR code: the dashboard displays a token that changes every
+# QR_ROTATION_SECONDS; a scanned token stays acceptable for QR_GRACE_SECONDS
+# after the swap (slow network / scan lag).
+QR_ROTATION_SECONDS = int(os.getenv("QR_ROTATION_SECONDS", "5"))
+QR_GRACE_SECONDS = int(os.getenv("QR_GRACE_SECONDS", "10"))
+QR_TOKEN_LENGTH = int(os.getenv("QR_TOKEN_LENGTH", "6"))
 
 # None -> use the server's system local time. Set to an IANA name
 # (e.g. "Asia/Jakarta") so schedule windows stay consistent regardless

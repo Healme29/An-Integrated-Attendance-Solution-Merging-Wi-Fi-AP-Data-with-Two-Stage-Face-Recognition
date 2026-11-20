@@ -44,44 +44,29 @@ async def create_test_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS schedules (
+        CREATE TABLE IF NOT EXISTS qr_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT NOT NULL,
+            prev_token TEXT,
+            token_rotated_at TIMESTAMP NOT NULL,
+            created_by TEXT,
             class_name TEXT NOT NULL,
-            day_of_week INTEGER NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            ap_bssid TEXT,
             room TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            is_active INTEGER NOT NULL DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER NOT NULL,
-            schedule_id INTEGER NOT NULL,
-            check_type TEXT NOT NULL CHECK(check_type IN ('start', 'end')),
+            qr_session_id INTEGER NOT NULL,
             confidence REAL,
-            wifi_verified INTEGER DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'pending',
+            ip_address TEXT,
+            status TEXT NOT NULL DEFAULT 'verified',
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             faces_detected INTEGER DEFAULT 0,
             FOREIGN KEY (student_id) REFERENCES students(id),
-            FOREIGN KEY (schedule_id) REFERENCES schedules(id)
-        );
-        CREATE TABLE IF NOT EXISTS schedule_students (
-            schedule_id INTEGER NOT NULL,
-            student_id INTEGER NOT NULL,
-            enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (schedule_id, student_id),
-            FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
-            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS ap_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mac_address TEXT NOT NULL,
-            ip_address TEXT,
-            bssid TEXT,
-            ssid TEXT,
-            scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
         );
     """)
     await db.commit()
@@ -125,6 +110,7 @@ async def test_db():
 
 @pytest.fixture
 def client():
+    # TestClient runs on localhost -> always inside the school subnet check.
     return TestClient(app)
 
 
@@ -191,30 +177,10 @@ def mock_face_recognition():
 
 
 @pytest.fixture(autouse=True)
-def mock_wifi_scanner():
-    with patch("services.attendance.check_mac_on_network") as mock:
-        mock.return_value = True
-        yield mock
-
-
-@pytest.fixture(autouse=True)
-def mock_current_bssid():
-    with patch("services.attendance.get_current_bssid") as mock:
-        mock.return_value = "aa:bb:cc:dd:ee:ff"
-        yield mock
-
-
-@pytest.fixture(autouse=True)
-def mock_wifi_scan_api():
-    """Avoid real network scans / BSSID queries from the /wifi API in tests."""
-    devices = [
-        {"ip": "192.168.1.10", "mac": "aa:bb:cc:dd:ee:ff"},
-        {"ip": "192.168.1.20", "mac": "11:22:33:44:55:66"},
-    ]
-    with patch("routers.wifi.scan_network_arp") as mock, \
-         patch("routers.wifi.get_current_bssid") as mock_bssid:
-        mock.return_value = devices
-        mock_bssid.return_value = "aa:bb:cc:dd:ee:ff"
+def mock_school_subnet():
+    """TestClient reports its host as the literal 'testclient' (not an IP),
+    so the router-level school-subnet check is mocked per test."""
+    with patch("routers.attendance.is_school_subnet", return_value=True) as mock:
         yield mock
 
 

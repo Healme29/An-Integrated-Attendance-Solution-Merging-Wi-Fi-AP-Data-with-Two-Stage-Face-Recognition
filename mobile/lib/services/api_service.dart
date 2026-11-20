@@ -17,8 +17,7 @@ class ApiService {
   static const String _urlKey = "backend_base_url";
 
   /// Default points at the laptop's Mobile Hotspot address (Windows always
-  /// assigns 192.168.137.1 to the hotspot host). This is the canonical demo
-  /// path because campus Wi-Fi blocks device-to-device traffic. For USB
+  /// assigns 192.168.137.1 to the hotspot host). For USB
   /// (`adb reverse tcp:8000 tcp:8000`) override in Settings with
   /// http://127.0.0.1:8000 instead.
   static const String _defaultBaseUrl = "http://192.168.137.1:8000";
@@ -114,13 +113,6 @@ class ApiService {
     return data.map((json) => Student.fromJson(json)).toList();
   }
 
-  /// Auto check-in prompt: which stage (if any) is actionable right now.
-  /// Contract: docs/A/auto_prompt_spec.md (backend GET /me/prompt).
-  static Future<Map<String, dynamic>> getCheckInPrompt(int studentId) async {
-    final data = await _get("/me/prompt?student_id=$studentId");
-    return Map<String, dynamic>.from(data as Map);
-  }
-
   /// Login lookup: returns the student with this NIM, or null if not found.
   static Future<Student?> findStudentByNim(String nim) async {
     final data = await _get("/students/?nim=$nim") as List<dynamic>;
@@ -128,24 +120,43 @@ class ApiService {
     return Student.fromJson(data.first);
   }
 
-  static Future<Student> createStudent(String name, String nim, String? macAddress) async {
+  static Future<Student> createStudent(String name, String nim) async {
     final data = await _send("POST", "/students/", body: {
       "name": name,
       "nim": nim,
-      "mac_address": macAddress,
     });
     return Student.fromJson(data);
   }
 
-  static Future<AttendanceResult> checkAttendance({
+  /// Active QR class session (teacher started it from the dashboard), or null.
+  static Future<QRSessionInfo?> getActiveSession() async {
+    final data = await _get("/qr-sessions/active");
+    if (data is! Map || data["active"] != true) return null;
+    return QRSessionInfo(
+      sessionId: data["session_id"],
+      token: data["token"],
+      className: data["class_name"] ?? "Class",
+      room: data["room"],
+    );
+  }
+
+  /// Validate a scanned QR token before opening the selfie camera.
+  static Future<QRValidateResult> validateQrToken(String token) async {
+    final data = await _send("POST", "/qr-sessions/validate", body: {
+      "token": token,
+    });
+    return QRValidateResult.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  /// QR-based check-in: the scanned token + a fresh selfie.
+  static Future<AttendanceResult> checkInQr({
     required int studentId,
-    required int scheduleId,
-    required String checkType,
+    required String token,
     required File imageFile,
   }) async {
     final data = await _send(
       "POST",
-      "/attendance/check?student_id=$studentId&schedule_id=$scheduleId&check_type=$checkType",
+      "/attendance/check-qr?student_id=$studentId&token=$token",
       imageFile: imageFile,
     );
     return AttendanceResult.fromJson(data);
@@ -164,32 +175,6 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getAttendanceHistory(int studentId) async {
     final data = await _get("/attendance/student/$studentId") as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
-  }
-
-  static Future<Map<String, dynamic>> scanWifi() async {
-    return await _get("/wifi/scan");
-  }
-
-  static Future<List<Map<String, dynamic>>> getSchedules() async {
-    final data = await _get("/schedules/") as List<dynamic>;
-    return data.cast<Map<String, dynamic>>();
-  }
-
-  /// Schedules whose attendance window includes right now (grace applied).
-  static Future<List<Map<String, dynamic>>> getActiveSchedules() async {
-    final data = await _get("/schedules/active") as List<dynamic>;
-    return data.cast<Map<String, dynamic>>();
-  }
-
-  /// Ask the server whether a check-in could succeed before opening the camera.
-  static Future<Map<String, dynamic>> preflight({
-    required int studentId,
-    required int scheduleId,
-    required String checkType,
-  }) async {
-    return await _get(
-        "/attendance/preflight?student_id=$studentId&schedule_id=$scheduleId&check_type=$checkType")
-        as Map<String, dynamic>;
   }
 
   /// Quick connectivity probe for the Settings screen.

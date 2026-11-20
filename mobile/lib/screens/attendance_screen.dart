@@ -9,37 +9,18 @@ class AttendanceScreen extends StatelessWidget {
     required this.result,
   });
 
-  Color get _statusColor {
-    if (result.isVerified) return Colors.green;
-    if (result.isPartial) return Colors.orange;
-    return Colors.deepOrange;
-  }
+  Color get _statusColor => result.isVerified ? Colors.green : Colors.deepOrange;
 
-  IconData get _statusIcon {
-    if (result.isVerified) return Icons.check_circle;
-    if (result.isPartial) return Icons.access_time;
-    return Icons.wifi_off;
-  }
+  IconData get _statusIcon => result.isVerified ? Icons.check_circle : Icons.error_outline;
 
-  String get _statusTitle {
-    if (result.isVerified) return "ATTENDANCE VERIFIED";
-    if (result.isPartial) return "START CHECK-IN RECORDED";
-    return "RECORDED (NO WI-FI)";
-  }
+  String get _statusTitle => result.isVerified ? "ATTENDANCE RECORDED" : "CHECK-IN FAILED";
 
-  String get _statusDetail {
-    if (result.isVerified) {
-      return "Both selfies matched and Wi-Fi verified.";
-    }
-    if (result.isPartial) {
-      return "Don't forget to scan again at the end of class.";
-    }
-    return "Your device was not detected on the class Wi-Fi network.";
-  }
+  String get _statusDetail => result.isVerified
+      ? "QR code valid, face matched, and your device is on the school network."
+      : "The check-in was not recorded. Please try again.";
 
   @override
   Widget build(BuildContext context) {
-    final bool success = result.isVerified;
     return Scaffold(
       appBar: AppBar(title: const Text("Attendance Result")),
       body: Center(
@@ -70,9 +51,15 @@ class AttendanceScreen extends StatelessWidget {
                 result.studentName ?? "Unknown",
                 style: const TextStyle(fontSize: 20),
               ),
+              if (result.className != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  "${result.className}${result.room != null ? ' — Room ${result.room}' : ''}",
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ],
               const SizedBox(height: 16),
-              _infoRow("Check-in", result.checkType.toUpperCase()),
-              _infoRow("Wi-Fi verified", result.wifiVerified ? "Yes" : "No"),
+              _infoRow("Time", result.timestamp),
               _infoRow(
                 "Confidence",
                 "${(result.confidence * 100).toStringAsFixed(1)}%",
@@ -80,7 +67,7 @@ class AttendanceScreen extends StatelessWidget {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(success ? "Done" : "Back"),
+                child: Text(result.isVerified ? "Done" : "Back"),
               ),
             ],
           ),
@@ -96,7 +83,7 @@ class AttendanceScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 16, color: Colors.grey)),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Flexible(child: Text(value, style: const TextStyle(fontSize: 16))),
         ],
       ),
     );

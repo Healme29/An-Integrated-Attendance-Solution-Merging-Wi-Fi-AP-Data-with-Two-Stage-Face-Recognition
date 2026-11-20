@@ -4,13 +4,14 @@ Usage:
     python backend/scripts/smoke_test.py [--base-url http://127.0.0.1:8000]
 
 Exercises every endpoint that does not require a real face photo:
-health, dashboard, students + NIM login, schedules, real Wi-Fi scan,
-attendance flow (face pipeline responds correctly to a faceless image),
-today list, and CSV export.
+health, dashboard, students + NIM login, QR session lifecycle (start,
+rotating token, validate, QR PNG), attendance flow (face pipeline responds
+correctly to a faceless image), today list, and CSV export.
 """
 import argparse
+import io
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 
@@ -35,8 +36,8 @@ def main(base_url: str) -> int:
     r = client.get("/dashboard")
     check("GET /dashboard",
           r.status_code == 200
-          and "Presentation Dashboard" in r.text
-          and "Student Attendance" in r.text)
+          and "Teacher Dashboard" in r.text
+          and "QR Code" in r.text)
 
     # 2. Student create + login by NIM
     nim = f"smoke{int(datetime.now().timestamp()) % 100000000}"
@@ -47,56 +48,39 @@ def main(base_url: str) -> int:
     r = client.get(f"/students/?nim={nim}")
     check("GET /students/?nim= (login)", r.status_code == 200 and len(r.json()) == 1)
 
-    # 3. Schedule valid right now (time-enforcement aware)
-    now = datetime.now()
-    r = client.post("/schedules/", json={
+    # 3. QR session lifecycle: start -> active info -> rotating token -> QR image
+    client.post("/qr-sessions/end")  # clear any session left over from a previous run
+    r = client.post("/qr-sessions/start", json={
         "class_name": "Smoke Test Class",
-        "day_of_week": now.weekday(),
-        "start_time": (now - timedelta(minutes=5)).strftime("%H:%M"),
-        "end_time": (now + timedelta(minutes=5)).strftime("%H:%M"),
         "room": "Smoke Room",
+        "created_by": "smoke",
     })
-    check("POST /schedules/ (active now)", r.status_code == 200)
-    schedule = r.json()
+    check("POST /qr-sessions/start", r.status_code == 200, str(r.json())[:80])
+    session = r.json()
 
-    # 4. Validation rejects bad schedule
-    r = client.post("/schedules/", json={
-        "class_name": "Bad", "day_of_week": 0, "start_time": "10:00", "end_time": "09:00"
-    })
-    check("POST /schedules/ rejects end<=start", r.status_code == 400)
+    r = client.get("/qr-sessions/active")
+    check("GET /qr-sessions/active",
+          r.status_code == 200
+          and r.json().get("active") is True
+          and r.json().get("session_id") == session["id"])
 
-    # 5. Real Wi-Fi scan (ARP + ping sweep on this machine's network)
-    r = client.get("/wifi/scan")
-    devices = r.json().get("devices", []) if r.status_code == 200 else []
-    check("GET /wifi/scan (real ARP scan)", r.status_code == 200, f"{len(devices)} devices found")
+    r = client.get("/qr-sessions/active/token")
+    token = r.json().get("token")
+    check("GET /qr-sessions/active/token", r.status_code == 200 and bool(token), f"token={token}")
 
-    # 6. Wi-Fi check endpoint: a random MAC must return on_network=False;
-    #    the machine's own MAC is reported as info (Windows never lists its
-    #    own MAC in its own ARP cache, so it legitimately may be absent).
-    import subprocess
-    import re
-    try:
-        ipconfig = subprocess.run(
-            ["getmac", "/fo", "csv", "/nh"], capture_output=True, text=True, timeout=15
-        )
-        macs = re.findall(r"(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", ipconfig.stdout)
-        own_mac = macs[0] if macs else None
-    except Exception:
-        own_mac = None
+    r = client.post("/qr-sessions/validate", json={"token": token})
+    check("POST /qr-sessions/validate (current token)",
+          r.status_code == 200 and r.json().get("valid") is True)
 
-    r = client.get("/wifi/check/DE:AD:BE:EF:00:01")
-    unknown_result = r.json().get("on_network") if r.status_code == 200 else None
-    check("GET /wifi/check (unknown MAC -> False)",
-          r.status_code == 200 and unknown_result is False)
+    r = client.post("/qr-sessions/validate", json={"token": "ZZZZZZ"})
+    check("POST /qr-sessions/validate (wrong token rejected)",
+          r.status_code == 200 and r.json().get("valid") is False)
 
-    if own_mac:
-        r = client.get(f"/wifi/check/{own_mac}")
-        found = r.json().get("on_network") if r.status_code == 200 else None
-        check("GET /wifi/check/{own-mac}", r.status_code == 200,
-              f"mac={own_mac} on_network={found} (may be False on isolated APs)")
+    r = client.get("/qr-sessions/active/qr.png")
+    check("GET /qr-sessions/active/qr.png",
+          r.status_code == 200 and r.headers.get("content-type") == "image/png")
 
-    # 7. Face pipeline: faceless image must be rejected cleanly
-    import io
+    # 4. Face pipeline: faceless image must be rejected cleanly
     import cv2
     import numpy as np
     ok, buf = cv2.imencode(".jpg", np.full((480, 640, 3), 128, dtype=np.uint8))
@@ -108,33 +92,39 @@ def main(base_url: str) -> int:
           str(r.json())[:80] if r.status_code == 200 else r.text[:80])
 
     r = client.post(
-        f"/attendance/check?student_id={student['id']}&schedule_id={schedule['id']}&check_type=start",
+        f"/attendance/check-qr?student_id={student['id']}&token={token}",
         files={"file": ("blank.jpg", blank_jpeg, "image/jpeg")},
     )
-    check("POST /attendance/check (no face -> 400)",
+    check("POST /attendance/check-qr (no face -> 400)",
           r.status_code == 400 and "no_face_detected" in r.text, r.text[:80])
 
-    # 8. Unknown schedule -> 404
     r = client.post(
-        f"/attendance/check?student_id={student['id']}&schedule_id=999999&check_type=start",
+        f"/attendance/check-qr?student_id={student['id']}&token=WRONG1",
         files={"file": ("blank.jpg", blank_jpeg, "image/jpeg")},
     )
-    # 400 (no face checked first) OR 404 depending on validation order - both acceptable?
-    # Our order checks the face first, so expect 400; a 404 would mean schedule checked first.
-    check("POST /attendance/check (unknown schedule handled)", r.status_code in (400, 404), r.text[:80])
+    check("POST /attendance/check-qr (invalid token -> 400)",
+          r.status_code == 400 and "Invalid or expired QR code" in r.text, r.text[:80])
 
-    # 9. Attendance listing + CSV export
-    r = client.get("/attendance/today")
+    # 5. Attendance listing + CSV export
+    r = client.get(f"/attendance/today?qr_session_id={session['id']}")
     check("GET /attendance/today", r.status_code == 200 and isinstance(r.json(), list))
 
-    r = client.get("/attendance/export/csv")
+    r = client.get(f"/attendance/export/csv?qr_session_id={session['id']}")
     check("GET /attendance/export/csv",
           r.status_code == 200 and r.text.startswith("id,timestamp"), "CSV header OK")
 
-    # 10. Cleanup smoke-test data
+    # 6. End session -> no more check-ins
+    r = client.post("/qr-sessions/end", json={"session_id": session["id"]})
+    check("POST /qr-sessions/end",
+          r.status_code == 200 and r.json().get("total_attendance") == 0)
+
+    r = client.get("/qr-sessions/active")
+    check("GET /qr-sessions/active (after end -> inactive)",
+          r.status_code == 200 and r.json().get("active") is False)
+
+    # 7. Cleanup smoke-test data
     r = client.delete(f"/students/{student['id']}")
-    client.delete(f"/schedules/{schedule['id']}")
-    check("Cleanup (delete smoke student/schedule)", r.status_code == 200)
+    check("Cleanup (delete smoke student)", r.status_code == 200)
 
     client.close()
 
