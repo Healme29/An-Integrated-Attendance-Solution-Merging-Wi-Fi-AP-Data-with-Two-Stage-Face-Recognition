@@ -9,6 +9,9 @@ Passive liveness (S1) is checked after face detection: the cropped face is
 analysed for screen/print artefacts. A spoof result rejects the check-in before
 any embedding comparison.
 """
+import asyncio
+
+from config import LIVENESS_ENABLED, LIVENESS_MIN_SCORE
 from services.face_recognition import get_embedding, compare_faces, is_match, load_embeddings
 from services.face_detection import detect_faces_from_bytes, dedupe_faces, distinct_people
 from services.liveness import assess_liveness
@@ -38,7 +41,7 @@ async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -
     if image is None:
         return {"recognized": False, "reason": "invalid_image"}
 
-    detected = detect_faces_from_bytes(image_bytes)
+    detected = await asyncio.to_thread(detect_faces_from_bytes, image_bytes)
     if not detected:
         return {"recognized": False, "reason": "no_face_detected"}
 
@@ -62,17 +65,18 @@ async def recognize_face(image_bytes: bytes, enforce_single_face: bool = True) -
     cy2 = min(h, int(y2 + (y2 - y1) * pad))
     face_crop = image[cy1:cy2, cx1:cx2]
 
-    is_live, live_score, live_reason = assess_liveness(face_crop)
-    if not is_live:
-        return {
-            "recognized": False,
-            "reason": "liveness_failed",
-            "liveness_score": live_score,
-            "liveness_reason": live_reason,
-            "faces_detected": len(detected),
-        }
+    if LIVENESS_ENABLED:
+        is_live, live_score, live_reason = await asyncio.to_thread(assess_liveness, face_crop)
+        if not is_live or live_score < LIVENESS_MIN_SCORE:
+            return {
+                "recognized": False,
+                "reason": "liveness_failed",
+                "liveness_score": live_score,
+                "liveness_reason": live_reason,
+                "faces_detected": len(detected),
+            }
 
-    embedding = get_embedding(image, primary["bbox"])
+    embedding = await asyncio.to_thread(get_embedding, image, primary["bbox"])
     if embedding is None:
         return {
             "recognized": False,

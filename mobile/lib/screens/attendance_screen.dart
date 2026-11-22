@@ -11,13 +11,21 @@ class AttendanceScreen extends StatelessWidget {
 
   Color get _statusColor => result.isVerified ? Colors.green : Colors.deepOrange;
 
-  IconData get _statusIcon => result.isVerified ? Icons.check_circle : Icons.error_outline;
+  IconData get _statusIcon => result.isVerified ? Icons.verified : Icons.check_circle_outline;
 
-  String get _statusTitle => result.isVerified ? "ATTENDANCE RECORDED" : "CHECK-IN FAILED";
+  String get _statusTitle {
+    if (result.checkType == 'spot') return 'SPOT CHECK RECORDED';
+    return result.isVerified ? 'ATTENDANCE VERIFIED' : 'START CHECK-IN RECORDED';
+  }
 
-  String get _statusDetail => result.isVerified
-      ? "QR code valid, face matched, and your device is on the school network."
-      : "The check-in was not recorded. Please try again.";
+  String get _statusDetail {
+    if (result.checkType == 'spot') {
+      return 'Your spot-check selfie was accepted. Remember to complete the final check-in before class ends.';
+    }
+    return result.isVerified
+        ? 'Both start and final selfies matched. Your attendance is complete.'
+        : 'Your first selfie was accepted. Before class ends, scan the final QR and take another selfie to become Verified.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +67,11 @@ class AttendanceScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
+              _infoRow("Stage", switch (result.checkType) {
+                'end' => 'Final check-in',
+                'spot' => 'Spot check #${result.spotRound}',
+                _ => 'Start check-in',
+              }),
               _infoRow("Time", result.timestamp),
               _infoRow(
                 "Confidence",

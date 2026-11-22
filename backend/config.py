@@ -40,6 +40,22 @@ SCHOOL_SUBNET = os.getenv("SCHOOL_SUBNET", "192.168.0.0/16")
 QR_ROTATION_SECONDS = int(os.getenv("QR_ROTATION_SECONDS", "5"))
 QR_GRACE_SECONDS = int(os.getenv("QR_GRACE_SECONDS", "10"))
 QR_TOKEN_LENGTH = int(os.getenv("QR_TOKEN_LENGTH", "6"))
+FINAL_CHECK_GRACE_MINUTES = int(os.getenv("FINAL_CHECK_GRACE_MINUTES", "5"))
+
+# Teacher authentication for dashboard actions. Credentials are deliberately
+# environment-driven for the demo; use a stronger identity provider in production.
+TEACHER_USERNAME = os.getenv("TEACHER_USERNAME", "teacher")
+TEACHER_PASSWORD = os.getenv("TEACHER_PASSWORD", "attendance2026")
+TEACHER_TOKEN_HOURS = int(os.getenv("TEACHER_TOKEN_HOURS", "8"))
+
+# Passive anti-spoof heuristic. Disable only for controlled unit tests or when
+# evaluating its false-reject rate on the actual classroom devices.
+LIVENESS_ENABLED = os.getenv("LIVENESS_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+LIVENESS_MIN_SCORE = float(os.getenv("LIVENESS_MIN_SCORE", "0.35"))
+
+# Limit expensive face-recognition work so a whole class scanning at once does
+# not exhaust the demo laptop. Excess requests receive a retryable 429 response.
+MAX_CONCURRENT_RECOGNITIONS = int(os.getenv("MAX_CONCURRENT_RECOGNITIONS", "4"))
 
 # None -> use the server's system local time. Set to an IANA name
 # (e.g. "Asia/Jakarta") so schedule windows stay consistent regardless

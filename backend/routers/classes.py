@@ -4,8 +4,9 @@ One class groups students. One student belongs to at most one class (enforced
 in the UI). The dashboard roster shows only students enrolled in the session's
 class — never students from other classes.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from models.database import get_db
+from routers.teachers import require_teacher
 from models.schemas import (
     ClassCreate,
     ClassResponse,
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/classes", tags=["classes"])
 
 
 @router.post("/", response_model=ClassResponse)
-async def create_class(data: ClassCreate, created_by: str = "teacher"):
+async def create_class(data: ClassCreate, created_by: str = Depends(require_teacher)):
     db = await get_db()
     try:
         cursor = await db.execute(
@@ -66,7 +67,7 @@ async def list_class_students(class_id: int):
 
 
 @router.post("/{class_id}/students", response_model=ClassStudentResponse)
-async def add_student_to_class(class_id: int, data: ClassStudentAdd):
+async def add_student_to_class(class_id: int, data: ClassStudentAdd, teacher: str = Depends(require_teacher)):
     db = await get_db()
     try:
         # Verify class exists
@@ -111,7 +112,7 @@ async def add_student_to_class(class_id: int, data: ClassStudentAdd):
 
 
 @router.delete("/{class_id}/students/{student_id}")
-async def remove_student_from_class(class_id: int, student_id: int):
+async def remove_student_from_class(class_id: int, student_id: int, teacher: str = Depends(require_teacher)):
     db = await get_db()
     try:
         cursor = await db.execute(
@@ -122,5 +123,32 @@ async def remove_student_from_class(class_id: int, student_id: int):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Enrollment not found")
         return {"message": "Student removed from class"}
+    finally:
+        await db.close()
+
+
+@router.delete("/{class_id}")
+async def delete_class(class_id: int, teacher: str = Depends(require_teacher)):
+    """Delete a class. Rejected if any session (active or closed) still exists,
+    so attendance history is never accidentally destroyed."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT id FROM classes WHERE id = ?", (class_id,))
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Class not found")
+
+        cursor = await db.execute(
+            "SELECT id FROM qr_sessions WHERE class_id = ? LIMIT 1", (class_id,)
+        )
+        if await cursor.fetchone():
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete a class that has sessions. Close or remove sessions first.",
+            )
+
+        await db.execute("DELETE FROM class_students WHERE class_id = ?", (class_id,))
+        await db.execute("DELETE FROM classes WHERE id = ?", (class_id,))
+        await db.commit()
+        return {"message": "Class deleted"}
     finally:
         await db.close()
