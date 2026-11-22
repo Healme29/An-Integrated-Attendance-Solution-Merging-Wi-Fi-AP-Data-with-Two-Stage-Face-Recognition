@@ -1,0 +1,431 @@
+# PROJECT CONTEXT — Claude Assistant Reference
+
+> Copy this entire file into a Claude Project as the system context.
+> The Claude Project will be used for development discussion on this codebase.
+
+---
+
+## 1. PROJECT IDENTITY
+
+**Project name:** An Integrated Attendance Solution Merging Wi-Fi AP Data with Two-Stage Face Recognition.
+
+**What it does:** Replaces manual university roll-call. A student logs in to a Flutter mobile app with their NIM (student ID number), takes a selfie at the START of class and another at the END. The backend verifies identity (face recognition) AND that the student's phone is on the classroom Wi-Fi network. Attendance is granted only when ALL THREE conditions are met:
+
+| # | Condition | How it is checked |
+|---|-----------|-------------------|
+| 1 | Correct Wi-Fi AP | Student's device MAC address is found on the classroom network; if the schedule pins an AP (`ap_bssid`), the server's own associated BSSID must match it |
+| 2 | Valid class time | Check-in within the schedule window ± 15-minute grace period (`ATTENDANCE_CHECK_WINDOW_MINUTES`), on the correct weekday |
+| 3 | Two selfies matched | BOTH a `start` and an `end` check-in for the same student + schedule, each with a face that matches the enrolled face |
+
+**Users:** students (Flutter mobile app) and teachers (web dashboard at `/dashboard`).
+
+**LANGUAGE RULE:** ALL outputs and inputs in the project must be in English — app UI text, API responses and error `detail` strings, server logs, code comments, docstrings, identifiers, commit messages, every file under `docs/`, CSV headers, dashboard text, slides, demo video, and the final report. The two deliberate exceptions: (1) team group chat may be Indonesian; (2) work-package instruction files for members A, B, C are written in Indonesian, and instructions for D are in English — but whatever those instructions *produce* is still English.
+
+---
+
+## 2. ARCHITECTURE
+
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Backend | Python + FastAPI 0.115 + Uvicorn | Single app, 5 routers |
+| Database | SQLite via aiosqlite (async) | `backend/attendance.db`, 6 tables |
+| Face detection | Ultralytics YOLOv8-face 8.2.100 (`yolov8m-face.pt`) | Weights NOT in git, download manually |
+| Face recognition | InsightFace ArcFace `buffalo_l`, ONNX Runtime 1.18.1 | Auto-downloads on first use (~330 MB), 512-D embeddings, cosine similarity |
+| Wi-Fi detection | Scapy ARP scan (Windows needs Npcap in WinPcap mode) | Subnet auto-detect if `WI_FI_SUBNET` unset |
+| Mobile app | Flutter >= 3.0 (Android + iOS) | `mobile/`, http + camera + shared_preferences |
+| Teacher dashboard | Single-file vanilla HTML/JS | `backend/static/dashboard.html`, served at `/dashboard` |
+| Testing | pytest, pytest-asyncio, httpx | Services mocked, no ML models needed |
+| Deployment | Docker + docker-compose OR native uvicorn | Volume `backend-data` persists DB + embeddings |
+
+Directory layout:
+
+```
+project-root/
+├── AGENTS.md                      # Coding rules for agents
+├── CLAUDE_CONTEXT.txt             # This file
+├── README.md                      # Accurate, up to date
+├── docker-compose.yml
+├── backend/
+│   ├── main.py                    # FastAPI app, CORS, /health, /dashboard
+│   ├── config.py                  # ALL settings, env-overridable
+│   ├── Dockerfile
+│   ├── attendance.db              # SQLite (gitignored, do not commit)
+│   ├── models/                    # database.py (schema), schemas.py (Pydantic)
+│   ├── services/                  # face_detection, face_recognition, wifi_scanner, attendance
+│   ├── routers/                   # students, faces, attendance, schedules, wifi
+│   ├── utils/helpers.py           # ensure_dir, image_bytes_to_array, ...
+│   ├── static/dashboard.html      # Teacher dashboard (single file, no build step)
+│   ├── scripts/                   # smoke_test.py, evaluate_threshold.py, seed_demo.py, reenroll_clean.py
+│   ├── tests/                     # 205 pytest tests (all pass as of 2026-11-12)
+│   └── data/
+│       ├── models/                # yolov8m-face.pt (downloaded, not in git)
+│       ├── embeddings/            # student_<id>.pkl (pickled 512-D embeddings)
+│       └── faces/                 # enrolled selfie images
+├── docs/                          # ALL project documentation
+│   ├── PROJECT_CONTEXT.md         # Master reference (older than this file)
+│   ├── PLAN_TIMELINE.md           # Milestones, living progress log
+│   ├── threshold_report.md        # FAR/FRR/EER evaluation
+│   ├── meetings/                  # Meeting minutes (English)
+│   ├── A/ B/ C/ D/                # Per-member TASK.md + PROMPT.md + DECISIONS.md
+│   └── archive/                   # OUTDATED historical docs — do not use as reference
+└── mobile/
+    └── lib/
+        ├── main.dart              # Login-state routing
+        ├── models/student.dart
+        ├── screens/               # login, home, camera, enroll, history, settings, attendance
+        └── services/              # api_service.dart, session_service.dart
+```
+
+---
+
+## 3. BUSINESS RULES (ALREADY IMPLEMENTED — DO NOT REDESIGN)
+
+### Two-stage status flow
+
+```
+start check-in  →  row inserted with status "partial"
+end check-in    →  finds the "start" row, finalizes BOTH rows:
+                     "verified"    = face matched AND Wi-Fi confirmed on both checks
+                     "face_only"   = face matched but Wi-Fi not confirmed
+```
+
+| Status | Meaning |
+|--------|---------|
+| `partial` | Only the start check-in exists (waiting for end selfie) |
+| `verified` | Start + end complete, face + Wi-Fi OK → attendance VALID |
+| `face_only` | Start + end complete, face OK but Wi-Fi not verified |
+| `present` / `pending` | Legacy values, kept for backward compatibility |
+
+### Error responses
+
+| Situation | HTTP code | Detail |
+|-----------|-----------|--------|
+| Duplicate check-in (same student + schedule + stage) | 409 | `duplicate_check_in` |
+| `end` without a prior `start` | 409 | `missing_start_check` |
+| Check-in outside class window ± grace | 403 | `outside_class_time` |
+| Check-in on the wrong weekday | 403 | `wrong_day` |
+| Unknown schedule id | 404 | `schedule_not_found` |
+| Check-in not on classroom network (strict mode) | 403 | `not_on_classroom_network` |
+| Overlapping schedules in same room | 409 | (create/update validation) |
+| Upload too large / not JPEG/PNG / face too small | 413 / 400 | enrollment hardening |
+| Multiple faces in photo (area ≥ 10% of largest) | 400 | `Multiple faces detected` |
+| Face matches different student | 403 | `Identity mismatch` (no row written) |
+
+### Strict classroom mode
+
+- `REQUIRE_CLASSROOM_WIFI=true` → check-in from a device NOT visible on the classroom network (and, when `ap_bssid` is pinned, a server NOT on that BSSID) → HTTP 403 "You are not connected to the classroom network." No row is written.
+- Off by default (`false`), which keeps the legacy `face_only` status.
+- Enabled for the demo (decision D-006).
+- The mobile app calls `GET /attendance/preflight` before opening the camera, so out-of-window / off-network check-ins are blocked client-side too.
+- The mobile app lists only `/schedules/active` (not all schedules), removing the "pick an old schedule and take a photo" dead end.
+
+### Face detection and recognition
+
+- `get_embedding(image, bbox)` expects the FULL image plus the YOLO bounding box (it crops with margin internally). Does NOT take a pre-cropped face.
+- Enrollment stores only the largest distinct face; rejects photos with a second face (area ≥ 10% of largest).
+- Nested duplicate boxes are merged first (containment ≥ 0.6).
+- `attendance.faces_detected` records the raw YOLO box count per check-in (audit column).
+- `attendance.check_type` is 'start' or 'end'.
+
+### Other verified facts
+
+- Cosine similarity threshold: **0.5** (env `FACE_SIMILARITY_THRESHOLD`) — measured, not guessed (decision D-001).
+- YOLO config: `conf 0.25`, `imgsz 640` (decision D-002, measured 3.8× faster than 1280 with identical recall on close-up photos).
+- Wi-Fi scan results deduplicated per MAC for 60 seconds.
+- `WI_FI_SUBNET` unset → subnet auto-detected from the machine's primary interface at scan time (real netmask, capped at one /24).
+- Timestamps stored as explicit LOCAL time strings (SQLite `CURRENT_TIMESTAMP` is UTC and would break date comparisons). `TIMEZONE` env pins the zone, e.g. `Asia/Jakarta`.
+- Enrollment hardening: JPEG/PNG magic-byte check, `MAX_UPLOAD_BYTES` cap (413), `MIN_FACE_BBOX_PX` filter (default 40 px), max `MAX_EMBEDDINGS_PER_STUDENT` (default 5) samples per student.
+- Schedule creation/update rejects overlapping time slots in the same room (409).
+- `ap_logs` is populated by `/wifi/scan` and `/wifi/check/{mac}` (60 s dedupe window).
+
+---
+
+## 4. DATABASE SCHEMA (6 tables)
+
+- **students**: id, name, nim (UNIQUE), mac_address, created_at
+- **faces**: id, student_id → students.id, embedding (BLOB, pickled), image_path, created_at
+- **schedules**: id, class_name, day_of_week (0=Mon … 6=Sun), start_time "HH:MM", end_time "HH:MM", ap_bssid, room, created_at
+- **attendance**: id, student_id, schedule_id, check_type ('start'|'end'), confidence, wifi_verified (0/1), status, timestamp, faces_detected (raw YOLO box count)
+- **ap_logs**: id, mac_address, ip_address, bssid, ssid, scan_time (60 s dedupe window)
+- **schedule_students**: schedule_id → schedules.id, student_id → students.id, enrolled_at (PRIMARY KEY = schedule_id + student_id; ON DELETE CASCADE for both foreign keys)
+
+The `schedule_students` table was added by "Felix 22.1" (merged to main 2026-11-12) to support class-based attendance sheets with roster management. Migration: on first run after adding the table, every existing student is enrolled in every existing schedule (`INSERT OR IGNORE`).
+
+---
+
+## 5. API ENDPOINTS (COMPLETE — including Felix 22.1 additions)
+
+### Students
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/students/?nim=` | List students, or look up one by NIM (login) |
+| POST | `/students/?schedule_id=` | Create student (name, nim, mac_address); optionally enroll in a schedule |
+| GET | `/students/{id}` | Get student by ID |
+| DELETE | `/students/{id}` | Delete student (also removes schedule enrollments) |
+| PUT | `/students/{id}/mac` | Update MAC address |
+| GET | `/students/attendance-sheet?schedule_id=&date=` | Full class roster with attendance status for one date (Felix 22.1) |
+| POST | `/students/import/csv?schedule_id=` | Bulk-import/roster from CSV (name, nim, mac_address) (Felix 22.1) |
+| GET | `/students/export/xlsx?schedule_id=&date=` | Download full roster + attendance result as Excel file (Felix 22.1) |
+| POST | `/students/{id}/schedules/{sid}` | Enroll student in a schedule (Felix 22.1) |
+| DELETE | `/students/{id}/schedules/{sid}` | Remove student from a schedule roster (Felix 22.1) |
+
+### Faces
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/faces/enroll?student_id=` | Enroll face (upload image, hardening rules) |
+| POST | `/faces/recognize` | Recognize face (upload image) |
+
+### Attendance
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/attendance/check?student_id=&schedule_id=&check_type=` | Check attendance (identity-bound, time-enforced, network-enforced) |
+| GET | `/attendance/preflight?student_id=&schedule_id=&check_type=` | Whether a check-in could succeed (window, classroom network, duplicates) |
+| GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
+| GET | `/attendance/student/{id}` | History (limit, offset, date_from, date_to; total in `X-Total-Count`) |
+| GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |
+
+### Schedules
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/schedules/` | List schedules |
+| GET | `/schedules/active` | Schedules whose attendance window includes now |
+| POST | `/schedules/` | Create schedule (validated, overlap check) |
+| GET | `/schedules/{id}` | Get schedule by ID |
+| PUT | `/schedules/{id}` | Update schedule (validated) |
+| DELETE | `/schedules/{id}` | Delete schedule (also removes schedule_students) |
+| GET | `/schedules/export/csv` | Export all schedules as CSV (Felix 22.1) |
+| POST | `/schedules/import/csv` | Import schedules from CSV (Felix 22.1) |
+
+### Wi-Fi
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/wifi/scan` | Scan network devices, writes `ap_logs` |
+| GET | `/wifi/check/{mac}` | Check if MAC is on network now |
+
+### Other
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/dashboard` | Teacher web dashboard (HTML, `include_in_schema=False`) |
+| GET | `/health` | Health check with database ping (503 on DB failure) |
+| GET | `/` | Root: `{"message":"Face Attendance API is running", "docs":"/docs", "dashboard":"/dashboard"}` |
+
+---
+
+## 6. CONFIGURATION (all env-overridable via `backend/config.py`)
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `DATABASE_PATH` | `backend/attendance.db` | SQLite file location |
+| `DATA_DIR` | `backend/data` | Models, embeddings, faces |
+| `FACE_SIMILARITY_THRESHOLD` | `0.5` | Cosine match threshold (measured, decision D-001) |
+| `INSIGHTFACE_MODEL` | `buffalo_l` | Recognition model pack |
+| `YOLO_CONF_THRESHOLD` | `0.25` | Detection confidence (measured, decision D-002) |
+| `YOLO_IMG_SIZE` | `640` | Detection input size (measured, decision D-002) |
+| `ATTENDANCE_CHECK_WINDOW_MINUTES` | `15` | Grace period around class time |
+| `WI_FI_SUBNET` | *(unset → auto-detect)* | Subnet to scan (reads real netmask, caps at /24) |
+| `WI_FI_SCAN_TIMEOUT` | `3` | Seconds |
+| `TIMEZONE` | *(unset → system local)* | IANA name, e.g. `Asia/Jakarta` |
+| `MAX_UPLOAD_BYTES` | `10485760` | Upload cap (10 MB, 413 above) |
+| `MAX_EMBEDDINGS_PER_STUDENT` | `5` | Enrollment sample cap |
+| `MIN_FACE_BBOX_PX` | `40` | Reject tiny faces |
+| `CORS_ORIGINS` | `*` | Comma-separated whitelist |
+| `REQUIRE_CLASSROOM_WIFI` | `false` | Strict mode: 403 if device not on classroom network (decision D-006) |
+
+**Locked values for the demo:** threshold 0.5, conf 0.25, imgsz 640, `REQUIRE_CLASSROOM_WIFI=true` for demo machine.
+
+---
+
+## 7. MEASURED EVIDENCE (as of 2026-11-12)
+
+| Metric | Result | Source |
+|--------|--------|--------|
+| Threshold (FAR/FRR) | FAR = FRR = 0.00 across 0.25–0.65 band; 15 samples, 30 genuine pairs, 75 impostor | `docs/threshold_report.md`, decision D-001 |
+| YOLO 640 vs 1280 | 52/52 detection at both sizes; 640 median 481 ms vs 1280 median 1816 ms (3.8× faster); 0/15 nested duplicates vs 15/15 | `docs/A/yolo_tuning.md`, decision D-002 |
+| Robustness (mini) | 46/46 usable accepted, 0 false accepts, p50 1069 ms (bright/dim/angled × 3 people) | `docs/A/robustness_test.md` |
+| Test suite | 205 passed (was 124 at baseline; grew with strict classroom mode + Felix 22.1) | `python -m pytest backend/tests -q` |
+| Smoke test (E2E) | 15/15 checks passed | `backend/scripts/smoke_test.py` |
+| G1 demo env | Cold start 5.9 s, `/health` ok, DB persistence verified, `TIMEZONE` proven (8 h gap), smoke test 14/14 | `docs/B/demo_environment.md` |
+| Wi-Fi scan on campus | 2.4 s fresh, 0 s cached; only gateway visible (client isolation); BSSID `54:2b:de:fd:90:21` stable | `docs/B/network_validation.md` |
+| BSSID probe fix | `iw` → `nmcli` → `iwconfig` chain; handles escaped colons in `nmcli` output; 15 new tests | decision D-009 |
+| Migration (schedule_students) | 3 existing students auto-enrolled in 1 existing schedule; 19 attendance rows intact | Tested on DB copy 2026-11-12 |
+
+---
+
+## 8. NETWORK FINDINGS & ACCEPTED CLAIMS
+
+### Campus network measurement (NJUPT-CMCC)
+- SSID: shared across many classrooms; BSSID at test location `50:98:b8:c9:2b:e2`.
+- Only the gateway visible on ARP scan — **client isolation or VLAN splitting**.
+- Subnet: interface `/17` (`10.163.216.0/17`), but scan capped at `/24` (decision D-004).
+- Result: student phones NOT visible → strict classroom mode would reject every check-in (403) if demo ran on campus SSID as-is.
+
+### Demo network options (both approved by supervisor)
+1. **Campus AP in the actual classroom** — preferred because BSSID proves the server is on the scheduled AP; will re-test on-site to confirm whether devices are visible.
+2. **Own hotspot / portable router** — fallback if campus network isolates. SSID `Attendance-Demo`, all phones + server join, ARP scan works (measured on flat network).
+
+### Accepted claims (supervisor confirmed)
+- "The check-in was made within the coverage area of the scheduled AP" is acceptable for assessment, stated honestly.
+- Supervisor's reasoning: one AP practically covers one classroom; even if signal spills to adjacent rooms, AP capacity cannot serve all students from multiple rooms simultaneously.
+- What we explicitly do NOT claim: per-device AP association, RSSI-based distance, or "inside the room" — these require the AP management plane (SSH/SNMP/controller API), which we have no authorisation for. This is documented as future work in `docs/B/ap_management_plane.md`.
+
+---
+
+## 9. TIMELINE & CURRENT STATUS (as of 2026-11-16)
+
+### Accelerated scope (decision D-005, 2026-11-09)
+Original M2 demo was ~Jan 18, 2027. Accelerated to **presentation ~Nov 23, end-of-Nov demo** by the supervisor. Gates G7–G16 re-sequenced; full classroom pilot (G7→G9→G10) moved to December.
+
+### Demo set (end of November)
+NIM login → face enrollment (including two-person rejection) → two-stage check-in (start/partial → end/verified) → teacher dashboard with live rows → CSV export → protection demos (400 multiple faces, 403 identity mismatch, 409 duplicate). Mini robustness study (3 people × 3 conditions) for evidence slides.
+
+### Current gates status
+- G1 (demo env alive) ✅ — B
+- G2 (mobile on 2nd phone) ✅ — C
+- G3 (ML config locked) ✅ — A
+- G4 (teacher date/roster) ⏳ — reassigned to C (C-003), due Nov 22
+- G5 (offline fallback) ⏳ — B, due Nov 22
+- G6 (auto check-in) deferred — C (C-002), demo uses manual APK v0.9.0
+- G7–G16 — re-sequenced around end-of-Nov demo
+
+### Supervisor interactions
+- **2026-11-11:** Asked whether demo on own network is OK → yes. Asked whether "coverage area" claim is acceptable → yes (capacity argument).
+- **2026-11-16:** Supervisor replied: use existing NJUPT Wi-Fi (no separate AP needed). Online meeting available Monday → Tencent Meeting link requested. We will re-test NJUPT in the actual demo room first to confirm device visibility.
+- **Meeting:** Monday, Nov 16, 19:00 via Tencent Meeting (all 4 team members attending).
+
+### Team role changes
+- Dashboard ownership (`backend/static/dashboard.html`) + slides/backup-video: transferred from D to C (C-001).
+- G6 (auto check-in) deferred until after end-of-Nov presentation (C-002).
+- G4 (teacher confirmation) reassigned from D to C (C-003).
+- **NEW (2026-11-16):** Member B shifts to focus on application design. The current user (team lead, previously A) takes over server and application technical work. This is an in-progress reassignment being documented.
+
+---
+
+## 10. DEMO FLOW (4 phases, ~5 minutes total)
+
+### Phase 0 — Prep (before audience arrives)
+1. Laptop: env locked (`TIMEZONE`, `REQUIRE_CLASSROOM_WIFI=true`, threshold 0.5), DB backup + restore procedure, backup video on laptop.
+2. Network: start hotspot `Attendance-Demo` (or join campus AP), server gets IP.
+3. Create schedule covering demo time (window ±15 min grace).
+4. Read BSSID from `/wifi/scan` → pin to schedule (`PUT /schedules/{id}`).
+5. Enroll 2–3 demo faces (disable private/random MAC on demo phones).
+6. Warm up model: one `/faces/recognize` call so first real check-in is fast.
+
+### Phase 1 — Opening (~30 sec)
+Narrate the 3 conditions, then open the app.
+
+### Phase 2 — Main flow (~2 min)
+1. Login NIM on phone → only active schedules shown.
+2. Enroll face + demo two-person rejection (400).
+3. Start check-in → photo → status `partial`.
+4. Dashboard shows partial row live.
+5. End check-in → photo → BOTH rows final: `verified`.
+6. `/wifi/scan` shows phone MAC + BSSID matches schedule.
+7. CSV export from dashboard.
+
+### Phase 3 — Protection demos (~1 min)
+1. Duplicate check-in → 409, no double rows.
+2. Off-network check-in → app refuses before camera opens (preflight), server 403, no row written. **This is the strongest visual proof of AP presence.**
+3. (Optional) Wrong person's face → 403 identity mismatch.
+
+### Phase 4 — Close (~30 sec)
+Honest limitations slide: AP presence = proxy for room presence (one AP ≈ one class, approved by supervisor); per-device AP/RSSI + anti-spoofing = future work.
+
+### Fallback ladder (if live demo fails)
+1. `/wifi/scan` not seeing phones → restart with `REQUIRE_CLASSROOM_WIFI=false`, demo face-only path, explain openly (sentence pre-written in `docs/B/offline_fallback.md`).
+2. Live flow completely stuck → play backup video (30–60 s, gate G14).
+3. DB corrupt → restore backup (~6 s) or seed with `seed_demo.py`.
+
+---
+
+## 11. KEY DECISIONS (summary — full text in `docs/A/DECISIONS.md` and `docs/B/DECISIONS.md`)
+
+| ID | Title | Decision |
+|----|-------|----------|
+| D-001 | Similarity threshold | Keep 0.5 (FAR=FRR=0 on small sample) |
+| D-002 | Detection settings | conf 0.25, imgsz 640 (3.8× faster, same recall on close-ups) |
+| D-003 | Identity binding + one-face | student_id required, 403 on mismatch, reject 2+ faces |
+| D-004 | Rebuild demo profiles | Delete contaminated embeddings, re-enroll from single-person photos |
+| D-005 | Accelerated demo timeline | End-of-Nov presentation, pilot moves to December |
+| D-006 | Strict classroom mode | `REQUIRE_CLASSROOM_WIFI=true` for demo; 403 before camera opens |
+| B/D-001 | Docker vs native | Native on demo machine (container can't see host Wi-Fi LAN) |
+| B/D-002 | Demo machine | Native uvicorn, not Docker |
+| B/D-003 | face_only on isolated networks | Expected behaviour, not system failure |
+| B/D-004 | Subnet detection fix | Real netmask, capped at /24 |
+| B/D-005 | Unprivileged Linux fallback | ping + `ip neigh` fallback for non-root scans |
+| B/D-006 | Demo-day recovery | Backup file + measured restore (~6 s), seeded data as last resort |
+| B/D-007 | Demo exclusions | What's off during live demo documented |
+| B/D-008 | Seed data identities | Real names vs fakes, fake-MAC trade-off |
+| B/D-009 | BSSID probe chain | iw → nmcli → iwconfig (nmcli colons escaped) |
+| B/D-010 | macOS support | Fix ping flags, no BSSID probe on Darwin |
+
+---
+
+## 12. BUILD / TEST COMMANDS
+
+```bash
+# Install backend deps
+pip install -r backend/requirements.txt
+
+# Download YOLOv8-face weights (once)
+curl -L -o backend/data/models/yolov8m-face.pt https://github.com/YapaLab/yolo-face/releases/download/1.0.0/yolov8m-face.pt
+
+# Run backend (from repo root)
+uvicorn backend.main:app --reload            # API docs: http://localhost:8000/docs
+
+# Tests (mocked, no ML models needed)
+python -m pytest backend/tests -q
+
+# E2E smoke test (server must be running)
+python backend/scripts/smoke_test.py --base-url http://127.0.0.1:8000
+
+# Threshold evaluation (reads embeddings, no ML models loaded)
+python backend/scripts/evaluate_threshold.py --markdown --output docs/threshold_report.md
+
+# Docker
+docker compose up -d --build
+
+# Flutter
+cd mobile && flutter pub get && flutter run
+cd mobile && flutter build apk --release
+```
+
+Machine: Windows, Python 3.11, Flutter SDK at `C:\flutter`, Android SDK at `C:\Android\Sdk` (platform 36, build-tools 36.0.0), JDK 17 at `C:\Program Files\Eclipse Adoptium\jdk-17.0.16.8-hotspot`.
+
+---
+
+## 13. KNOWN LIMITATIONS (state these honestly in reports)
+
+1. **No anti-spoofing / liveness detection:** `buffalo_l` cannot distinguish a live face from a photo. Mitigations: two-stage check, Wi-Fi presence, supervised classroom.
+2. **Wi-Fi verification is best-effort:** ARP cache varies per router/OS; `face_only` exists because Wi-Fi can fail while the face is genuine.
+3. **SQLite single-writer:** fine for one classroom/school server; not multi-school.
+4. **Recognition accuracy depends on enrollment quality:** bad lighting degrades everything; threshold must be tuned on the deployment camera.
+5. **AP presence ≠ device association:** We see MACs on the network segment, not which AP the phone associates to. On a multi-AP bridged network, a phone in another room could still be visible. Mitigated by one-AP-per-classroom assumption for the demo.
+6. **No authenticated session:** `student_id` in the check-in API is claimed, not proven. A colluding pair could still do "buddy check-in" by sending the friend's ID with the friend's photo. Session auth is out of scope for M2, recorded for M3.
+7. **Small sample size:** threshold and robustness measured on ≤5 people, not in classroom lighting. G7 pilot will expand this.
+
+---
+
+## 14. WORKFLOW RULES
+
+1. Work on your own branch: `task-a`, `task-b`, `task-c`, `task-d`. Never commit to `main` directly (use PRs reviewed by the lead).
+2. One task = one small commit. Conventional messages: `Fix X`, `Add Y`.
+3. `python -m pytest backend/tests -q` must pass before every commit.
+4. Do not edit files owned by another member without coordinating first.
+5. Never commit: `attendance.db`, `*.pkl`, `yolov8m-face.pt`, `backend/data/faces/*`, log files.
+6. All progress reporting in `docs/PLAN_TIMELINE.md` and member folders.
+7. Every non-trivial decision goes into `docs/<X>/DECISIONS.md` (graded).
+8. Stuck > 30 minutes → ask in group chat with a proposal, not a raw problem.
+
+---
+
+## 15. REPOSITORY STATE (as of 2026-11-16)
+
+- **Default branch:** `main` (HEAD = `a317994` — "Felix 22.1: add attendance sheets and schedule CSV tools").
+- **Remote:** `https://github.com/Healme29/An-Integrated-Attendance-Solution-Merging-Wi-Fi-AP-Data-with-Two-Stage-Face-Recognition.git`
+- **Other branches:** `task-c`, `a` (local), plus archived `tugas-*`.
+- **Upstream branches on main:** `3d9e91c` "Fix: keep ArcFace models on the volume, require a face for warm-up" (ahead of main locally, not yet pushed).
+- **Working tree:** Clean on `main` at time of this writing.
+
+---
+
+END OF CONTEXT FILE. When using this context: do not redesign business rules in section 3; build on top of them. Do not use `docs/archive/` as status reference. Always state limitations honestly. All outputs must be in English (except when the user explicitly asks for Indonesian).

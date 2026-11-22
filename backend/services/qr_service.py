@@ -8,6 +8,13 @@ scans or network lag do not produce false rejections.
 
 A check-in additionally requires the request to come from the school Wi-Fi
 subnet (SCHOOL_SUBNET) - proof that the phone is on the school network.
+
+Phase flow (S6):
+  - 'start' : teacher pressed Start Class Session; QR rotates; students scan
+              once for start selfie -> status 'partial' (yellow)
+  - 'end'   : teacher pressed Start Final Attendance; QR rotates again; students
+              scan again for end selfie -> status 'verified' (green)
+  - 'closed': teacher pressed End Session; no more check-ins accepted.
 """
 import ipaddress
 import secrets
@@ -54,8 +61,8 @@ def _parse_ts(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
 
 
-async def create_session(class_name: str, room: str | None = None, created_by: str | None = None) -> dict:
-    """Start a new class session, closing any session still active."""
+async def create_session(class_name: str, room: str | None = None, created_by: str | None = None, class_id: int | None = None) -> dict:
+    """Start a new class session in 'start' phase, closing any session still active."""
     db = await get_db()
     now = now_local()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -63,15 +70,15 @@ async def create_session(class_name: str, room: str | None = None, created_by: s
         # One active session at a time: auto-close a forgotten session.
         await db.execute(
             """UPDATE qr_sessions
-                  SET is_active = 0, ended_at = ?
+                  SET is_active = 0, ended_at = ?, phase = 'closed'
                 WHERE is_active = 1 AND ended_at IS NULL""",
             (timestamp,),
         )
         await db.execute(
             """INSERT INTO qr_sessions
-                   (token, token_rotated_at, created_by, class_name, room, started_at, is_active)
-               VALUES (?, ?, ?, ?, ?, ?, 1)""",
-            (generate_token(), timestamp, created_by, class_name, room, timestamp),
+                   (token, token_rotated_at, created_by, class_id, class_name, room, started_at, is_active, phase)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'start')""",
+            (generate_token(), timestamp, created_by, class_id, class_name, room, timestamp),
         )
         await db.commit()
         cursor = await db.execute(
@@ -144,6 +151,7 @@ async def validate_token(token: str) -> dict:
             "session_id": session["id"],
             "class_name": session["class_name"],
             "room": session["room"],
+            "phase": session.get("phase", "start"),
         }
 
     # Grace window: the previous token stays valid shortly after rotating.
@@ -155,8 +163,32 @@ async def validate_token(token: str) -> dict:
                 "session_id": session["id"],
                 "class_name": session["class_name"],
                 "room": session["room"],
+                "phase": session.get("phase", "start"),
             }
     return {"valid": False, "message": "Invalid or expired QR code"}
+
+
+async def set_phase(session_id: int, phase: str) -> dict | None:
+    """Move a session to a new phase ('start' | 'end' | 'closed') and rotate its token."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM qr_sessions WHERE id = ?", (session_id,))
+        session = await cursor.fetchone()
+        if not session:
+            return None
+        timestamp = now_local().strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute(
+            """UPDATE qr_sessions
+                  SET phase = ?, token = ?, token_rotated_at = ?, prev_token = ?
+                WHERE id = ?""",
+            (phase, generate_token(), timestamp, None, session_id),
+        )
+        await db.commit()
+        cursor = await db.execute("SELECT * FROM qr_sessions WHERE id = ?", (session_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
 
 
 async def end_session(session_id: int | None = None) -> dict | None:
@@ -175,7 +207,7 @@ async def end_session(session_id: int | None = None) -> dict | None:
         session = dict(session)
         timestamp = now_local().strftime("%Y-%m-%d %H:%M:%S")
         await db.execute(
-            "UPDATE qr_sessions SET is_active = 0, ended_at = ? WHERE id = ?",
+            "UPDATE qr_sessions SET is_active = 0, ended_at = ?, phase = 'closed' WHERE id = ?",
             (timestamp, session["id"]),
         )
         await db.commit()

@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from models.schemas import (
     QRSessionEndRequest,
+    QRSessionPhase,
     QRSessionResponse,
     QRSessionStart,
     QRValidateRequest,
@@ -19,15 +20,36 @@ router = APIRouter(prefix="/qr-sessions", tags=["qr-sessions"])
 
 @router.post("/start", response_model=QRSessionResponse)
 async def start_session(data: QRSessionStart):
-    """Teacher opens a class session; any previous session is auto-closed."""
+    """Teacher opens a class session in 'start' phase; any previous session is auto-closed."""
     if not data.class_name.strip():
         raise HTTPException(status_code=400, detail="class_name is required")
     session = await qr_service.create_session(
+        class_id=None,
         class_name=data.class_name.strip(),
         room=(data.room or None),
         created_by=data.created_by,
     )
     return session
+
+
+@router.post("/phase")
+async def set_phase(data: QRSessionPhase):
+    """Move the active session to a new phase ('start' | 'end' | 'closed') and rotate token."""
+    session = await qr_service.get_active_session()
+    if not session:
+        raise HTTPException(status_code=404, detail="No active class session")
+    if data.phase not in ("start", "end", "closed"):
+        raise HTTPException(status_code=400, detail="phase must be 'start', 'end', or 'closed'")
+    updated = await qr_service.set_phase(session["id"], data.phase)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update phase")
+    return {
+        "session_id": updated["id"],
+        "phase": updated["phase"],
+        "token": updated["token"],
+        "class_name": updated["class_name"],
+        "room": updated["room"],
+    }
 
 
 @router.post("/end")
@@ -61,6 +83,7 @@ async def get_active_session():
         "room": session["room"],
         "created_by": session["created_by"],
         "started_at": session["started_at"],
+        "phase": session.get("phase", "start"),
     }
 
 
@@ -76,6 +99,7 @@ async def get_active_token():
         "token": session["token"],
         "class_name": session["class_name"],
         "room": session["room"],
+        "phase": session.get("phase", "start"),
     }
 
 
@@ -89,6 +113,7 @@ async def get_active_qr_png():
         "session_id": session["id"],
         "token": session["token"],
         "class_name": session["class_name"],
+        "phase": session.get("phase", "start"),
     })
     image = qrcode.make(payload, box_size=12, border=2)
     buffer = io.BytesIO()

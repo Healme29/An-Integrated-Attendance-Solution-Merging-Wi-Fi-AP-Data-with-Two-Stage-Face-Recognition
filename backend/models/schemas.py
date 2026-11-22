@@ -3,6 +3,63 @@ from typing import Optional
 from datetime import datetime
 
 
+# ---------------------------------------------------------------------------
+# Teacher auth (S5 — simple token/session)
+# ---------------------------------------------------------------------------
+
+class TeacherLogin(BaseModel):
+    username: str
+    password: str
+
+
+class TeacherLoginResponse(BaseModel):
+    token: str
+    teacher: str
+
+
+class TeacherVerify(BaseModel):
+    token: str
+
+
+# ---------------------------------------------------------------------------
+# Classes & Enrollment (S3)
+# ---------------------------------------------------------------------------
+
+class ClassCreate(BaseModel):
+    class_name: str
+    room: Optional[str] = None
+
+
+class ClassResponse(BaseModel):
+    id: int
+    class_name: str
+    room: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ClassStudentAdd(BaseModel):
+    student_id: int
+
+
+class ClassStudentResponse(BaseModel):
+    id: int
+    student_id: int
+    student_name: str
+    student_nim: str
+    added_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Student
+# ---------------------------------------------------------------------------
+
 class StudentCreate(BaseModel):
     name: str
     nim: str
@@ -47,9 +104,14 @@ class QRSessionResponse(BaseModel):
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     is_active: bool
+    phase: Optional[str] = "start"
 
     class Config:
         from_attributes = True
+
+
+class QRSessionPhase(BaseModel):
+    phase: str  # 'start' | 'end' | 'closed'
 
 
 class QRSessionEndRequest(BaseModel):
@@ -92,3 +154,31 @@ class RecognizeResponse(BaseModel):
     student_id: Optional[int] = None
     student_name: Optional[str] = None
     confidence: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Roster: one row per student in a class (S3)
+# ---------------------------------------------------------------------------
+
+class RosterStudent(BaseModel):
+    id: int
+    student_id: int
+    student_name: str
+    student_nim: str
+    status: str = "pending"      # pending / partial / verified / absent
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    start_confidence: Optional[float] = None
+    end_confidence: Optional[float] = None
+    faces_detected_start: int = 0
+    faces_detected_end: int = 0
+    manual: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Manual attendance (S6)
+# ---------------------------------------------------------------------------
+
+class ManualAttendanceRequest(BaseModel):
+    student_id: int
+    reason: Optional[str] = None
