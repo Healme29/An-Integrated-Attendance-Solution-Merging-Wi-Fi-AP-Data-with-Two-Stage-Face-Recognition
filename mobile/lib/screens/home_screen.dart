@@ -1,15 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:face_attendance/models/student.dart';
-import 'package:face_attendance/services/prompt_service.dart';
 import 'package:face_attendance/services/session_service.dart';
-import 'camera_screen.dart';
+import 'package:face_attendance/services/api_service.dart';
 import 'enroll_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
-import 'package:face_attendance/services/api_service.dart';
+import 'qr_scanner_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Student student;
@@ -20,200 +17,36 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  List<Map<String, dynamic>> _schedules = [];
-  int? _selectedScheduleId;
-  String _selectedCheckType = "start";
-  bool _isLoadingSchedules = true;
-  String? _schedulesError;
-
-  // Auto check-in prompt (tier 1, polling GET /me/prompt every ~20 s).
-  final PromptService _promptService = PromptService();
-  StreamSubscription<CheckInPrompt>? _promptSub;
-  CheckInPrompt? _prompt; // banner currently shown, null = none
-  bool _autoPromptOn = true;
+class _HomeScreenState extends State<HomeScreen> {
+  QRSessionInfo? _activeSession;
+  bool _isLoadingSession = true;
+  String? _sessionError;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _loadSchedules();
-    _initPrompt();
+    _loadActiveSession();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Save battery and stop pointless polls while backgrounded.
-    if (state == AppLifecycleState.paused) {
-      _promptService.stop();
-    } else if (state == AppLifecycleState.resumed && _autoPromptOn) {
-      _promptService.start(widget.student.id);
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _promptSub?.cancel();
-    _promptService.stop();
-    super.dispose();
-  }
-
-  Future<void> _initPrompt() async {
-    final on = await SessionService.getAutoPromptOn();
-    if (!mounted) return;
-    setState(() => _autoPromptOn = on);
-    if (!on) return;
-    _startPromptService();
-  }
-
-  void _startPromptService() {
-    _promptSub ??= _promptService.stream.listen(_onPrompt);
-    _promptService.start(widget.student.id);
-  }
-
-  void _stopPromptService() {
-    _promptSub?.cancel();
-    _promptSub = null;
-    _promptService.stop();
-    if (mounted) setState(() => _prompt = null);
-  }
-
-  void _onPrompt(CheckInPrompt p) {
-    if (!mounted) return;
-    setState(() => _prompt = p);
-  }
-
-  void _dismissPrompt() => setState(() => _prompt = null);
-
-  void _acceptPrompt() {
-    final p = _prompt;
-    if (p == null || p.scheduleId == null || p.checkType == null) return;
+  Future<void> _loadActiveSession() async {
     setState(() {
-      _selectedScheduleId = p.scheduleId;
-      _selectedCheckType = p.checkType!;
-      _prompt = null;
-    });
-    _openCamera();
-  }
-
-  Future<void> _loadSchedules() async {
-    setState(() {
-      _isLoadingSchedules = true;
-      _schedulesError = null;
+      _isLoadingSession = true;
+      _sessionError = null;
     });
     try {
-      final schedules = await ApiService.getActiveSchedules();
+      final session = await ApiService.getActiveSession();
       if (!mounted) return;
       setState(() {
-        _schedules = schedules;
-        // Drop a selection whose window has closed while the screen was open.
-        if (_selectedScheduleId != null &&
-            !_schedules.any((s) => s['id'] == _selectedScheduleId)) {
-          _selectedScheduleId = null;
-        }
+        _activeSession = session;
+        _isLoadingSession = false;
       });
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _schedulesError = e.message);
     } catch (e) {
-      if (mounted) setState(() => _schedulesError = "Unexpected error: $e");
-    } finally {
-      if (mounted) setState(() => _isLoadingSchedules = false);
-    }
-  }
-
-  Future<void> _openCamera() async {
-    if (_selectedScheduleId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a schedule first")),
-      );
-      return;
-    }
-
-    // Ask the server first: the camera must not open when the class window is
-    // closed or the phone is not on the classroom network.
-    Map<String, dynamic> preflight;
-    try {
-      preflight = await ApiService.preflight(
-        studentId: widget.student.id,
-        scheduleId: _selectedScheduleId!,
-        checkType: _selectedCheckType,
-      );
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-        );
-      }
-      return;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Unexpected error: $e"), backgroundColor: Colors.red),
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-
-    if (preflight["allowed"] != true) {
-      _showCheckInBlocked(preflight);
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CameraScreen(
-          studentId: widget.student.id,
-          scheduleId: _selectedScheduleId!,
-          checkType: _selectedCheckType,
-        ),
-      ),
-    );
-  }
-
-  void _showCheckInBlocked(Map<String, dynamic> preflight) {
-    final reason = preflight["reason"] as String?;
-    final windowStart = preflight["window_start"] as String? ?? "";
-    final windowEnd = preflight["window_end"] as String? ?? "";
-    final className = preflight["class_name"] as String? ?? "This class";
-    final message = switch (reason) {
-      "outside_class_time" =>
-        "Attendance window closed. $className accepts check-ins $windowStart-$windowEnd.",
-      "wrong_day" => "$className is not scheduled today.",
-      "not_on_classroom_network" =>
-        "You are not connected to the classroom Wi-Fi. Join the classroom network and try again.",
-      "duplicate_check_in" =>
-        "You already did the ${preflight['check_type']} check-in for $className.",
-      "missing_start_check" => "Do the start check-in first.",
-      _ => "Check-in is not available right now.",
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.orange.shade800),
-    );
-  }
-
-  Future<void> _scanWifi() async {
-    try {
-      final result = await ApiService.scanWifi();
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text("WiFi Scan Result"),
-          content: Text("Found ${result['count']} devices on ${result['subnet']}"),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-          ],
-        ),
-      );
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-        );
-      }
+      setState(() {
+        _activeSession = null;
+        _isLoadingSession = false;
+        _sessionError = e is ApiException ? e.message : e.toString();
+      });
     }
   }
 
@@ -241,76 +74,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _openSettings() async {
+  Future<void> _openSettings() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
-    // Schedules may change with a new server URL.
-    _loadSchedules();
-    // Auto check-in toggle may have changed too.
-    final on = await SessionService.getAutoPromptOn();
-    if (!mounted) return;
-    setState(() => _autoPromptOn = on);
-    if (on) {
-      _promptService.resetOffered();
-      _startPromptService();
-    } else {
-      _stopPromptService();
-    }
+    if (mounted) _loadActiveSession();
   }
 
-  Widget _buildPromptBanner() {
-    final p = _prompt!;
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.wifi, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "${p.label} detected!",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              p.checkType == "end"
-                  ? "End check-in is available now."
-                  : "Start check-in is available now.",
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _dismissPrompt,
-                  child: const Text("Later"),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _acceptPrompt,
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text("Check in now"),
-                ),
-              ],
-            ),
-          ],
-        ),
+  void _scanQr() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QRScannerScreen(studentId: widget.student.id),
       ),
-    );
+    ).then((_) {
+      if (mounted) _loadActiveSession();
+    });
   }
 
   @override
-  Widget build(BuildContext context) {    return Scaffold(
+  Widget build(BuildContext context) {
+    return Scaffold(
       appBar: AppBar(
         title: const Text("Student Attendance"),
         actions: [
@@ -355,8 +140,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_autoPromptOn && _prompt != null) _buildPromptBanner(),
-            if (_autoPromptOn && _prompt != null) const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -389,82 +172,77 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Select Schedule", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    if (_isLoadingSchedules)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_schedulesError != null)
-                      Column(
-                        children: [
-                          Text(_schedulesError!, style: const TextStyle(color: Colors.red)),
-                          const SizedBox(height: 8),
-                          ElevatedButton(onPressed: _loadSchedules, child: const Text("Retry")),
-                        ],
-                      )
-                    else if (_schedules.isEmpty)
-                      Column(
-                        children: [
-                          const Icon(Icons.event_busy, size: 44, color: Colors.grey),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "No active class right now",
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                child: _isLoadingSession
+                    ? const Center(child: CircularProgressIndicator())
+                    : _sessionError != null
+                        ? Column(
+                            children: [
+                              const Icon(Icons.cloud_off, size: 44, color: Colors.grey),
+                              const SizedBox(height: 8),
+                              const Text(
+                                "Cannot load the class session",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _sessionError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              TextButton(
+                                onPressed: _loadActiveSession,
+                                child: const Text("Retry"),
+                              ),
+                            ],
+                          )
+                        : _activeSession == null
+                        ? const Column(
+                            children: [
+                              Icon(Icons.event_busy, size: 44, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text(
+                                "No active class session right now",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                "Ask your teacher to start a class session, then scan the QR code shown in class.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.qr_code, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Class in progress",
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "${_activeSession!.className}"
+                                "${_activeSession!.room != null ? ' — Room ${_activeSession!.room}' : ''}",
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Check-in is only available during a class window.",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton.icon(
-                            onPressed: _loadSchedules,
-                            icon: const Icon(Icons.refresh, size: 18),
-                            label: const Text("Refresh"),
-                          ),
-                        ],
-                      )
-                    else
-                      DropdownButton<int>(
-                        isExpanded: true,
-                        value: _selectedScheduleId,
-                        hint: const Text("Choose a class schedule"),
-                        items: _schedules.map<DropdownMenuItem<int>>((s) => DropdownMenuItem<int>(
-                          value: s['id'] as int,
-                          child: Text("${s['class_name']} - ${s['room'] ?? 'N/A'}"),
-                        )).toList(),
-                        onChanged: (val) => setState(() => _selectedScheduleId = val),
-                      ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: "start", label: Text("Start")),
-                        ButtonSegment(value: "end", label: Text("End")),
-                      ],
-                      selected: {_selectedCheckType},
-                      onSelectionChanged: (val) => setState(() => _selectedCheckType = val.first),
-                    ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _openCamera,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text("Open Camera", style: TextStyle(fontSize: 18)),
+              onPressed: _scanQr,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text("Scan QR Code", style: TextStyle(fontSize: 18)),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 20),
               ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _scanWifi,
-              icon: const Icon(Icons.wifi),
-              label: const Text("Scan WiFi Network"),
             ),
           ],
         ),

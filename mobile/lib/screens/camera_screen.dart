@@ -7,14 +7,16 @@ import 'attendance_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   final int studentId;
-  final int scheduleId;
-  final String checkType;
+  final String qrToken;
+  final int? qrSessionId;
+  final String? className;
 
   const CameraScreen({
     super.key,
     required this.studentId,
-    required this.scheduleId,
-    required this.checkType,
+    required this.qrToken,
+    this.qrSessionId,
+    this.className,
   });
 
   @override
@@ -39,7 +41,11 @@ class _CameraScreenState extends State<CameraScreen> {
       (c) => c.lensDirection == CameraLensDirection.front,
       orElse: () => cameras.first,
     );
-    final controller = CameraController(camera, ResolutionPreset.high);
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
     await controller.initialize();
     if (!mounted) {
       await controller.dispose();
@@ -59,10 +65,9 @@ class _CameraScreenState extends State<CameraScreen> {
       final XFile picture = await controller.takePicture();
       await picture.saveTo(filePath);
 
-      final result = await ApiService.checkAttendance(
+      final result = await ApiService.checkInQr(
         studentId: widget.studentId,
-        scheduleId: widget.scheduleId,
-        checkType: widget.checkType,
+        token: widget.qrToken,
         imageFile: File(filePath),
       );
 
@@ -102,7 +107,7 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Scan Face (${widget.checkType.toUpperCase()})")),
+      appBar: AppBar(title: const Text("Face Check-in")),
       body: FutureBuilder<void>(
         future: _initFuture,
         builder: (context, snapshot) {
@@ -142,16 +147,56 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             );
           }
-          return Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              CameraPreview(_controller!),
-              if (_isProcessing)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-            ],
+          return ValueListenableBuilder<CameraValue>(
+            valueListenable: _controller!,
+            builder: (context, value, _) {
+              // The preview would otherwise be a blank area when the camera is
+              // torn down underneath us (e.g. another plugin releasing CameraX).
+              if (!value.isInitialized || value.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.photo_camera_front,
+                            size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "Camera unavailable",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          value.errorDescription ??
+                              "Camera access failed. Close other apps that use the camera, then retry.",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() => _initFuture = _initCamera());
+                          },
+                          child: const Text("Retry"),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  CameraPreview(_controller!),
+                  if (_isProcessing)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                ],
+              );
+            },
           );
         },
       ),

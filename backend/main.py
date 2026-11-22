@@ -12,7 +12,7 @@ if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
 from models.database import init_db
-from routers import students, faces, attendance, schedules, wifi, prompt
+from routers import students, faces, attendance, qr_sessions
 from config import CORS_ORIGINS
 
 DASHBOARD_FILE = Path(__file__).resolve().parent / "static" / "dashboard.html"
@@ -26,8 +26,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Face Attendance API",
-    description="Integrated attendance system with face recognition and Wi-Fi AP verification",
-    version="1.0.0",
+    description="Integrated attendance system with face recognition and rotating QR code verification",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -42,9 +42,7 @@ app.add_middleware(
 app.include_router(students.router)
 app.include_router(faces.router)
 app.include_router(attendance.router)
-app.include_router(schedules.router)
-app.include_router(wifi.router)
-app.include_router(prompt.router)
+app.include_router(qr_sessions.router)
 
 
 @app.get("/")

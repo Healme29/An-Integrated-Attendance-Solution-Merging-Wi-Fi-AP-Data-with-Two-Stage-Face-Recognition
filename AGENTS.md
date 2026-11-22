@@ -19,16 +19,21 @@ Two deliberate exceptions:
 
 ## Project
 
-Integrated attendance system combining Wi-Fi AP connection logs with two-stage face recognition (start + end of class). Attendance is granted only when all three conditions are met: correct AP, valid class time, and both selfies matched.
+Integrated attendance system combining **rotating QR code** presence proof with **face recognition**.
+The teacher starts a class session from the dashboard; a QR code is projected on the classroom
+LCD and rotates every 5 seconds. Students scan the QR with the mobile app, take a selfie, and
+attendance is granted only when all three conditions are met: the device is on the school
+Wi-Fi, the QR token is valid, and the selfie matches the enrolled face.
 
 ## Architecture
 
-- **Backend**: Python (FastAPI) — face detection, recognition, Wi-Fi AP check, attendance logic
-- **Frontend**: Flutter mobile app (Android + iOS) — camera capture, status display
-- **Database**: SQLite — students, faces, attendance, schedules, AP logs
+- **Backend**: Python (FastAPI) — QR session lifecycle, rotating tokens, face detection/recognition, attendance logic
+- **Frontend**: Flutter mobile app (Android + iOS) — QR scan, camera capture, status display
+- **Database**: SQLite — students, faces, qr_sessions, attendance
 - **Face Detection**: YOLOv8 (`yolov8m-face.pt` from `akanametov/yolo-face`)
 - **Face Recognition**: InsightFace ArcFace (`buffalo_l`) — 512-D embeddings, cosine similarity threshold ~0.5
-- **Wi-Fi AP**: Scapy ARP scan or router DHCP/ARP query — detect devices on classroom network
+- **QR Codes**: `qrcode[pil]` server-side rendering; `mobile_scanner` in the app
+- **Network check**: client IP must be inside `SCHOOL_SUBNET` (default `192.168.0.0/16`; loopback always allowed)
 
 ## Directory Layout
 
@@ -67,66 +72,68 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 
 - YOLOv8-face model: `yolov8m-face.pt` (50 MB) — download from `github.com/YapaLab/yolo-face/releases`
 - InsightFace model: `buffalo_l` (auto-downloaded on first use; set `INSIGHTFACE_HOME` to relocate)
-- Attendance requires ALL 3 conditions: correct AP + valid class time + both selfies matched
-- Two-stage status flow: `start` → `partial`, `end` → `verified` (Wi-Fi ok) or `face_only` (no Wi-Fi); start row finalized on end check-in
-- Duplicate check-ins rejected (409); `end` without prior `start` rejected (409)
+- Attendance requires ALL 3 conditions: school Wi-Fi (subnet check) + valid rotating QR token + face match
+- Teacher flow: POST `/qr-sessions/start` → dashboard renders `/qr-sessions/active/qr.png`,
+  auto-refreshed every 5 s; POST `/qr-sessions/end` closes the session
+- **One active session at a time**: starting a new session auto-closes the previous one
+- QR token: 6-char uppercase alphanumeric (unambiguous alphabet), rotates every
+  `QR_ROTATION_SECONDS` (default 5); the previous token stays valid for `QR_GRACE_SECONDS`
+  (default 10) after rotation, so slow scans do not fail
+- Student flow: login by NIM → scan QR (`/qr-sessions/validate`) → selfie →
+  `POST /attendance/check-qr?student_id=&token=` with multipart image
 - Check-in is bound to the logged-in `student_id`: the accepted face must match that
   student, otherwise 403 `identity mismatch` (no row written). A second *significant*
   face in the frame (area ≥ 10% of the largest) → 400 `Multiple faces detected`; nested
   duplicate boxes of one face are merged first (containment ≥ 0.6)
-- Enrollment stores only the largest distinct face and rejects photos with two people;
-  enrollment with a friend in frame no longer contaminates the profile
-- `attendance.faces_detected` records the raw YOLO box count per check-in (audit)
-- Attendance outside class window ± grace → 403; wrong day → 403; unknown schedule → 404
-- `REQUIRE_CLASSROOM_WIFI=true` → check-in from a device not visible on the classroom network
-  (and, when `ap_bssid` is pinned, a server not on that BSSID) → 403 `You are not connected to
-  the classroom network.` No row is written. Off by default (`false`), which keeps `face_only`.
-- The mobile app lists only `/schedules/active` and calls `/attendance/preflight` before
-  opening the camera, so out-of-window / off-network check-ins are blocked client-side too
+- Duplicate check-ins for the same session rejected (409)
+- Requests from outside `SCHOOL_SUBNET` → 403 `You are not connected to the school network.`
+- No active session (or session ended) → 400 `No active class session` / `Invalid or expired QR code`
+- Enrollment stores only the largest distinct face and rejects photos with two people
+- `attendance.faces_detected` records the raw YOLO box count per check-in (audit);
+  `attendance.ip_address` records the client IP (audit)
 - `get_embedding(image, bbox)` expects the FULL image + YOLO bbox (crops with margin internally)
-- Wi-Fi detection requires Npcap on Windows (WinPcap API-compatible mode)
 - Cosine similarity threshold: 0.5 (env `FACE_SIMILARITY_THRESHOLD`)
-- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `WI_FI_SUBNET`, `ATTENDANCE_CHECK_WINDOW_MINUTES`, `YOLO_CONF_THRESHOLD`, `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`, `TIMEZONE`, `MAX_UPLOAD_BYTES`, `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`, `REQUIRE_CLASSROOM_WIFI`
-- `WI_FI_SUBNET` unset → subnet auto-detected from the machine's primary interface at scan time
-- `TIMEZONE` (IANA name, e.g. `Asia/Jakarta`) — set on the server so schedule windows stay consistent across machines; unset → system local time
+- Config is env-overridable: `DATABASE_PATH`, `DATA_DIR`, `SCHOOL_SUBNET`,
+  `QR_ROTATION_SECONDS`, `QR_GRACE_SECONDS`, `QR_TOKEN_LENGTH`, `YOLO_CONF_THRESHOLD`,
+  `YOLO_IMG_SIZE`, `INSIGHTFACE_MODEL`, `TIMEZONE`, `MAX_UPLOAD_BYTES`,
+  `MAX_EMBEDDINGS_PER_STUDENT`, `MIN_FACE_BBOX_PX`
+- `TIMEZONE` (IANA name, e.g. `Asia/Jakarta`) — set on the server so timestamps stay
+  consistent across machines; unset → system local time
 - Enrollment hardening: JPEG/PNG magic-byte check, `MAX_UPLOAD_BYTES` cap (413), `MIN_FACE_BBOX_PX` filter, max `MAX_EMBEDDINGS_PER_STUDENT` samples per student
-- Schedule creation/update rejects overlapping time slots in the same room (409)
-- `ap_logs` is populated by `/wifi/scan` and `/wifi/check/{mac}` (60 s dedupe window)
+- Removed in v2 (QR redesign): schedules/schedule-based rosters, per-student MAC collection,
+  ARP scanning (`wifi_scanner.py`, scapy), two-stage start/end check-ins, auto-prompt polling
+- Database migration: an old schedule-based `attendance` table is rebuilt automatically on
+  startup (student/confidence/status/timestamp survive; `schedule_id` rows get `qr_session_id=0`)
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/students/?nim=` | List students, or look up one by NIM (login) |
-| POST | `/students/` | Create student (name, nim, mac_address) |
+| POST | `/students/` | Create student (name, nim) |
 | GET | `/students/{id}` | Get student by ID |
 | DELETE | `/students/{id}` | Delete student |
-| PUT | `/students/{id}/mac` | Update MAC address |
 | POST | `/faces/enroll?student_id=` | Enroll face (upload image) |
 | POST | `/faces/recognize` | Recognize face (upload image) |
-| POST | `/attendance/check?student_id=&schedule_id=&check_type=` | Check attendance with face scan (identity-bound, time-enforced) |
-| GET | `/attendance/preflight?student_id=&schedule_id=&check_type=` | Whether a check-in could succeed (window, classroom network, duplicates) |
-| GET | `/attendance/today?schedule_id=` | Today's attendance (joined names, optional filter) |
+| POST | `/qr-sessions/start` | Teacher starts a class session (auto-closes any active one) |
+| POST | `/qr-sessions/end` | Teacher ends the session (`{session_id?}`, returns total attendance) |
+| GET | `/qr-sessions/active` | Active session info (rotates the token when stale) |
+| GET | `/qr-sessions/active/token` | Current rotating token (lightweight dashboard poll) |
+| GET | `/qr-sessions/active/qr.png` | QR code image (PNG) of the current token for the LCD |
+| POST | `/qr-sessions/validate` | Validate a scanned token (`{token}` → `{valid, session_id, ...}`) |
+| POST | `/attendance/check-qr?student_id=&token=` | QR check-in with face scan (subnet-checked, identity-bound) |
+| GET | `/attendance/today?qr_session_id=` | Today's attendance (joined names, optional filter) |
 | GET | `/attendance/student/{id}` | Get student history (supports `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count`) |
-| GET | `/attendance/export/csv?date=&schedule_id=` | Export attendance as CSV |
-| GET | `/schedules/` | List schedules |
-| GET | `/schedules/active` | Schedules whose attendance window includes now |
-| POST | `/schedules/` | Create schedule (validated) |
-| GET | `/schedules/{id}` | Get schedule by ID |
-| PUT | `/schedules/{id}` | Update schedule (validated) |
-| DELETE | `/schedules/{id}` | Delete schedule |
-| GET | `/wifi/scan` | Scan network devices |
-| GET | `/wifi/check/{mac}` | Check if MAC is on network |
-| GET | `/dashboard` | Teacher web dashboard (HTML) |
+| GET | `/attendance/export/csv?date=&qr_session_id=` | Export attendance as CSV |
+| GET | `/dashboard` | Teacher web dashboard (HTML: QR + live attendance + students) |
 | GET | `/health` | Health check with database ping (503 on DB failure) |
 
 ## Database Schema
 
-- **students**: id, name, nim, mac_address, created_at
+- **students**: id, name, nim, mac_address (unused), created_at
 - **faces**: id, student_id, embedding, image_path, created_at
-- **schedules**: id, class_name, day_of_week, start_time, end_time, ap_bssid, room
-- **attendance**: id, student_id, schedule_id, check_type, confidence, wifi_verified, status, timestamp
-- **ap_logs**: id, mac_address, ip_address, bssid, ssid, scan_time
+- **qr_sessions**: id, token, prev_token, token_rotated_at, created_by, class_name, room, started_at, ended_at, is_active
+- **attendance**: id, student_id, qr_session_id, confidence, ip_address, status, timestamp, faces_detected
 
 ## Setup Steps
 
@@ -151,3 +158,12 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
    ```bash
    cd mobile && flutter pub get && flutter run
    ```
+
+## Demo Flow
+
+1. Open `http://127.0.0.1:8000/dashboard` (teacher)
+2. Enter class name + room → "Start Class Session" → project the QR on the LCD (rotates every 5 s)
+3. On the phone: log in with NIM → "Scan QR Code" → scan → selfie
+4. The dashboard live-attendance list updates every 5 s; "Export CSV" downloads the sheet
+5. "End Session" closes the class (QR check-ins are refused afterwards)
+6. Optional demo seed: `python backend/scripts/seed_demo.py --reset`

@@ -1,39 +1,33 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, UploadFile, File, Response
-from models.schemas import AttendanceRequest, AttendanceResponse
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, File
+from models.schemas import AttendanceResponse
 from models.database import get_db
-from services.attendance import (
-    recognize_face,
-    mark_attendance,
-    validate_schedule_time,
-    classroom_wifi_verified,
-    get_existing_check,
-    is_within_window,
-    schedule_window,
-)
+from services.attendance import recognize_face
 from services.photo_guard import fingerprint, assert_not_replayed, record as record_photo
-from services.wifi_scanner import get_current_bssid
-from config import ATTENDANCE_CHECK_WINDOW_MINUTES, REQUIRE_CLASSROOM_WIFI, now_local
+from services.qr_service import validate_token, is_school_subnet
+from config import now_local
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
-@router.post("/check", response_model=AttendanceResponse)
-async def check_attendance(
+@router.post("/check-qr", response_model=AttendanceResponse)
+async def check_attendance_qr(
+    request: Request,
     student_id: int,
-    schedule_id: int,
-    check_type: str,
-    file: UploadFile = File(...)
+    token: str,
+    file: UploadFile = File(...),
 ):
-    """Two-stage check-in for the logged-in student.
+    """QR-based check-in for the logged-in student.
 
-    `student_id` is the account that is signed in on the phone. It is not
-    trusted on its own: the uploaded selfie must match that same student. This
-    closes the "friend's face in front of my camera" hole (see D-003).
+    Attendance is granted only when ALL conditions hold:
+    1. The phone reaches this server from the school Wi-Fi subnet.
+    2. The scanned QR token matches the active session (grace included).
+    3. The uploaded selfie matches the face enrolled for `student_id`
+       (identity binding - a friend holding the phone cannot check in).
+    4. The student has not already checked into this session.
     """
-    if check_type not in ("start", "end"):
-        raise HTTPException(status_code=400, detail="check_type must be 'start' or 'end'")
-
     db = await get_db()
     cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
     student_row = await cursor.fetchone()
@@ -41,6 +35,21 @@ async def check_attendance(
     if not student_row:
         raise HTTPException(status_code=404, detail="Student not found")
 
+    # 1. School network proof: the request must originate from the school subnet.
+    client_ip = request.client.host if request.client else None
+    if not is_school_subnet(client_ip):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not connected to the school network.",
+        )
+
+    # 2. QR token must belong to the active session (rotation grace applies).
+    validation = await validate_token(token)
+    if not validation.get("valid"):
+        raise HTTPException(status_code=400, detail=validation.get("message") or "Invalid or expired QR code")
+    session_id = validation["session_id"]
+
+    # 3. Face recognition with identity binding.
     contents = await file.read()
     sha = fingerprint(contents)
     recognition = await recognize_face(contents)
@@ -53,14 +62,8 @@ async def check_attendance(
                 detail="Multiple faces detected. Take a selfie alone, with only "
                        "your own face in frame."
             )
-        raise HTTPException(
-            status_code=400,
-            detail=f"Face not recognized: {reason}"
-        )
+        raise HTTPException(status_code=400, detail=f"Face not recognized: {reason}")
 
-    # Identity binding: the face must belong to the account that is logged in.
-    # Without this, the endpoint would happily mark the person the camera sees
-    # (a friend holding the phone), not the student who signed in.
     if recognition["student_id"] != student_id:
         raise HTTPException(
             status_code=403,
@@ -79,125 +82,78 @@ async def check_attendance(
                    "capture a fresh selfie in the app."
         )
 
-    try:
-        await validate_schedule_time(schedule_id)
-    except ValueError as e:
-        reason = str(e)
-        if reason == "schedule_not_found":
-            raise HTTPException(status_code=404, detail="Schedule not found")
-        if reason == "wrong_day":
-            raise HTTPException(status_code=403, detail="No class scheduled today for this schedule")
-        if reason == "outside_class_time":
-            raise HTTPException(
-                status_code=403,
-                detail=f"Attendance only allowed within class time (+/- {ATTENDANCE_CHECK_WINDOW_MINUTES} minutes)"
-            )
-        if reason == "not_on_classroom_network":
-            raise HTTPException(
-                status_code=403,
-                detail="You are not connected to the classroom network.",
-            )
-        raise
-
-    try:
-        result = await mark_attendance(
-            student_id=student_id,
-            schedule_id=schedule_id,
-            check_type=check_type,
-            confidence=recognition["confidence"],
-            faces_detected=recognition.get("faces_detected", 0),
-        )
-    except ValueError as e:
-        reason = str(e)
-        if reason == "duplicate_check_in":
-            raise HTTPException(status_code=409, detail=f"Already checked in ({check_type}) for this schedule")
-        if reason == "missing_start_check":
-            raise HTTPException(status_code=409, detail="End check-in requires a prior start check-in")
-        if reason == "not_on_classroom_network":
-            raise HTTPException(
-                status_code=403,
-                detail="You are not connected to the classroom network.",
-            )
-        raise
-    record_photo(sha, result["student_id"], schedule_id, check_type)
-    return result
-
-
-@router.get("/preflight")
-async def attendance_preflight(student_id: int, schedule_id: int, check_type: str = "start"):
-    """Report whether a check-in could succeed *before* the app opens the camera.
-
-    Mirrors the enforcement in POST /attendance/check so the mobile app can
-    grey out the camera instead of letting the student take a selfie that is
-    guaranteed to be rejected. It never writes anything.
-    """
-    if check_type not in ("start", "end"):
-        raise HTTPException(status_code=400, detail="check_type must be 'start' or 'end'")
-
+    # 4. One check-in per session.
     db = await get_db()
-    cursor = await db.execute("SELECT id FROM students WHERE id = ?", (student_id,))
-    student = await cursor.fetchone()
-    cursor = await db.execute("SELECT * FROM schedules WHERE id = ?", (schedule_id,))
-    schedule = await cursor.fetchone()
+    cursor = await db.execute(
+        "SELECT id FROM attendance WHERE student_id = ? AND qr_session_id = ?",
+        (student_id, session_id),
+    )
+    duplicate = await cursor.fetchone()
+    if duplicate:
+        await db.close()
+        raise HTTPException(status_code=409, detail="Already checked in for this class session")
+
+    # Store an explicit local timestamp (SQLite's CURRENT_TIMESTAMP is UTC,
+    # which would break DATE() comparisons against local class days).
+    timestamp = now_local().strftime("%Y-%m-%d %H:%M:%S")
+    await db.execute(
+        """INSERT INTO attendance
+               (student_id, qr_session_id, confidence, ip_address, status, timestamp, faces_detected)
+           VALUES (?, ?, ?, ?, 'verified', ?, ?)""",
+        (
+            student_id,
+            session_id,
+            recognition["confidence"],
+            client_ip,
+            timestamp,
+            recognition.get("faces_detected", 0),
+        ),
+    )
+    await db.commit()
+
+    cursor = await db.execute("SELECT last_insert_rowid()")
+    att_id = (await cursor.fetchone())[0]
+    cursor = await db.execute(
+        """SELECT st.name AS student_name, qs.class_name, qs.room
+             FROM qr_sessions qs, students st
+            WHERE qs.id = ? AND st.id = ?""",
+        (session_id, student_id),
+    )
+    info = await cursor.fetchone()
     await db.close()
 
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Schedule not found")
-    schedule = dict(schedule)
-
-    now = now_local()
-    in_window = is_within_window(schedule, now)
-    window_start, window_end = schedule_window(schedule, now)
-    wifi_verified = await classroom_wifi_verified(student_id, schedule_id)
-
-    allowed, reason = True, None
-    if schedule["day_of_week"] != now.weekday():
-        allowed, reason = False, "wrong_day"
-    elif not in_window:
-        allowed, reason = False, "outside_class_time"
-    elif REQUIRE_CLASSROOM_WIFI and not wifi_verified:
-        allowed, reason = False, "not_on_classroom_network"
-    elif await get_existing_check(student_id, schedule_id, check_type):
-        allowed, reason = False, "duplicate_check_in"
-    elif check_type == "end" and not await get_existing_check(student_id, schedule_id, "start"):
-        allowed, reason = False, "missing_start_check"
-
+    record_photo(sha, student_id, session_id, "qr")
     return {
-        "allowed": allowed,
-        "reason": reason,
-        "check_type": check_type,
-        "class_name": schedule["class_name"],
-        "room": schedule["room"],
-        "start_time": schedule["start_time"],
-        "end_time": schedule["end_time"],
-        "window_start": window_start.strftime("%H:%M"),
-        "window_end": window_end.strftime("%H:%M"),
-        "in_window": in_window,
-        "wifi_verified": wifi_verified,
-        "wifi_required": REQUIRE_CLASSROOM_WIFI,
-        "schedule_bssid": schedule["ap_bssid"],
-        "server_bssid": get_current_bssid(),
+        "id": att_id,
+        "student_id": student_id,
+        "student_name": info["student_name"] if info else None,
+        "qr_session_id": session_id,
+        "confidence": recognition["confidence"],
+        "ip_address": client_ip,
+        "status": "verified",
+        "timestamp": timestamp,
+        "class_name": info["class_name"] if info else validation.get("class_name"),
+        "room": info["room"] if info else validation.get("room"),
+        "faces_detected": recognition.get("faces_detected", 0),
     }
 
 
 @router.get("/today", response_model=list[AttendanceResponse])
-async def get_today_attendance(schedule_id: int | None = None):
+async def get_today_attendance(qr_session_id: Optional[int] = None):
     db = await get_db()
     today = now_local().strftime("%Y-%m-%d")
 
     query = """
-        SELECT a.*, st.name AS student_name, s.class_name
+        SELECT a.*, st.name AS student_name, qs.class_name, qs.room
         FROM attendance a
         LEFT JOIN students st ON a.student_id = st.id
-        LEFT JOIN schedules s ON a.schedule_id = s.id
+        LEFT JOIN qr_sessions qs ON a.qr_session_id = qs.id
         WHERE DATE(a.timestamp) = ?
     """
     params: list = [today]
-    if schedule_id is not None:
-        query += " AND a.schedule_id = ?"
-        params.append(schedule_id)
+    if qr_session_id is not None:
+        query += " AND a.qr_session_id = ?"
+        params.append(qr_session_id)
     query += " ORDER BY a.timestamp DESC"
 
     cursor = await db.execute(query, params)
@@ -207,8 +163,8 @@ async def get_today_attendance(schedule_id: int | None = None):
 
 
 @router.get("/export/csv")
-async def export_attendance_csv(date: str | None = None, schedule_id: int | None = None):
-    """Export attendance records as CSV. Filters: ?date=YYYY-MM-DD&schedule_id=N"""
+async def export_attendance_csv(date: str | None = None, qr_session_id: int | None = None):
+    """Export attendance records as CSV. Filters: ?date=YYYY-MM-DD&qr_session_id=N"""
     import csv
     import io
 
@@ -222,18 +178,18 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
 
     db = await get_db()
     query = """
-        SELECT a.id, a.timestamp, a.check_type, a.confidence, a.wifi_verified, a.status,
+        SELECT a.id, a.timestamp, a.confidence, a.ip_address, a.status,
                a.student_id, st.name AS student_name, st.nim,
-               a.schedule_id, s.class_name, s.room, a.faces_detected
+               a.qr_session_id, qs.class_name, qs.room, a.faces_detected
         FROM attendance a
         LEFT JOIN students st ON a.student_id = st.id
-        LEFT JOIN schedules s ON a.schedule_id = s.id
+        LEFT JOIN qr_sessions qs ON a.qr_session_id = qs.id
         WHERE DATE(a.timestamp) = ?
     """
     params: list = [date]
-    if schedule_id is not None:
-        query += " AND a.schedule_id = ?"
-        params.append(schedule_id)
+    if qr_session_id is not None:
+        query += " AND a.qr_session_id = ?"
+        params.append(qr_session_id)
     query += " ORDER BY a.timestamp"
 
     cursor = await db.execute(query, params)
@@ -242,22 +198,18 @@ async def export_attendance_csv(date: str | None = None, schedule_id: int | None
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "id", "timestamp", "check_type", "confidence", "wifi_verified", "status",
-        "student_id", "student_name", "nim", "schedule_id", "class_name", "room",
-        "faces_detected"
-    ])
+    headers = [
+        "id", "timestamp", "student_id", "student_name", "nim",
+        "qr_session_id", "class_name", "room",
+        "confidence", "ip_address", "status", "faces_detected",
+    ]
+    writer.writerow(headers)
     for row in rows:
         record = dict(row)
-        record["wifi_verified"] = "yes" if record["wifi_verified"] else "no"
         record["faces_detected"] = record.get("faces_detected") or 0
-        writer.writerow([record.get(col, "") for col in [
-            "id", "timestamp", "check_type", "confidence", "wifi_verified", "status",
-            "student_id", "student_name", "nim", "schedule_id", "class_name", "room",
-            "faces_detected"
-        ]])
+        writer.writerow([record.get(col, "") for col in headers])
 
-    filename = f"attendance_{date}" + (f"_schedule{schedule_id}" if schedule_id is not None else "") + ".csv"
+    filename = f"attendance_{date}" + (f"_session{qr_session_id}" if qr_session_id is not None else "") + ".csv"
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
@@ -300,13 +252,13 @@ async def get_student_attendance(
         params.append(date_to)
 
     db = await get_db()
-    base = f"FROM attendance a JOIN schedules s ON a.schedule_id = s.id WHERE {where}"
+    base = f"FROM attendance a JOIN qr_sessions qs ON a.qr_session_id = qs.id WHERE {where}"
 
     count_cursor = await db.execute(f"SELECT COUNT(*) {base}", params)
     total = (await count_cursor.fetchone())[0]
 
     cursor = await db.execute(
-        f"SELECT a.*, s.class_name, s.room {base} ORDER BY a.timestamp DESC LIMIT ? OFFSET ?",
+        f"SELECT a.*, qs.class_name, qs.room {base} ORDER BY a.timestamp DESC LIMIT ? OFFSET ?",
         params + [limit, offset]
     )
     rows = await cursor.fetchall()
