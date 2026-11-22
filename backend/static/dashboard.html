@@ -1,1687 +1,305 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Student Attendance System — Presentation Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<style>
-  :root {
-    /* Palette: gargoyle gas #FFE14F / deep navy #192853 / pale blue #ECF4F7 */
-    --primary: #192853;
-    --primary-dark: #101A38;
-    --primary-light: #E4ECF4;
-    --accent: #FFE14F;
-    --accent-light: #FFF7CC;
-    --warning: #B45309;
-    --warning-light: #FEF1D6;
-    --danger: #C4323C;
-    --danger-light: #FCE9EB;
-    --success: #12624F;
-    --bg: #ECF4F7;
-    --card: #FFFFFF;
-    --text: #192853;
-    --text-secondary: #5A6B82;
-    --border: #D7E3EA;
-    --sidebar-width: 260px;
-    --header-height: 64px;
-    --radius: 14px;
-    --shadow: 0 1px 2px rgba(25,40,83,.06), 0 6px 18px rgba(25,40,83,.05);
-    --shadow-lg: 0 10px 30px rgba(25,40,83,.14);
-    /* Inter / DM Mono are used only if installed locally; the fallbacks are deliberate. */
-    --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
-    --font-mono: 'DM Mono', 'SFMono-Regular', Consolas, ui-monospace, monospace;
-    --space-1: 4px; --space-2: 8px; --space-3: 12px;
-    --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body {
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    min-height: 100vh;
-  }
-
-  /* Sidebar */
-  .sidebar {
-    position: fixed;
-    top: 0; left: 0;
-    width: var(--sidebar-width);
-    height: 100vh;
-    background: var(--primary);
-    border-right: 1px solid rgba(255,255,255,.08);
-    box-shadow: 6px 0 24px rgba(25,40,83,.10);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-  .sidebar-brand {
-    padding: 18px 20px;
-    border-bottom: 1px solid rgba(255,255,255,.12);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 700;
-    font-size: 16px;
-    letter-spacing: -.02em;
-    color: #FFFFFF;
-  }
-  .sidebar-brand .brand-icon {
-    width: 36px; height: 36px;
-    background: var(--accent);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--primary); font-size: 18px;
-  }
-  .sidebar-nav { flex: 1; padding: 18px 0; }
-  .sidebar-nav a {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 20px; margin: 2px 10px;
-    border-radius: 9px;
-    color: rgba(236,244,247,.72);
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.15s;
-    cursor: pointer;
-  }
-  .sidebar-nav a i { width: 20px; text-align: center; font-size: 15px; color: inherit; opacity: .85; }
-  .sidebar-nav a:hover { background: rgba(255,255,255,.09); color: #FFFFFF; }
-  .sidebar-nav a.active {
-    background: var(--accent); color: var(--primary); font-weight: 700;
-    box-shadow: inset 3px 0 0 var(--primary);
-  }
-  .sidebar-nav .section-label {
-    padding: 22px 20px 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: .14em;
-    color: rgba(255,225,79,.72);
-  }
-  .sidebar-nav .section-label::before {
-    content: "";
-    width: 14px; height: 2px;
-    background: var(--accent);
-    border-radius: 2px;
-  }
-  .sidebar-footer {
-    padding: 16px 20px;
-    border-top: 1px solid rgba(255,255,255,.12);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: .04em;
-    color: rgba(236,244,247,.55);
-    text-align: center;
-  }
-
-  /* Main */
-  .main {
-    min-width: 0;
-    margin-left: var(--sidebar-width);
-    flex: 1;
-    min-height: 100vh;
-  }
-  .header {
-    height: var(--header-height);
-    box-shadow: 0 1px 0 rgba(25,40,83,.06);
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 32px;
-    position: sticky;
-    top: 0;
-    z-index: 50;
-  }
-  .header-left { display: flex; align-items: center; gap: 12px; }
-  .header-left h2 { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
-  .header-left .badge {
-    background: var(--accent);
-    color: var(--primary);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-  }
-  .header-left .badge i { color: var(--primary) !important; }
-  .header-right { display: flex; align-items: center; gap: 16px; }
-  .header-right .status-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    display: inline-block;
-  }
-  .header-right .status-dot.online { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
-  .header-right .status-dot.offline { background: var(--danger); }
-  .header-right .status-label { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-  .header-right .refresh-btn {
-    background: var(--primary-light);
-    border: none;
-    color: var(--primary);
-    padding: 8px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.15s;
-  }
-  .header-right .refresh-btn:hover { background: var(--accent); color: var(--primary); }
-
-  .content { min-width: 0; padding: var(--space-5) var(--space-6); }
-  .section { display: none; }
-  .section.active { display: block; }
-
-  /* Page title */
-  .page-title {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-  }
-  .page-heading {
-    font-size: 30px;
-    font-weight: 700;
-    letter-spacing: -.035em;
-    color: var(--primary);
-    margin-bottom: 24px;
-  }
-  .page-heading small {
-    font-size: 13px;
-    font-weight: 400;
-    letter-spacing: 0;
-    color: var(--text-secondary);
-  }
-
-  /* Stats Grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    box-shadow: var(--shadow);
-    transition: transform 0.15s, box-shadow 0.15s;
-    border-top: 3px solid var(--primary);
-  }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-  .stat-card.green { border-top-color: var(--success); }
-  .stat-card.orange { border-top-color: var(--warning); }
-  .stat-card.red { border-top-color: var(--danger); }
-  .stat-card .stat-icon { font-size: 24px; opacity: 1; color: var(--primary); margin-bottom: 8px; }
-  .stat-card .stat-value {
-    font-size: 36px;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -.045em;
-    font-variant-numeric: tabular-nums;
-    color: var(--primary);
-  }
-  .stat-card .stat-label { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--text-secondary); margin-top: 4px; }
-  .stat-card .stat-detail { font-size: 12px; color: var(--text-secondary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
-
-  /* Cards */
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    margin-bottom: 20px;
-    overflow: hidden;
-  }
-  .card-header {
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .card-header h3 {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: .01em;
-    color: var(--primary);
-  }
-  .card-header h3::before {
-    content: "";
-    display: inline-block;
-    width: 8px; height: 8px;
-    margin-right: 9px;
-    border-radius: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-light);
-  }
-  .card-header .card-action {
-    background: var(--accent-light);
-    border: none;
-    color: var(--primary);
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .card-body { padding: 20px 24px; }
-
-  /* Tables */
-  .table-wrap { overflow-x: auto; max-width: 100%; }
-  .table-wrap table { min-width: 520px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td {
-    text-align: left; padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-    font-variant-numeric: tabular-nums;
-  }
-  th {
-    background: #F4F8FB;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .1em;
-    white-space: nowrap;
-  }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #F7FAFC; }
-  .empty-state { padding: 40px 24px; text-align: center; color: var(--text-secondary); }
-  .empty-state i { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
-  .empty-state p { font-size: 14px; }
-
-  /* Chips */
-  .chip {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: #fff;
-  }
-  .chip.verified, .chip.present { background: var(--success); }
-  .chip.partial { background: var(--warning); }
-  .chip.face_only { background: var(--danger); }
-  .chip.start { background: var(--primary); }
-  .chip.end { background: var(--accent); color: var(--primary); }
-  .chip.default { background: var(--text-secondary); }
-
-  /* Controls */
-  .controls-bar {
-    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
-    margin-bottom: 16px;
-  }
-  .controls-bar select, .controls-bar input {
-    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
-    font-size: 14px; background: var(--card);
-    min-width: 200px;
-  }
-  .controls-bar select:focus, .controls-bar input:focus,
-  .modal-body .form-group input:focus, .modal-body .form-group select:focus {
-    outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent);
-  }
-  .controls-bar .btn {
-    padding: 8px 16px; border-radius: 8px; border: none;
-    font-size: 13px; font-weight: 500; cursor: pointer;
-    display: flex; align-items: center; gap: 6px;
-    background: var(--primary); color: #fff;
-    transition: background 0.15s;
-  }
-  .controls-bar .btn:hover { background: var(--primary-dark); }
-  .controls-bar .btn-secondary { background: var(--primary-light); color: var(--primary); }
-  .controls-bar .btn-secondary:hover { background: var(--accent); color: var(--primary); }
-  .controls-bar .btn-danger { background: var(--danger); color: #fff; }
-  .controls-bar .btn-danger:hover { background: #c62828; }
-  .controls-bar .btn-sm { padding: 6px 10px; font-size: 12px; }
-  .table-wrap .btn {
-    padding: 6px 10px; border-radius: 7px; border: none; cursor: pointer;
-    font-size: 12px; margin-right: 4px;
-  }
-  .table-wrap .btn-secondary { background: var(--primary-light); color: var(--primary); }
-  .table-wrap .btn-danger { background: var(--danger-light); color: var(--danger); }
-
-  /* Felix 22.1 Attendance Sheet */
-  .sheet-tabs {
-    display: flex; gap: 8px; padding: 0 24px; border-bottom: 1px solid var(--border);
-    background: #F4F8FB;
-  }
-  .sheet-tab {
-    border: none; background: transparent; color: var(--text-secondary);
-    padding: 14px 4px 12px; margin-right: 20px; cursor: pointer;
-    font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent;
-  }
-  .sheet-tab.active { color: var(--primary); border-bottom-color: var(--accent); }
-  .sheet-panel { display: none; }
-  .sheet-panel.active { display: block; }
-  .attendance-mark {
-    width: 30px; height: 30px; border-radius: 8px; display: inline-flex;
-    align-items: center; justify-content: center; font-size: 16px; font-weight: 700;
-  }
-  .attendance-mark.present { background: #E4F2ED; color: var(--success); }
-  .attendance-mark.absent { background: var(--danger-light); color: var(--danger); }
-  .sheet-summary { font-size: 13px; color: var(--text-secondary); }
-  .sheet-summary strong { color: var(--text); }
-  .detail-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .detail-time-card { border: 1px solid var(--border); border-radius: 10px; background: #F9FBFD; padding: 16px; }
-  .detail-time-card span { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; }
-  .detail-time-card strong { font-size: 18px; color: var(--primary); font-variant-numeric: tabular-nums; }
-  .hidden-file { display: none; }
-  .modern-date {
-    min-width: 210px; height: 46px; padding: 6px 12px;
-    display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, #FFFFFF, #F4F8FB);
-    border: 1px solid var(--border); border-radius: 11px;
-    box-shadow: 0 1px 2px rgba(25,40,83,0.05);
-    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-  }
-  .modern-date:focus-within {
-    border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent);
-    transform: translateY(-1px);
-  }
-  .modern-date > i { color: var(--primary); font-size: 17px; }
-  .modern-date-content { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-  .modern-date-content label {
-    color: var(--text-secondary); font-size: 10px; font-weight: 700;
-    letter-spacing: 0.45px; line-height: 1; text-transform: uppercase;
-  }
-  .controls-bar .modern-date input[type="date"] {
-    min-width: 0; width: 100%; padding: 2px 0 0; border: 0; border-radius: 0;
-    background: transparent; color: var(--text); font-size: 14px; font-weight: 600;
-    box-shadow: none; outline: none; cursor: pointer;
-  }
-  .modern-date input[type="date"]::-webkit-calendar-picker-indicator {
-    cursor: pointer; opacity: 0.65; padding: 3px; border-radius: 5px;
-  }
-  .modern-date input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    background: var(--primary-light); opacity: 1;
-  }
-
-  /* Chart container */
-  .chart-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 24px;
-  }
-  .chart-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 20px;
-  }
-  .chart-card h3 {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: .01em;
-    color: var(--primary);
-    margin-bottom: 16px;
-  }
-  .chart-card canvas { max-height: 260px; }
-  .chart-fallback { font-size: 12px; color: var(--text-secondary); padding: 18px 0; line-height: 1.5; }
-
-  /* Architecture Diagram */
-  .arch-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-    margin-top: 16px;
-  }
-  .arch-card {
-    background: var(--card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 24px;
-    text-align: center;
-    border: 1px solid var(--border);
-    transition: transform 0.2s;
-  }
-  .arch-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-  .arch-card .arch-icon {
-    width: 56px; height: 56px;
-    border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 16px;
-    font-size: 24px;
-    color: #fff;
-  }
-  .arch-card h4 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-  .arch-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
-  .arch-flow {
-    display: flex; align-items: center; justify-content: center;
-    gap: 12px; flex-wrap: wrap;
-    padding: 20px 0; color: var(--text-secondary);
-  }
-  .arch-flow .flow-step {
-    background: var(--primary-light); color: var(--primary);
-    padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
-  }
-  .arch-flow .flow-arrow { font-size: 18px; }
-
-  /* Modal */
-  .modal-overlay {
-    display: none;
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 200;
-    align-items: center; justify-content: center;
-  }
-  .modal-overlay.show { display: flex; }
-  .modal {
-    background: var(--card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    width: 480px;
-    max-width: 90vw;
-    max-height: 80vh;
-    overflow-y: auto;
-    padding: 0;
-  }
-  .modal-header {
-    padding: 18px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .modal-header h3 { font-size: 16px; font-weight: 600; }
-  .modal-close {
-    background: none; border: none; font-size: 20px; cursor: pointer;
-    color: var(--text-secondary); padding: 4px; line-height: 1;
-  }
-  .modal-body { padding: 20px 24px; }
-  .modal-body .form-group { margin-bottom: 16px; }
-  .modal-body .form-group label {
-    display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;
-    color: var(--text-secondary);
-  }
-  .modal-body .form-group input, .modal-body .form-group select {
-    width: 100%; padding: 9px 12px; border-radius: 8px;
-    border: 1px solid var(--border); font-size: 14px;
-  }
-  .modal-body .form-group input:focus, .modal-body .form-group select:focus {
-    outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
-  }
-  .modal-footer {
-    padding: 14px 24px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-  .modal-footer .btn { padding: 8px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
-  .modal-footer .btn-primary { background: var(--primary); color: #fff; }
-  .modal-footer .btn-primary:hover { background: var(--primary-dark); }
-  .modal-footer .btn-cancel { background: var(--primary-light); color: var(--primary); }
-  .modal-footer .btn-cancel:hover { background: var(--accent); color: var(--primary); }
-
-  /* Toast */
-  .toast-container {
-    position: fixed; top: 80px; right: 24px; z-index: 300;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .toast {
-    background: var(--card);
-    border-radius: 10px;
-    box-shadow: var(--shadow-lg);
-    padding: 14px 20px;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 280px;
-    animation: slideIn 0.25s ease;
-    border-left: 4px solid var(--accent);
-  }
-  .toast.error { border-left-color: var(--danger); }
-  .toast.warning { border-left-color: var(--warning); }
-  .toast i { font-size: 18px; }
-  .toast.success i { color: var(--success); }
-  .toast.error i { color: var(--danger); }
-  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-  /* Responsive: the sidebar becomes an accessible drawer on narrow screens */
-  @media (max-width: 768px) {
-    .mobile-menu-btn { display: inline-flex; }
-    .sidebar { width: 260px; transform: translateX(-100%); transition: transform .2s ease; }
-    .sidebar.drawer-open { transform: translateX(0); }
-    .sidebar-brand span, .sidebar-nav a span, .sidebar-footer { display: block; }
-    .sidebar-nav .section-label { display: flex; }
-    .sidebar-nav a { justify-content: flex-start; padding: 11px 20px; margin: 2px 10px; }
-    .sidebar-brand { justify-content: flex-start; padding: 18px 20px; }
-    .main { margin-left: 0; }
-    .content { padding: 16px; }
-    .chart-row { grid-template-columns: 1fr; }
-    .header { padding: 0 16px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* ============================================================
-     DESIGN SYSTEM POLISH (unique rules only)
-     Palette: #FFE14F gargoyle gas / #192853 navy / #ECF4F7 pale blue
-     Base rules above are authoritative for shared selectors.
-     ============================================================ */
-  .mobile-menu-btn {
-    display: none; align-items: center; justify-content: center;
-    width: 38px; height: 38px; border: 0; border-radius: 9px;
-    background: var(--primary); color: var(--accent); cursor: pointer;
-  }
-  .mobile-menu-btn:focus-visible, .modal-close:focus-visible,
-  .sidebar-nav a:focus-visible, .controls-bar button:focus-visible {
-    outline: 3px solid var(--accent); outline-offset: 2px;
-  }
-  .nav-overlay {
-    position: fixed; inset: 0; z-index: 90;
-    background: rgba(16,26,56,.45);
-  }
-
-  /* Supporting components are defined once in the base rules above. */
-
-  /* The two-up chart grid needs more room than the original 768 px breakpoint */
-  @media (max-width: 1100px) {
-    .chart-row { grid-template-columns: 1fr; }
-    .chart-card canvas { max-width: 100%; }
-  }
-</style>
-</head>
-<body>
-
-<!-- Sidebar -->
-<div class="nav-overlay" id="navOverlay" hidden></div>
-
-<aside class="sidebar">
-  <div class="sidebar-brand">
-    <div class="brand-icon"><i class="fas fa-user-check"></i></div>
-    <span>Student Attendance</span>
-  </div>
-  <nav class="sidebar-nav" id="sidebarNav">
-    <div class="section-label">Overview</div>
-    <a class="active" data-section="overview"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
-    <a data-section="architecture"><i class="fas fa-sitemap"></i><span>Architecture</span></a>
-
-    <div class="section-label">Management</div>
-    <a data-section="students"><i class="fas fa-clipboard-check"></i><span>Attendance Sheet</span></a>
-    <a data-section="schedules"><i class="fas fa-calendar-alt"></i><span>Schedules</span></a>
-    <a data-section="enroll"><i class="fas fa-camera"></i><span>Face Enrollment</span></a>
-
-    <div class="section-label">Operations</div>
-    <a data-section="attendance"><i class="fas fa-clipboard-list"></i><span>Attendance</span></a>
-    <a data-section="wifi"><i class="fas fa-wifi"></i><span>Wi-Fi Scanner</span></a>
-    <a data-section="recognize"><i class="fas fa-face-smile"></i><span>Recognition Demo</span></a>
-  </nav>
-  <div class="sidebar-footer">
-    <i class="fas fa-cube"></i> Felix 22.1 &mdash; Attendance Sheet
-  </div>
-</aside>
-
-<!-- Main -->
-<div class="main">
-  <header class="header">
-    <div class="header-left">
-      <button class="mobile-menu-btn" id="menuToggle" aria-label="Open navigation"
-        aria-expanded="false" aria-controls="sidebarNav"><i class="fas fa-bars"></i></button>
-      <h2 id="header-title">Dashboard</h2>
-      <span class="badge"><i class="fas fa-circle" style="font-size:8px;color:var(--accent);margin-right:4px"></i>Live</span>
-    </div>
-    <div class="header-right">
-      <span class="status-label"><span class="status-dot online" id="health-dot"></span> <span id="health-text">Connected</span></span>
-      <button class="refresh-btn" onclick="refreshCurrent()"><i class="fas fa-sync-alt"></i> Refresh</button>
-    </div>
-  </header>
-
-  <div class="content">
-
-    <!-- ===== OVERVIEW ===== -->
-    <div class="section active" id="section-overview">
-      <div class="page-heading">Dashboard <small>Real-time attendance overview</small></div>
-
-      <div class="stats-grid" id="overview-stats">
-        <div class="stat-card"><div class="stat-icon"><i class="fas fa-users"></i></div><div class="stat-value" id="ov-students">-</div><div class="stat-label">Total Students</div></div>
-        <div class="stat-card green"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-value" id="ov-verified">0</div><div class="stat-label">Verified Today</div></div>
-        <div class="stat-card orange"><div class="stat-icon"><i class="fas fa-hourglass-half"></i></div><div class="stat-value" id="ov-partial">0</div><div class="stat-label">Partial (no end)</div></div>
-        <div class="stat-card red"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-value" id="ov-faceonly">0</div><div class="stat-label">No Wi-Fi</div></div>
-      </div>
-
-      <div class="chart-row">
-        <div class="chart-card"><h3><i class="fas fa-chart-bar"></i> Attendance Status (Today)</h3><canvas id="chart-status"></canvas><div class="chart-fallback" id="chart-status-fallback" hidden>Chart.js is unavailable; the counts are still shown in the KPI cards above.</div></div>
-        <div class="chart-card"><h3><i class="fas fa-clock"></i> Scheduled Classes by Subject</h3><canvas id="chart-classes"></canvas><div class="chart-fallback" id="chart-classes-fallback" hidden>Chart.js is unavailable; schedule details remain available below.</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calendar-week"></i> Today's Schedule</h3></div>
-        <div class="card-body"><div id="today-schedule"><div class="empty-state"><i class="fas fa-calendar"></i><p>Loading schedules...</p></div></div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-list"></i> Recent Attendance</h3></div>
-        <div class="card-body"><div class="table-wrap"><div id="recent-attendance"><div class="empty-state"><i class="fas fa-clock"></i><p>Waiting for data...</p></div></div></div></div>
-      </div>
-    </div>
-
-    <!-- ===== ARCHITECTURE ===== -->
-    <div class="section" id="section-architecture">
-      <div class="page-heading">System Architecture <small>How the three pillars work together</small></div>
-
-      <div class="arch-flow">
-        <span class="flow-step"><i class="fas fa-wifi"></i> Wi-Fi AP</span>
-        <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
-        <span class="flow-step"><i class="fas fa-face-smile"></i> Face Recognition</span>
-        <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
-        <span class="flow-step"><i class="fas fa-check-double"></i> Two-Stage Logic</span>
-        <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
-        <span class="flow-step" style="background:var(--accent-light);color:var(--primary)"><i class="fas fa-clipboard-check"></i> Attendance</span>
-      </div>
-
-      <div class="arch-grid">
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#192853,#35509B)"><i class="fas fa-wifi"></i></div>
-          <h4>Wi-Fi AP Detection</h4>
-          <p>Scans classroom network via ARP to verify the student's device is physically present on the correct access point. Uses Npcap/Scapy.</p>
-        </div>
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#E8B800,#FFE14F)"><i class="fas fa-eye" style="color:#192853"></i></div>
-          <h4>Face Detection &amp; Recognition</h4>
-          <p>YOLOv8-face detects faces, InsightFace ArcFace (buffalo_l) generates 512-D embeddings. Cosine similarity threshold: 0.5.</p>
-        </div>
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#8A4300,#C77917)"><i class="fas fa-flag-checkered"></i></div>
-          <h4>Two-Stage Attendance</h4>
-          <p>Start of class: status = "partial". End of class: finalizes to "verified" (Wi-Fi ok on both) or "face_only" (no Wi-Fi).</p>
-        </div>
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#243A73,#4C68B0)"><i class="fas fa-database"></i></div>
-          <h4>SQLite Database</h4>
-          <p>Stores students, faces (embeddings), schedules, attendance records, and AP logs. Rollback-safe transaction logic.</p>
-        </div>
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#98232B,#C4323C)"><i class="fas fa-mobile-alt"></i></div>
-          <h4>Flutter Mobile App</h4>
-          <p>Android/iOS app for student selfies. Captures face images via camera for enrollment and attendance check-in.</p>
-        </div>
-        <div class="arch-card">
-          <div class="arch-icon" style="background:linear-gradient(135deg,#0C4C3E,#12624F)"><i class="fas fa-server"></i></div>
-          <h4>FastAPI Backend</h4>
-          <p>Python web server connecting all components. Endpoints for face operations, attendance logic, Wi-Fi scanning, and data export.</p>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:24px">
-        <div class="card-header"><h3><i class="fas fa-exchange-alt"></i> Attendance Flow</h3></div>
-        <div class="card-body">
-          <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;padding:16px 0">
-            <div style="text-align:center;flex:1;min-width:120px">
-              <div style="background:var(--primary-light);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--primary);font-size:20px"><i class="fas fa-wifi"></i></div>
-              <div style="font-size:13px;font-weight:600">1. Wi-Fi Check</div>
-              <div style="font-size:12px;color:var(--text-secondary)">ARP scan for student MAC</div>
-            </div>
-            <div style="display:flex;align-items:center;color:var(--text-secondary);font-size:20px"><i class="fas fa-arrow-right"></i></div>
-            <div style="text-align:center;flex:1;min-width:120px">
-              <div style="background:var(--accent-light);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--accent);font-size:20px"><i class="fas fa-camera"></i></div>
-              <div style="font-size:13px;font-weight:600">2. Start Selfie</div>
-              <div style="font-size:12px;color:var(--text-secondary)">Face detection + recognition</div>
-            </div>
-            <div style="display:flex;align-items:center;color:var(--text-secondary);font-size:20px"><i class="fas fa-arrow-right"></i></div>
-            <div style="text-align:center;flex:1;min-width:120px">
-              <div style="background:var(--warning-light);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--warning);font-size:20px"><i class="fas fa-hourglass-half"></i></div>
-              <div style="font-size:13px;font-weight:600">3. Partial Status</div>
-              <div style="font-size:12px;color:var(--text-secondary)">Wi-Fi: OK | Face: matched</div>
-            </div>
-            <div style="display:flex;align-items:center;color:var(--text-secondary);font-size:20px"><i class="fas fa-arrow-right"></i></div>
-            <div style="text-align:center;flex:1;min-width:120px">
-              <div style="background:var(--primary-light);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--primary);font-size:20px"><i class="fas fa-camera"></i></div>
-              <div style="font-size:13px;font-weight:600">4. End Selfie</div>
-              <div style="font-size:12px;color:var(--text-secondary)">Second face match + Wi-Fi re-check</div>
-            </div>
-            <div style="display:flex;align-items:center;color:var(--text-secondary);font-size:20px"><i class="fas fa-arrow-right"></i></div>
-            <div style="text-align:center;flex:1;min-width:120px">
-              <div style="background:var(--accent-light);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--accent);font-size:20px"><i class="fas fa-check-double"></i></div>
-              <div style="font-size:13px;font-weight:600">5. Verified!</div>
-              <div style="font-size:12px;color:var(--text-secondary)">All conditions satisfied</div>
-            </div>
-          </div>
-          <div style="background:var(--primary-light);border-radius:10px;padding:16px 20px;margin-top:8px">
-            <strong style="color:var(--primary)"><i class="fas fa-info-circle"></i> Key Rule:</strong>
-            <span style="font-size:13px;color:var(--text-secondary)"> Attendance is granted ONLY when <strong>all 3 conditions</strong> are met: correct Wi-Fi AP + valid class time + both selfies matched.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== FELIX 22.0 ATTENDANCE SHEET ===== -->
-    <div class="section" id="section-students">
-      <div class="page-heading">Attendance Sheet</div>
-      <div class="controls-bar">
-        <select id="sheet-schedule" onchange="loadStudents()">
-          <option value="">Select class / subject</option>
-        </select>
-        <div class="modern-date">
-          <i class="fas fa-calendar-day"></i>
-          <div class="modern-date-content">
-            <label for="sheet-date">Attendance date</label>
-            <input type="date" id="sheet-date" onchange="loadStudents()">
-          </div>
-        </div>
-        <input type="text" id="student-search" placeholder="Search by NIM or name..." oninput="debouncedLoadStudents()" style="min-width:240px">
-        <button class="btn" onclick="openStudentModal()"><i class="fas fa-plus"></i> Add Student</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('student-import-file').click()"><i class="fas fa-file-import"></i> Import CSV</button>
-        <button class="btn btn-secondary" onclick="exportAttendanceSheet()"><i class="fas fa-file-excel"></i> Export Excel</button>
-        <input class="hidden-file" type="file" id="student-import-file" accept=".csv,text/csv" onchange="importStudentList(event)">
-      </div>
-      <div class="card">
-        <div class="sheet-tabs">
-          <button class="sheet-tab active" data-sheet-tab="list" onclick="showSheetTab('list')"><i class="fas fa-users"></i> Student List</button>
-          <button class="sheet-tab" data-sheet-tab="records" onclick="showSheetTab('records')"><i class="fas fa-clock"></i> Attendance Record</button>
-        </div>
-        <div class="card-body sheet-panel active" id="sheet-panel-list"><div class="table-wrap"><div id="student-table"><div class="empty-state"><i class="fas fa-users"></i><p>Select a class to load its student list.</p></div></div></div></div>
-        <div class="card-body sheet-panel" id="sheet-panel-records"><div class="table-wrap"><div id="attendance-record-table"><div class="empty-state"><i class="fas fa-clock"></i><p>No attendance records loaded.</p></div></div></div></div>
-      </div>
-    </div>
-
-    <!-- ===== SCHEDULES ===== -->
-    <div class="section" id="section-schedules">
-      <div class="page-heading">Schedules <small>Class schedule management</small></div>
-      <div class="controls-bar">
-        <button class="btn" onclick="openScheduleModal()"><i class="fas fa-plus"></i> Add Schedule</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('schedule-import-file').click()"><i class="fas fa-file-import"></i> Import CSV</button>
-        <button class="btn btn-secondary" onclick="exportSchedules()"><i class="fas fa-file-export"></i> Export CSV</button>
-        <input class="hidden-file" type="file" id="schedule-import-file" accept=".csv,text/csv" onchange="importSchedules(event)">
-      </div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Schedule List</h3><span id="schedule-count" style="font-size:13px;color:var(--text-secondary)"></span></div>
-        <div class="card-body"><div class="table-wrap"><div id="schedule-table"><div class="empty-state"><i class="fas fa-calendar"></i><p>Loading schedules...</p></div></div></div></div>
-      </div>
-    </div>
-
-    <!-- ===== FACE ENROLLMENT ===== -->
-    <div class="section" id="section-enroll">
-      <div class="page-heading">Face Enrollment <small>Register student face embeddings</small></div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-camera"></i> Enroll Face</h3></div>
-        <div class="card-body">
-          <div style="max-width:480px">
-            <div class="form-group" style="margin-bottom:16px">
-              <label>Select Student</label>
-              <select id="enroll-student" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:14px">
-                <option value="">-- Loading students --</option>
-              </select>
-            </div>
-            <div class="form-group" style="margin-bottom:16px">
-              <label>Face Image (JPEG/PNG)</label>
-              <input type="file" id="enroll-file" accept="image/jpeg,image/png" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px">
-            </div>
-            <div style="display:flex;gap:12px;align-items:center">
-              <button class="btn" onclick="enrollFace()"><i class="fas fa-upload"></i> Enroll</button>
-              <div id="enroll-result" style="font-size:13px;color:var(--text-secondary)"></div>
-            </div>
-          </div>
-          <hr style="margin:24px 0;border:none;border-top:1px solid var(--border)">
-          <h4 style="font-size:14px;margin-bottom:12px"><i class="fas fa-database"></i> Enrolled Students</h4>
-          <div class="table-wrap"><div id="enrolled-table"><div class="empty-state"><i class="fas fa-inbox"></i><p>Loading enrollment status...</p></div></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== ATTENDANCE ===== -->
-    <div class="section" id="section-attendance">
-      <div class="page-heading">Attendance Records <small>Two-stage check-in tracking</small></div>
-      <div class="controls-bar">
-        <select id="attendance-filter" onchange="loadAttendance()">
-          <option value="">All classes</option>
-        </select>
-        <a id="csv-export-link" class="btn btn-secondary" href="/attendance/export/csv"><i class="fas fa-download"></i> Export CSV</a>
-        <span style="font-size:12px;color:var(--text-secondary)"><i class="fas fa-sync-alt"></i> Auto-refresh 30s</span>
-      </div>
-      <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card"><div class="stat-value" id="att-total" style="font-size:24px">0</div><div class="stat-label">Total Check-ins</div></div>
-        <div class="stat-card green"><div class="stat-value" id="att-verified" style="font-size:24px">0</div><div class="stat-label">Verified</div></div>
-        <div class="stat-card orange"><div class="stat-value" id="att-partial" style="font-size:24px">0</div><div class="stat-label">Partial</div></div>
-        <div class="stat-card red"><div class="stat-value" id="att-faceonly" style="font-size:24px">0</div><div class="stat-label">Face Only (no Wi-Fi)</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-list"></i> Records</h3></div>
-        <div class="card-body"><div class="table-wrap"><div id="attendance-table"><div class="empty-state"><i class="fas fa-clipboard"></i><p>Loading attendance records...</p></div></div></div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-user-slash"></i> Absent Students</h3></div>
-        <div class="card-body"><div id="absent-table"><div class="empty-state"><i class="fas fa-users"></i><p>Select a class to see absent students.</p></div></div></div>
-      </div>
-    </div>
-
-    <!-- ===== WI-FI ===== -->
-    <div class="section" id="section-wifi">
-      <div class="page-heading">Wi-Fi Scanner <small>Network device detection via ARP</small></div>
-      <div class="controls-bar">
-        <button class="btn" onclick="scanWifi()"><i class="fas fa-wifi"></i> Scan Network</button>
-        <span id="wifi-status" style="font-size:13px;color:var(--text-secondary)">Ready to scan</span>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value" id="wifi-count" style="font-size:24px">0</div><div class="stat-label">Devices Found</div></div>
-        <div class="stat-card green"><div class="stat-value" id="wifi-subnet" style="font-size:18px">-</div><div class="stat-label">Subnet</div></div>
-        <div class="stat-card"><div class="stat-value" id="wifi-bssid" style="font-size:16px">-</div><div class="stat-label">BSSID</div></div>
-        <div class="stat-card"><div class="stat-value" id="wifi-timestamp" style="font-size:16px">-</div><div class="stat-label">Last Scan</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-laptop"></i> Detected Devices</h3></div>
-        <div class="card-body"><div class="table-wrap"><div id="wifi-table"><div class="empty-state"><i class="fas fa-wifi"></i><p>Click "Scan Network" to discover devices.</p></div></div></div></div>
-      </div>
-    </div>
-
-    <!-- ===== RECOGNITION DEMO ===== -->
-    <div class="section" id="section-recognize">
-      <div class="page-heading">Face Recognition Demo <small>Test recognition against enrolled faces</small></div>
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-face-smile"></i> Recognize Face</h3></div>
-        <div class="card-body">
-          <div style="max-width:480px">
-            <div class="form-group" style="margin-bottom:16px">
-              <label>Upload Face Image</label>
-              <input type="file" id="recognize-file" accept="image/jpeg,image/png" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px">
-            </div>
-            <button class="btn" onclick="recognizeFace()"><i class="fas fa-search"></i> Recognize</button>
-            <div id="recognize-result" style="margin-top:16px"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /.content -->
-</div><!-- /.main -->
-
-
-<!-- ===== STUDENT MODAL ===== -->
-<div class="modal-overlay" id="student-modal" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="student-modal-title">Add Student</h3>
-      <button class="modal-close" onclick="closeModal('student-modal')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Class / Subject</label><select id="student-schedule"><option value="">-- Select class --</option></select></div>
-      <div class="form-group"><label>Full Name</label><input type="text" id="student-name" placeholder="e.g. John Doe"></div>
-      <div class="form-group"><label>NIM (Student ID)</label><input type="text" id="student-nim" placeholder="e.g. 1234567890"></div>
-      <div class="form-group"><label>MAC Address (optional)</label><input type="text" id="student-mac" placeholder="e.g. AA:BB:CC:DD:EE:FF"></div>
-      <div class="form-group" id="student-edit-hint" hidden>
-        <small style="color:var(--text-secondary)">Only the MAC address can be changed here. Name and NIM are fixed after enrollment.</small>
-      </div>
-      <input type="hidden" id="student-edit-id" value="">
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" onclick="closeModal('student-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStudent()"><i class="fas fa-check"></i> <span id="student-save-label">Save</span></button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== FELIX 22.0 ATTENDANCE TIME DETAILS ===== -->
-<div class="modal-overlay" id="attendance-details-modal" role="dialog" aria-modal="true" aria-labelledby="attendance-details-title">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="attendance-details-title"><i class="fas fa-clock"></i> Attendance Time Details</h3>
-      <button class="modal-close" onclick="closeModal('attendance-details-modal')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="margin-bottom:16px">
-        <strong id="details-student-name" style="font-size:18px"></strong>
-        <div id="details-student-meta" style="font-size:13px;color:var(--text-secondary);margin-top:4px"></div>
-      </div>
-      <div class="detail-time-grid">
-        <div class="detail-time-card"><span>Start Attendance</span><strong id="details-start-time">-</strong></div>
-        <div class="detail-time-card"><span>End Attendance</span><strong id="details-end-time">-</strong></div>
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal('attendance-details-modal')">Close</button></div>
-  </div>
-</div>
-
-<!-- ===== SCHEDULE MODAL ===== -->
-<div class="modal-overlay" id="schedule-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="schedule-modal-title">Add Schedule</h3>
-      <button class="modal-close" onclick="closeModal('schedule-modal')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label>Class Name</label><input type="text" id="schedule-name" placeholder="e.g. Computer Science 101"></div>
-      <div class="form-group"><label>Day of Week</label>
-        <select id="schedule-day">
-          <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
-          <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option>
-        </select>
-      </div>
-      <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><label>Start Time</label><input type="time" id="schedule-start"></div>
-        <div><label>End Time</label><input type="time" id="schedule-end"></div>
-      </div>
-      <div class="form-group"><label>Room (optional)</label><input type="text" id="schedule-room" placeholder="e.g. Room 301"></div>
-      <div class="form-group"><label>AP BSSID (optional)</label><input type="text" id="schedule-bssid" placeholder="e.g. AA:BB:CC:DD:EE:FF"></div>
-      <input type="hidden" id="schedule-edit-id" value="">
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" onclick="closeModal('schedule-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSchedule()"><i class="fas fa-check"></i> Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast container -->
-<div class="toast-container" id="toast-container"></div>
-
-<script>
-// ===== HELPERS =====
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function fmtDate(d) { try { return new Date(d).toLocaleString(); } catch { return d; } }
-function fmtTime(d) { if (!d) return '-'; try { return new Date(d).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); } catch { return d; } }
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-
-const STATUS_CLASSES = ['verified','present','partial','face_only','start','end','default'];
-const CHECK_CLASSES = ['start','end'];
-function allowlisted(value, values, fallback) {
-  return values.includes(value) ? value : fallback;
-}
-function statusChip(s) {
-  return `<span class="chip ${allowlisted(s, STATUS_CLASSES, 'default')}">${esc(s)}</span>`;
-}
-function checkChip(t) {
-  return `<span class="chip ${allowlisted(t, CHECK_CLASSES, 'default')}">${esc(t)}</span>`;
-}
-
-function toast(msg, type='success') {
-  const c = document.getElementById('toast-container');
-  const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-exclamation-triangle';
-  const t = document.createElement('div');
-  t.className = `toast ${type}`;
-  t.innerHTML = `<i class="fas ${icon}"></i> ${esc(msg)}`;
-  c.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
-}
-
-function apiError(err) {
-  let msg = err.message || 'Connection failed';
-  if (err.detail && typeof err.detail === 'string') msg = err.detail;
-  toast(msg, 'error');
-}
-
-let modalTrigger = null;
-function openModal(id) {
-  modalTrigger = document.activeElement;
-  const el = document.getElementById(id);
-  el.classList.add('show');
-  const first = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
-    || el.querySelector('button');
-  if (first) first.focus();
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
-  if (modalTrigger && document.contains(modalTrigger)) modalTrigger.focus();
-  modalTrigger = null;
-}
-
-// ===== MOBILE DRAWER =====
-const menuToggle = document.getElementById('menuToggle');
-const navOverlay = document.getElementById('navOverlay');
-const sidebarEl = document.querySelector('.sidebar');
-function setDrawer(open) {
-  sidebarEl.classList.toggle('drawer-open', open);
-  navOverlay.hidden = !open;
-  menuToggle.setAttribute('aria-expanded', String(open));
-  menuToggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
-}
-menuToggle.addEventListener('click', () => setDrawer(!sidebarEl.classList.contains('drawer-open')));
-navOverlay.addEventListener('click', () => setDrawer(false));
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
-});
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  const open = document.querySelector('.modal-overlay.show');
-  if (open) closeModal(open.id); else setDrawer(false);
-});
-
-// ===== NAVIGATION =====
-document.querySelectorAll('.sidebar-nav a').forEach(a => {
-  a.addEventListener('click', () => {
-    document.querySelectorAll('.sidebar-nav a').forEach(x => x.classList.remove('active'));
-    a.classList.add('active');
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById('section-' + a.dataset.section).classList.add('active');
-    document.getElementById('header-title').textContent = a.querySelector('span').textContent;
-    setDrawer(false);
-  });
-});
-
-// ===== API CALLS =====
-async function api(method, url, body) {
-  const opts = { method, headers: {} };
-  if (body instanceof FormData) { opts.body = body; }
-  else if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try { const j = await res.json(); detail = j.detail || detail; } catch {}
-    const err = new Error(detail); err.status = res.status; throw err;
-  }
-  if (res.headers.get('content-type')?.includes('application/json')) return res.json();
-  return res;
-}
-
-// ===== HEALTH =====
-async function checkHealth() {
-  try {
-    const h = await api('GET','/health');
-    document.getElementById('health-dot').className = 'status-dot ' + (h.database === 'ok' ? 'online' : 'offline');
-    document.getElementById('health-text').textContent = h.database === 'ok' ? 'Connected' : 'DB Error';
-  } catch { document.getElementById('health-dot').className = 'status-dot offline'; document.getElementById('health-text').textContent = 'Disconnected'; }
-}
-
-// ===== OVERVIEW =====
-let statusChart = null;
-let classChart = null;
-
-async function loadOverview() {
-  try {
-    const [students, attendance,] = await Promise.all([
-      api('GET','/students/'),
-      api('GET','/attendance/today'),
-    ]);
-    document.getElementById('ov-students').textContent = students.length;
-    document.getElementById('ov-verified').textContent = attendance.filter(r => r.status === 'verified' || r.status === 'present').length;
-    document.getElementById('ov-partial').textContent = attendance.filter(r => r.status === 'partial').length;
-    document.getElementById('ov-faceonly').textContent = attendance.filter(r => r.status === 'face_only').length;
-
-    // Status chart — destroy the old instance before reusing this canvas.
-    if (statusChart) { statusChart.destroy(); statusChart = null; }
-    const chartStatusCanvas = document.getElementById('chart-status');
-    if (typeof Chart === 'undefined') { chartStatusCanvas.hidden = true; document.getElementById('chart-status-fallback').hidden = false; }
-    else {
-    chartStatusCanvas.hidden = false; document.getElementById('chart-status-fallback').hidden = true;
-    const ctx1 = chartStatusCanvas.getContext('2d');
-    statusChart = new Chart(ctx1, {
-      type: 'doughnut',
-      data: {
-        labels: ['Verified','Partial','Face Only'],
-        datasets: [{ data: [
-          attendance.filter(r => r.status==='verified'||r.status==='present').length,
-          attendance.filter(r => r.status==='partial').length,
-          attendance.filter(r => r.status==='face_only').length,
-        ], backgroundColor: ['#12624F','#B45309','#C4323C'], borderWidth: 0 }]
-      },
-      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-    }
-
-    // Recent attendance
-    const recent = attendance.slice(0, 20);
-    if (!recent.length) {
-      document.getElementById('recent-attendance').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>No attendance records today.</p></div>';
-    } else {
-      document.getElementById('recent-attendance').innerHTML = `<table>
-        <thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Check</th><th>Wi-Fi</th><th>Status</th></tr></thead>
-        <tbody>${recent.map(r => `<tr>
-          <td>${fmtTime(r.timestamp)}</td>
-          <td>${esc(r.student_name||'#'+r.student_id)}</td>
-          <td>${esc(r.class_name||'-')}</td>
-          <td>${checkChip(r.check_type)}</td>
-          <td>${r.wifi_verified ? '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
-          <td>${statusChip(r.status)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-
-    // Today's schedule
-    const scheds = await api('GET','/schedules/');
-    // Backend day_of_week is Monday=0; Date.getDay() is Sunday=0.
-    const today = (new Date().getDay() + 6) % 7;
-    const todayScheds = scheds.filter(s => s.day_of_week === today);
-    if (!todayScheds.length) {
-      document.getElementById('today-schedule').innerHTML = '<div class="empty-state"><i class="fas fa-calendar-day"></i><p>No classes scheduled for today.</p></div>';
-    } else {
-      document.getElementById('today-schedule').innerHTML = `<table>
-        <thead><tr><th>Class</th><th>Time</th><th>Room</th><th>AP BSSID</th></tr></thead>
-        <tbody>${todayScheds.map(s => `<tr>
-          <td><strong>${esc(s.class_name)}</strong></td>
-          <td>${s.start_time} - ${s.end_time}</td>
-          <td>${esc(s.room||'-')}</td>
-          <td style="font-family:monospace;font-size:12px">${esc(s.ap_bssid||'-')}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-
-    // Classes chart — destroy the old instance before reusing this canvas.
-    if (classChart) { classChart.destroy(); classChart = null; }
-    const chartClassesCanvas = document.getElementById('chart-classes');
-    if (typeof Chart === 'undefined') { chartClassesCanvas.hidden = true; document.getElementById('chart-classes-fallback').hidden = false; }
-    else {
-    chartClassesCanvas.hidden = false; document.getElementById('chart-classes-fallback').hidden = true;
-    const ctx2 = chartClassesCanvas.getContext('2d');
-    const classCounts = {};
-    scheds.forEach(s => { classCounts[s.class_name] = (classCounts[s.class_name]||0) + 1; });
-    classChart = new Chart(ctx2, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(classCounts),
-        datasets: [{ data: Object.values(classCounts), backgroundColor: '#192853', borderRadius: 4 }]
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-    });
-    }
-
-  } catch (e) { apiError(e); }
-}
-
-// ===== STUDENTS =====
-let studentsTimer = null;
-let studentsSeq = 0;
-function debouncedLoadStudents() {
-  clearTimeout(studentsTimer);
-  studentsTimer = setTimeout(loadStudents, 250);
-}
-let allStudents = [];
-let allSheetStudents = [];
-let currentSheet = null;
-
-function showSheetTab(tab) {
-  document.querySelectorAll('.sheet-tab').forEach(button => {
-    button.classList.toggle('active', button.dataset.sheetTab === tab);
-  });
-  document.getElementById('sheet-panel-list').classList.toggle('active', tab === 'list');
-  document.getElementById('sheet-panel-records').classList.toggle('active', tab === 'records');
-}
-
-function populateFaceEnrollmentStudents() {
-  const sel = document.getElementById('enroll-student');
-  sel.innerHTML = '<option value="">-- Select Student --</option>';
-  allStudents.forEach(student => {
-    const option = document.createElement('option');
-    option.value = student.id;
-    option.textContent = `${student.name} (${student.nim})`;
-    sel.appendChild(option);
-  });
-}
-
-async function loadStudents() {
-  const seq = ++studentsSeq;
-  try {
-    const scheduleId = document.getElementById('sheet-schedule').value;
-    const date = document.getElementById('sheet-date').value;
-    const search = document.getElementById('student-search').value;
-    allStudents = await api('GET','/students/');
-    if (seq !== studentsSeq) return;
-    populateFaceEnrollmentStudents();
-    if (!scheduleId) {
-      currentSheet = null;
-      allSheetStudents = [];
-      document.getElementById('student-table').innerHTML = '<div class="empty-state"><i class="fas fa-calendar-check"></i><p>Select a class / subject to view its full roster.</p></div>';
-      document.getElementById('attendance-record-table').innerHTML = '<div class="empty-state"><i class="fas fa-clock"></i><p>Select a class / subject to view attendance records.</p></div>';
-      return;
-    }
-
-    currentSheet = await api('GET', `/students/attendance-sheet?schedule_id=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`);
-    if (seq !== studentsSeq) return;
-    allSheetStudents = currentSheet.students;
-    let list = allSheetStudents;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q));
-    }
-    if (!list.length) {
-      document.getElementById('student-table').innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No students are enrolled in this class yet. Add one or import a CSV roster.</p></div>';
-    } else {
-      document.getElementById('student-table').innerHTML = `<table>
-        <thead><tr><th style="width:90px">Attendance</th><th>NIM</th><th>Name</th><th>Status</th><th style="width:130px">Actions</th></tr></thead>
-        <tbody>${list.map(s => `<tr>
-          <td>${s.attended
-            ? '<span class="attendance-mark present" title="Attendance submitted"><i class="fas fa-check"></i></span>'
-            : '<span class="attendance-mark absent" title="No attendance submitted"><i class="fas fa-times"></i></span>'}</td>
-          <td><strong>${esc(s.nim)}</strong></td>
-          <td>${esc(s.name)}</td>
-          <td>${s.attended ? statusChip(s.attendance_status) : '<span class="chip face_only">absent</span>'}</td>
-          <td>
-            <button class="btn btn-sm btn-secondary" onclick="editStudent(${s.id})" title="Edit student"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-sm btn-danger" onclick="removeStudentFromClass(${s.id})" title="Remove from this class"><i class="fas fa-user-minus"></i></button>
-          </td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-
-    const records = list.filter(student => student.attended);
-    if (!records.length) {
-      document.getElementById('attendance-record-table').innerHTML = '<div class="empty-state"><i class="fas fa-clock"></i><p>No students have submitted attendance for this class and date.</p></div>';
-    } else {
-      document.getElementById('attendance-record-table').innerHTML = `<table>
-        <thead><tr><th>NIM</th><th>Student Name</th><th>Status</th><th>Attendance Details</th></tr></thead>
-        <tbody>${records.map(student => `<tr>
-          <td><strong>${esc(student.nim)}</strong></td>
-          <td>${esc(student.name)}</td>
-          <td>${statusChip(student.attendance_status)}</td>
-          <td><button class="btn btn-sm btn-secondary" onclick="openAttendanceDetails(${student.id})"><i class="fas fa-clock"></i> View Times</button></td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-  } catch (e) { apiError(e); }
-}
-
-function openStudentModal(data) {
-  const editing = Boolean(data);
-  document.getElementById('student-modal-title').textContent = editing ? 'Edit MAC Address' : 'Add Student';
-  document.getElementById('student-schedule').value = document.getElementById('sheet-schedule').value;
-  document.getElementById('student-name').value = data?.name || '';
-  document.getElementById('student-nim').value = data?.nim || '';
-  document.getElementById('student-mac').value = data?.mac_address || '';
-  document.getElementById('student-edit-id').value = data?.id || '';
-  // PUT /students/{id}/mac is the only student update the backend exposes.
-  // Disable the fields it cannot persist instead of implying they were saved.
-  ['student-name','student-nim'].forEach(id => { document.getElementById(id).disabled = editing; });
-  document.getElementById('student-edit-hint').hidden = !editing;
-  document.getElementById('student-save-label').textContent = editing ? 'Update MAC' : 'Save';
-  openModal('student-modal');
-}
-
-function editStudent(id) {
-  const s = allStudents.find(x => x.id === id);
-  if (s) openStudentModal(s);
-}
-
-function getLocalDateInputValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-async function saveStudent() {
-  const id = document.getElementById('student-edit-id').value;
-  const scheduleId = document.getElementById('student-schedule').value;
-  if (!scheduleId) { toast('Select a class / subject first', 'warning'); return; }
-  const body = {
-    name: document.getElementById('student-name').value,
-    nim: document.getElementById('student-nim').value,
-    mac_address: document.getElementById('student-mac').value || null,
-  };
-  try {
-    if (id) {
-      // The backend only persists mac_address here; never claim name/NIM changed.
-      const mac = document.getElementById('student-mac').value.trim();
-
-      toast('MAC address updated', 'success');
-    } else {
-      await api('POST', `/students/?schedule_id=${encodeURIComponent(scheduleId)}`, body);
-      toast('Student added to the class roster', 'success');
-    }
-    closeModal('student-modal');
-    loadStudents();
-  } catch (e) { apiError(e); }
-}
-
-async function removeStudentFromClass(id) {
-  const scheduleId = document.getElementById('sheet-schedule').value;
-  if (!scheduleId || !confirm('Remove this student from the selected class roster? Their global student profile and attendance history will remain.')) return;
-  try {
-    await api('DELETE', `/students/${id}/schedules/${scheduleId}`);
-    toast('Student removed from this class', 'success');
-    loadStudents();
-  } catch (e) { apiError(e); }
-}
-
-function openAttendanceDetails(id) {
-  const student = allSheetStudents.find(item => item.id === id);
-  if (!student) return;
-  document.getElementById('details-student-name').textContent = student.name;
-  document.getElementById('details-student-meta').textContent = `${student.nim} • ${currentSheet.schedule.class_name} • ${currentSheet.date}`;
-  document.getElementById('details-start-time').textContent = fmtTime(student.start_time);
-  document.getElementById('details-end-time').textContent = fmtTime(student.end_time);
-  openModal('attendance-details-modal');
-}
-
-async function importStudentList(event) {
-  const file = event.target.files[0];
-  const scheduleId = document.getElementById('sheet-schedule').value;
-  if (!file) return;
-  if (!scheduleId) {
-    toast('Select a class / subject before importing', 'warning');
-    event.target.value = '';
-    return;
-  }
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const result = await api('POST', `/students/import/csv?schedule_id=${encodeURIComponent(scheduleId)}`, form);
-    const message = `${result.enrolled} enrolled, ${result.created} new student profiles` + (result.skipped ? `, ${result.skipped} skipped` : '');
-    toast(message, result.skipped ? 'warning' : 'success');
-    loadStudents();
-  } catch (e) { apiError(e); }
-  event.target.value = '';
-}
-
-function exportAttendanceSheet() {
-  const scheduleId = document.getElementById('sheet-schedule').value;
-  const date = document.getElementById('sheet-date').value;
-  if (!scheduleId) { toast('Select a class / subject before exporting', 'warning'); return; }
-  window.location.href = `/students/export/xlsx?schedule_id=${encodeURIComponent(scheduleId)}&date=${encodeURIComponent(date)}`;
-}
-
-async function deleteStudent(id) {
-  if (!confirm('Delete this student and all associated face data?')) return;
-  try {
-    await api('DELETE', `/students/${id}`);
-    toast('Student deleted', 'success');
-    loadStudents();
-  } catch (e) { apiError(e); }
-}
-
-// ===== SCHEDULES =====
-let allSchedules = [];
-
-async function importSchedules(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const result = await api('POST', '/schedules/import/csv', form);
-    const message = `${result.imported} schedules imported` + (result.skipped ? `, ${result.skipped} skipped` : '');
-    toast(message, result.skipped ? 'warning' : 'success');
-    await loadSchedules();
-    await loadStudents();
-  } catch (e) { apiError(e); }
-  event.target.value = '';
-}
-
-function exportSchedules() {
-  window.location.href = '/schedules/export/csv';
-}
-
-async function loadSchedules() {
-  try {
-    allSchedules = await api('GET','/schedules/');
-    document.getElementById('schedule-count').textContent = allSchedules.length + ' schedules';
-    if (!allSchedules.length) {
-      document.getElementById('schedule-table').innerHTML = '<div class="empty-state"><i class="fas fa-calendar"></i><p>No schedules defined.</p></div>';
-    } else {
-      document.getElementById('schedule-table').innerHTML = `<table>
-        <thead><tr><th>Class</th><th>Day</th><th>Time</th><th>Room</th><th>AP BSSID</th><th style="width:120px">Actions</th></tr></thead>
-        <tbody>${allSchedules.map(s => `<tr>
-          <td><strong>${esc(s.class_name)}</strong></td>
-          <td>${DAYS[s.day_of_week]||'?'}</td>
-          <td>${s.start_time} - ${s.end_time}</td>
-          <td>${esc(s.room||'-')}</td>
-          <td style="font-family:monospace;font-size:12px">${esc(s.ap_bssid||'-')}</td>
-          <td>
-            <button class="btn btn-sm btn-secondary" onclick="editSchedule(${s.id})" title="Edit"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${s.id})" title="Delete"><i class="fas fa-trash"></i></button>
-          </td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-    // Update attendance filter
-    const sel = document.getElementById('attendance-filter');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">All classes</option>';
-    allSchedules.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.id; o.textContent = `${s.class_name} (${DAYS[s.day_of_week]})`;
-      sel.appendChild(o);
-    });
-    sel.value = cur;
-
-    // Felix 22.1 class selectors
-    const sheetSelect = document.getElementById('sheet-schedule');
-    const sheetCurrent = sheetSelect.value;
-    sheetSelect.innerHTML = '<option value="">Select class / subject</option>';
-    const modalSelect = document.getElementById('student-schedule');
-    modalSelect.innerHTML = '<option value="">-- Select class --</option>';
-    allSchedules.forEach(schedule => {
-      const label = `${schedule.class_name} (${DAYS[schedule.day_of_week]} ${schedule.start_time})`;
-      const sheetOption = document.createElement('option');
-      sheetOption.value = schedule.id;
-      sheetOption.textContent = label;
-      sheetSelect.appendChild(sheetOption);
-      const modalOption = sheetOption.cloneNode(true);
-      modalSelect.appendChild(modalOption);
-    });
-    sheetSelect.value = sheetCurrent && allSchedules.some(schedule => String(schedule.id) === sheetCurrent)
-      ? sheetCurrent
-      : (allSchedules[0]?.id || '');
-    modalSelect.value = sheetSelect.value;
-  } catch (e) { apiError(e); }
-}
-
-function openScheduleModal(data) {
-  document.getElementById('schedule-modal-title').textContent = data ? 'Edit Schedule' : 'Add Schedule';
-  document.getElementById('schedule-name').value = data?.class_name || '';
-  document.getElementById('schedule-day').value = data?.day_of_week ?? 0;
-  document.getElementById('schedule-start').value = data?.start_time || '08:00';
-  document.getElementById('schedule-end').value = data?.end_time || '09:30';
-  document.getElementById('schedule-room').value = data?.room || '';
-  document.getElementById('schedule-bssid').value = data?.ap_bssid || '';
-  document.getElementById('schedule-edit-id').value = data?.id || '';
-  openModal('schedule-modal');
-}
-
-function editSchedule(id) {
-  const s = allSchedules.find(x => x.id === id);
-  if (s) openScheduleModal(s);
-}
-
-async function saveSchedule() {
-  const id = document.getElementById('schedule-edit-id').value;
-  const body = {
-    class_name: document.getElementById('schedule-name').value,
-    day_of_week: parseInt(document.getElementById('schedule-day').value),
-    start_time: document.getElementById('schedule-start').value,
-    end_time: document.getElementById('schedule-end').value,
-    room: document.getElementById('schedule-room').value || null,
-    ap_bssid: document.getElementById('schedule-bssid').value || null,
-  };
-  try {
-    if (id) {
-      await api('PUT', `/schedules/${id}`, body);
-      toast('Schedule updated', 'success');
-    } else {
-      await api('POST', '/schedules/', body);
-      toast('Schedule created', 'success');
-    }
-    closeModal('schedule-modal');
-    loadSchedules();
-  } catch (e) { apiError(e); }
-}
-
-async function deleteSchedule(id) {
-  if (!confirm('Delete this schedule? Attendance records are preserved.')) return;
-  try {
-    await api('DELETE', `/schedules/${id}`);
-    toast('Schedule deleted', 'success');
-    loadSchedules();
-  } catch (e) { apiError(e); }
-}
-
-// ===== FACE ENROLLMENT =====
-async function enrollFace() {
-  const sid = document.getElementById('enroll-student').value;
-  const file = document.getElementById('enroll-file').files[0];
-  if (!sid) { toast('Select a student', 'warning'); return; }
-  if (!file) { toast('Select an image file', 'warning'); return; }
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const r = await api('POST', `/faces/enroll?student_id=${sid}`, fd);
-    document.getElementById('enroll-result').innerHTML =
-      `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> ${esc(r.message)} (${esc(r.face_count)} face(s), total ${esc(r.total_embeddings)} samples)</span>`;
-    toast(`Enrolled ${r.face_count} face(s) for student #${sid}`, 'success');
-    loadEnrolledStatus();
-  } catch (e) { apiError(e); document.getElementById('enroll-result').innerHTML = `<span style="color:var(--danger)">Failed: ${e.message}</span>`; }
-}
-
-async function loadEnrolledStatus() {
-  try {
-    const students = await api('GET','/students/');
-    // We can't directly list embeddings; show students with indicator
-    let html = `<table><thead><tr><th>Student</th><th>NIM</th><th>Faces Enrolled</th></tr></thead><tbody>`;
-    for (const s of students) {
-      const count = s.face_count ?? '?';
-      html += `<tr><td>${esc(s.name)}</td><td>${esc(s.nim)}</td><td>${count}</td></tr>`;
-    }
-    html += '</tbody></table>';
-    document.getElementById('enrolled-table').innerHTML = html;
-  } catch { }
-}
-
-// ===== ATTENDANCE =====
-async function loadAttendance() {
-  try {
-    const sid = document.getElementById('attendance-filter').value;
-    const q = sid ? `?schedule_id=${sid}` : '';
-    document.getElementById('csv-export-link').href = `/attendance/export/csv${q}`;
-    const records = await api('GET', `/attendance/today${q}`);
-    document.getElementById('att-total').textContent = records.length;
-    document.getElementById('att-verified').textContent = records.filter(r => r.status === 'verified' || r.status === 'present').length;
-    document.getElementById('att-partial').textContent = records.filter(r => r.status === 'partial').length;
-    document.getElementById('att-faceonly').textContent = records.filter(r => r.status === 'face_only').length;
-
-    if (!records.length) {
-      document.getElementById('attendance-table').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>No check-ins yet today.</p></div>';
-    } else {
-      document.getElementById('attendance-table').innerHTML = `<table>
-        <thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Check</th><th>Wi-Fi</th><th>Confidence</th><th>Status</th></tr></thead>
-        <tbody>${records.map(r => `<tr>
-          <td>${fmtTime(r.timestamp)}</td>
-          <td>${esc(r.student_name||'#'+r.student_id)}</td>
-          <td>${esc(r.class_name||'-')}</td>
-          <td>${checkChip(r.check_type)}</td>
-          <td>${r.wifi_verified ? '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Yes</span>' : '<span style="color:var(--danger)"><i class="fas fa-times-circle"></i> No</span>'}</td>
-          <td>${r.confidence != null ? (r.confidence*100).toFixed(1)+'%' : '-'}</td>
-          <td>${statusChip(r.status)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-
-    // Absent
-    if (!sid) {
-      document.getElementById('absent-table').innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>Select a class to see absent students.</p></div>';
-      return;
-    }
-    const students = await api('GET','/students/');
-    const presentIds = new Set(records.map(r => r.student_id));
-    const absent = students.filter(s => !presentIds.has(s.id));
-    if (!absent.length) {
-      document.getElementById('absent-table').innerHTML = '<div class="empty-state"><i class="fas fa-check-double"></i><p>Everyone is accounted for.</p></div>';
-    } else {
-      document.getElementById('absent-table').innerHTML = `<table>
-        <thead><tr><th>NIM</th><th>Name</th></tr></thead>
-        <tbody>${absent.map(s => `<tr><td>${esc(s.nim)}</td><td>${esc(s.name)}</td></tr>`).join('')}</tbody></table>`;
-    }
-  } catch (e) { apiError(e); }
-}
-
-// ===== WI-FI =====
-async function scanWifi() {
-  document.getElementById('wifi-status').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
-  try {
-    const r = await api('GET','/wifi/scan');
-    document.getElementById('wifi-count').textContent = r.count;
-    document.getElementById('wifi-subnet').textContent = r.subnet;
-    document.getElementById('wifi-bssid').textContent = r.bssid || 'N/A';
-    document.getElementById('wifi-timestamp').textContent = fmtTime(r.timestamp);
-    document.getElementById('wifi-status').innerHTML = '<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Scan complete</span>';
-
-    if (!r.devices.length) {
-      document.getElementById('wifi-table').innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>No devices found. Ensure Npcap is installed and try again.</p></div>';
-    } else {
-      document.getElementById('wifi-table').innerHTML = `<table>
-        <thead><tr><th>#</th><th>IP Address</th><th>MAC Address</th></tr></thead>
-        <tbody>${r.devices.map((d,i) => `<tr>
-          <td>${i+1}</td>
-          <td>${esc(d.ip)}</td>
-          <td style="font-family:monospace">${esc(d.mac)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-  } catch (e) {
-    document.getElementById('wifi-status').innerHTML = '<span style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Scan failed: ' + esc(e.message) + '</span>';
-  }
-}
-
-// ===== RECOGNIZE =====
-async function recognizeFace() {
-  const file = document.getElementById('recognize-file').files[0];
-  if (!file) { toast('Select an image file', 'warning'); return; }
-  const fd = new FormData();
-  fd.append('file', file);
-  const resultDiv = document.getElementById('recognize-result');
-  resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-  try {
-    const r = await api('POST', '/faces/recognize', fd);
-    if (r.recognized) {
-      resultDiv.innerHTML = `<div style="background:var(--accent-light);border-radius:10px;padding:16px 20px">
-        <span style="color:var(--success);font-size:18px"><i class="fas fa-check-circle"></i> Recognized!</span>
-        <div style="margin-top:8px;font-size:14px">
-          <strong>Student:</strong> ${esc(r.student_name)} (ID: ${r.student_id})<br>
-          <strong>Confidence:</strong> ${(r.confidence*100).toFixed(2)}%
-        </div>
-      </div>`;
-    } else {
-      resultDiv.innerHTML = `<div style="background:var(--danger-light);border-radius:10px;padding:16px 20px">
-        <span style="color:var(--danger);font-size:16px"><i class="fas fa-times-circle"></i> Not recognized</span>
-        <div style="margin-top:4px;font-size:13px;color:var(--text-secondary)">${esc(r.reason || 'No matching face found in database.')}</div>
-      </div>`;
-    }
-  } catch (e) {
-    resultDiv.innerHTML = `<div style="background:var(--danger-light);border-radius:10px;padding:16px;color:var(--danger)">${esc(e.message)}</div>`;
-  }
-}
-
-// ===== REFRESH =====
-let refreshing = false;
-function refreshCurrent() {
-  if (refreshing) return;
-  const active = document.querySelector('.section.active');
-  if (!active) return;
-  const id = active.id.replace('section-','');
-  let request = null;
-  switch(id) {
-    case 'overview': request = loadOverview(); break;
-    case 'students': request = loadStudents(); break;
-    case 'schedules': request = loadSchedules(); break;
-    case 'attendance': request = loadAttendance(); break;
-    case 'enroll': request = loadEnrolledStatus(); break;
-    default: break;
-  }
-  if (request) { refreshing = true; request.finally(() => { refreshing = false; }); }
-}
-
-// ===== INIT =====
-async function init() {
-  await checkHealth();
-  document.getElementById('sheet-date').value = getLocalDateInputValue();
-  await loadSchedules();
-  await Promise.all([
-    loadOverview(),
-    loadStudents(),
-    loadAttendance(),
-    loadEnrolledStatus(),
-  ]);
-  setInterval(checkHealth, 15000);
-  setInterval(loadAttendance, 30000);
-}
-
-init();
-</script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Face Attendance ÔÇö Teacher Dashboard</title>
+<style>
+  :root {
+    --bg:#f4f7fb; --card:#fff; --navy:#173b67; --blue:#1f64d6; --blue-dark:#174da7;
+    --green:#087f5b; --amber:#b76000; --red:#c92a2a; --gray:#64748b; --line:#dbe4ee;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#172033;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{background:var(--navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  header h1{font-size:21px;margin:0} header p{margin:3px 0 0;opacity:.8;font-size:13px}
+  main{max-width:1180px;margin:22px auto;padding:0 16px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 8px #173b6708}
+  .card h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.wide{grid-column:1/-1}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.grow{flex:1;min-width:190px}
+  label{font-size:12px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px}
+  input,select{width:100%;padding:11px 12px;border:1px solid #bdccdc;border-radius:8px;font:inherit;background:#fff}
+  button{border:0;border-radius:8px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--blue);color:#fff}.primary:hover{background:var(--blue-dark)}
+  .warning{background:#e8930c;color:#201300}.danger{background:var(--red);color:#fff}.secondary{background:#e9eff7;color:var(--navy)}
+  .success{background:var(--green);color:#fff}.small{padding:7px 10px;font-size:12px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.step{padding:12px;border-radius:9px;background:#eef2f7;text-align:center;color:var(--gray);font-weight:700}
+  .step.active{background:#dceaff;color:var(--blue-dark);outline:2px solid #8fb5ef}.step.done{background:#dcf4e9;color:var(--green)}
+  .qr-wrap{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:center}.qr-box{text-align:center}
+  .qr-box img{width:310px;max-width:100%;border:10px solid #fff;border-radius:12px;box-shadow:0 4px 20px #0002}
+  .token{font:700 24px ui-monospace,monospace;letter-spacing:5px;margin-top:8px}.hint{color:var(--gray);font-size:13px;margin-top:8px}
+  .phase-title{font-size:24px;color:var(--navy);margin:0 0 8px}.phase-help{font-size:16px;margin-bottom:16px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .stat b{display:block;font-size:27px}.stat span{font-size:12px;color:var(--gray)}
+  table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 9px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--gray)}
+  .badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+  .verified{background:#d3f4e5;color:#066143}.partial{background:#fff0ce;color:#8b4a00}.pending{background:#e8edf3;color:#526174}.absent{background:#ffe0e0;color:#a31515}.manual-note{font-size:10px;margin-left:4px}
+  .scroll{overflow-x:auto}.empty{text-align:center;color:var(--gray);padding:28px}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#10233c;color:#fff;padding:12px 20px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:100;max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #login{position:fixed;inset:0;background:#10233cdd;display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
+  #login .modal{background:#fff;padding:28px;border-radius:14px;width:100%;max-width:390px;box-shadow:0 20px 60px #0005}
+  #login h2{margin-top:0}.error{color:var(--red);font-size:13px;min-height:20px;margin-top:8px}
+  .top-link{color:#fff;background:#ffffff1c;text-decoration:none;padding:8px 12px;border-radius:8px;border:0}
+  .roster-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .student-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;gap:8px}
+  details summary{cursor:pointer;font-weight:700;color:var(--blue);margin:10px 0}.notice{background:#eaf2ff;border-left:4px solid var(--blue);padding:12px;border-radius:7px;color:#294769}
+  body.projector main{margin:0;max-width:none;padding:0}body.projector header,body.projector .no-projector{display:none!important}
+  body.projector #sessionCard{border:0;box-shadow:none;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+  body.projector .qr-wrap{grid-template-columns:1fr 1fr;max-width:1200px;margin:auto}body.projector .qr-box img{width:min(70vh,90%)}
+  @media(max-width:780px){.grid,.qr-wrap{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.steps{font-size:12px}.card{padding:15px}header{padding:14px 16px}.qr-box img{width:270px}}
+</style>
+</head>
+<body>
+<header class="no-projector">
+  <div><h1>Face Attendance</h1><p>Teacher Dashboard ┬À two-stage QR + face verification</p></div>
+  <div class="row"><span id="teacherName"></span><button class="top-link" id="logoutBtn">Log out</button></div>
+</header>
+<main>
+  <section class="card no-projector" id="classCard">
+    <h2>1. Prepare the class</h2>
+    <div class="notice">Choose a class, enroll its students, then start. Only students in this class can check in.</div>
+    <div class="row" style="margin-top:14px">
+      <div class="grow"><label for="classSelect">Class</label><select id="classSelect"></select></div>
+      <div style="align-self:end"><button class="secondary" id="newClassBtn">+ New class</button></div>
+      <div style="align-self:end"><button class="danger small" id="deleteClassBtn">­ƒùæ Delete class</button></div>
+      <div style="align-self:end"><button class="primary" id="startBtn">ÔûÂ Start Class Session</button></div>
+    </div>
+    <div id="classForm" class="row" style="display:none;margin-top:12px">
+      <div class="grow"><label for="className">Class name</label><input id="className" placeholder="e.g. Mathematics A"></div>
+      <div class="grow"><label for="classRoom">Room (optional)</label><input id="classRoom" placeholder="e.g. Lab 101"></div>
+      <div style="align-self:end"><button class="primary" id="createClassBtn">Create class</button></div>
+    </div>
+    <details id="enrollmentDetails">
+      <summary>Manage students in the selected class</summary>
+      <div class="grid">
+        <div>
+          <label for="existingStudent">Enroll an existing student</label>
+          <div class="row"><select id="existingStudent" class="grow"></select><button class="secondary" id="enrollBtn">Enroll</button></div>
+          <label style="margin-top:14px">Or add a new student</label>
+          <div class="row"><input id="newName" class="grow" placeholder="Full name"><input id="newNim" class="grow" placeholder="NIM"><button class="secondary" id="addStudentBtn">Add &amp; enroll</button></div>
+        </div>
+        <div><label>Enrolled students (<span id="enrolledCount">0</span>)</label><div id="enrolledList" class="empty">Select a class first.</div></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card wide" id="sessionCard">
+    <div class="roster-toolbar"><h2>Class Session &amp; QR Code</h2><button class="secondary small no-projector" id="projectorBtn">ÔøÂ Projector mode</button></div>
+    <div class="steps no-projector">
+      <div class="step" id="stepStart">1 ┬À Start check-in</div><div class="step" id="stepEnd">2 ┬À Final check-in</div><div class="step" id="stepClosed">3 ┬À Session closed</div>
+    </div>
+    <div id="noSession" class="empty no-projector">No active session. Prepare a class above and press <b>Start Class Session</b>.</div>
+    <div id="sessionActive" style="display:none">
+      <div class="qr-wrap">
+        <div class="qr-box"><img id="qrImage" alt="Rotating class QR code"><div class="token" id="qrToken">------</div><div class="hint">QR rotates every 5 seconds. Students scan this screen, then take a selfie.</div></div>
+        <div class="no-projector">
+          <h3 class="phase-title" id="phaseTitle">Start check-in</h3>
+          <p class="phase-help" id="phaseHelp"></p>
+          <div class="row">
+            <button class="warning" id="finalBtn">ÔÅ¡ Start Final Attendance</button>
+            <button class="secondary" id="spotBtn">´╝ï Optional Spot Check</button>
+            <button class="secondary" id="resumeBtn" style="display:none">ÔåÉ Resume Class</button>
+            <button class="danger" id="endBtn">ÔÅ╣ End Session</button>
+          </div>
+          <p class="hint" id="phaseFootnote"></p>
+        </div>
+      </div>
+    </div>
+    <div id="sessionClosed" class="empty no-projector" style="display:none"><b>Session closed.</b> Review the final roster below. You can mark a student present manually if they spoke to you after class.</div>
+  </section>
+
+  <section class="card wide no-projector">
+    <div class="roster-toolbar">
+      <h2 style="margin:0">Class Roster <span id="rosterSubtitle" class="hint"></span></h2>
+      <div class="row">
+        <select id="historySelect" style="width:auto;min-width:210px"></select>
+        <button class="secondary small" id="refreshRosterBtn">Ôå╗ Refresh</button>
+        <button class="success small" id="exportBtn">­ƒôÑ Download CSV</button>
+      </div>
+    </div>
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><b id="verifiedCount">0</b><span>Verified</span></div>
+      <div class="stat"><b id="partialCount">0</b><span>Partial</span></div>
+      <div class="stat"><b id="pendingCount">0</b><span>Pending / Absent</span></div>
+      <div class="stat"><b id="totalCount">0</b><span>Students</span></div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>NIM</th><th>Name</th><th>Status</th><th>Start time</th><th>End time</th><th>Confidence</th><th>Action</th></tr></thead>
+      <tbody id="rosterBody"><tr><td colspan="7" class="empty">Start a session or choose a previous one.</td></tr></tbody>
+    </table></div>
+  </section>
+</main>
+<div id="toast"></div>
+<div id="login">
+  <form class="modal" id="loginForm">
+    <h2>Teacher Login</h2>
+    <p class="hint">Sign in to manage classes and attendance.</p>
+    <label for="username">Username</label><input id="username" autocomplete="username" value="teacher" required>
+    <label for="password" style="margin-top:10px">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <div class="error" id="loginError"></div>
+    <button class="primary" type="submit" style="width:100%">Log in</button>
+    <p class="hint">Demo account: teacher / attendance2026</p>
+  </form>
+</div>
+<script>
+let token = localStorage.getItem('teacherToken') || '';
+let teacher = localStorage.getItem('teacherName') || '';
+let active = null;
+let viewingSessionId = null;
+let viewingClosed = false;
+let classes = [];
+let students = [];
+let projector = new URLSearchParams(location.search).get('projector') === '1';
+if (projector) document.body.classList.add('projector');
+
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el.t); el.t=setTimeout(()=>el.classList.remove('show'),3200); }
+function headers(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
+async function api(path, options={}){
+  options.headers = {...headers(), ...(options.headers||{})};
+  const response = await fetch(path, options);
+  if(response.status===401 && !path.includes('/teachers/login')){ showLogin(); throw new Error('Teacher login required'); }
+  if(!response.ok){ let message=response.statusText; try{message=(await response.json()).detail||message;}catch(e){} throw new Error(message); }
+  return response.json();
+}
+function showLogin(){ if(projector) return; $('login').style.display='flex'; }
+function hideLogin(){ $('login').style.display='none'; }
+$('loginForm').onsubmit = async event => {
+  event.preventDefault();
+  try{
+    const result=await api('/teachers/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});
+    token=result.token; teacher=result.teacher;
+    localStorage.setItem('teacherToken',token); localStorage.setItem('teacherName',teacher);
+    $('teacherName').textContent=teacher; hideLogin(); await initializeDashboard(); toast('Welcome, '+teacher);
+  }catch(e){ $('loginError').textContent=e.message; }
+};
+$('logoutBtn').onclick=()=>{ localStorage.removeItem('teacherToken');localStorage.removeItem('teacherName');token='';teacher='';showLogin(); };
+
+async function loadClasses(){
+  classes=await api('/classes/');
+  const select=$('classSelect');
+  const previous=select.value;
+  select.innerHTML=classes.length?classes.map(c=>`<option value="${c.id}">${esc(c.class_name)}${c.room?' ┬À '+esc(c.room):''}</option>`).join(''):'<option value="">Create a class first</option>';
+  if(previous && classes.some(c=>String(c.id)===previous)) select.value=previous;
+  await refreshEnrolled();
+}
+async function loadStudents(){
+  students=await api('/students/');
+  $('existingStudent').innerHTML=students.length?students.map(s=>`<option value="${s.id}">${esc(s.nim)} ┬À ${esc(s.name)}</option>`).join(''):'<option value="">No students yet</option>';
+}
+async function refreshEnrolled(){
+  const cid=$('classSelect').value;
+  if(!cid){ $('enrolledList').textContent='Create a class first.'; $('enrolledCount').textContent='0'; return; }
+  const rows=await api('/classes/'+cid+'/students');
+  $('enrolledCount').textContent=rows.length;
+  $('enrolledList').className=rows.length?'':'empty';
+  $('enrolledList').innerHTML=rows.length?rows.map(s=>`<div class="student-row"><span><b>${esc(s.student_nim)}</b> ┬À ${esc(s.student_name)}</span><button class="secondary small" onclick="removeStudent(${cid},${s.student_id})">Remove</button></div>`).join(''):'No students enrolled yet.';
+}
+$('classSelect').onchange=refreshEnrolled;
+$('deleteClassBtn').onclick=async()=>{
+  const cid=Number($('classSelect').value);
+  if(!cid) return toast('Choose a class first');
+  const name=$('classSelect').selectedOptions[0]?.text||'this class';
+  if(!confirm(`Delete class "${esc(name)}"?\nThis removes all student enrollments for this class.`)) return;
+  try{
+    await api('/classes/'+cid,{method:'DELETE'});
+    toast('Class deleted');
+    await loadClasses();
+  }catch(e){ toast(e.message); }
+};
+$('newClassBtn').onclick=()=>{ $('classForm').style.display=$('classForm').style.display==='none'?'flex':'none'; };
+$('createClassBtn').onclick=async()=>{
+  const name=$('className').value.trim(); if(!name)return toast('Enter a class name');
+  try{ const created=await api('/classes/',{method:'POST',body:JSON.stringify({class_name:name,room:$('classRoom').value.trim()||null})});
+    $('className').value='';$('classRoom').value='';$('classForm').style.display='none';await loadClasses();$('classSelect').value=created.id;await refreshEnrolled();$('enrollmentDetails').open=true;toast('Class created. Add students next.');
+  }catch(e){toast(e.message);}
+};
+$('enrollBtn').onclick=async()=>{
+  const cid=$('classSelect').value,sid=$('existingStudent').value;if(!cid||!sid)return toast('Choose a class and student');
+  try{await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:Number(sid)})});await refreshEnrolled();toast('Student enrolled');}catch(e){toast(e.message);}
+};
+$('addStudentBtn').onclick=async()=>{
+  const cid=$('classSelect').value,name=$('newName').value.trim(),nim=$('newNim').value.trim();
+  if(!cid||!name||!nim)return toast('Class, name, and NIM are required');
+  try{const s=await api('/students/',{method:'POST',body:JSON.stringify({name,nim})});await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:s.id})});$('newName').value='';$('newNim').value='';await Promise.all([loadStudents(),refreshEnrolled()]);toast('Student added and enrolled');}catch(e){toast(e.message);}
+};
+window.removeStudent=async(cid,sid)=>{if(!confirm('Remove this student from the class?'))return;try{await api('/classes/'+cid+'/students/'+sid,{method:'DELETE'});await refreshEnrolled();}catch(e){toast(e.message);}};
+$('startBtn').onclick=async()=>{
+  const cid=Number($('classSelect').value);if(!cid)return toast('Create and select a class first');
+  if(Number($('enrolledCount').textContent)===0){$('enrollmentDetails').open=true;return toast('Add at least one student before starting');}
+  if(!confirm('Start the class session now?\nThe start QR will appear for students to scan and take their first selfie.'))return;
+  try{await api('/qr-sessions/start',{method:'POST',body:JSON.stringify({class_id:cid})});viewingClosed=false;await pollActive();toast('START phase opened. Students can scan the QR.');}catch(e){toast(e.message);}
+};
+
+function phaseContent(phase){
+  if(phase==='start')return {title:'STEP 1 ┬À Start check-in',help:'Students scan this QR and take their FIRST selfie. Successful students appear as Partial (yellow) in the roster.',foot:'When the class is almost finished, press Start Final Attendance.'};
+  if(phase==='spot')return {title:'OPTIONAL ┬À Spot check',help:'Students with a start check-in scan this QR and take another selfie. This helps confirm they are still present.',foot:'Resume the class or continue to Final Attendance.'};
+  return {title:'STEP 2 ┬À Final check-in',help:'Students scan this NEW QR and take their FINAL selfie. Students with both selfies become Verified (green).',foot:'The final phase closes automatically after the configured grace period, or press End Session.'};
+}
+function renderActive(data){
+  active=data && data.active?data:null;
+  const has=!!active;
+  $('noSession').style.display=has?'none':'block';
+  $('sessionActive').style.display=has?'block':'none';
+  $('sessionClosed').style.display=(!has&&viewingClosed)?'block':'none';
+  ['stepStart','stepEnd','stepClosed'].forEach(id=>$(id).className='step');
+  $('finalBtn').style.display='none';$('spotBtn').style.display='none';$('resumeBtn').style.display='none';$('endBtn').style.display='none';
+  if(!has){ if(viewingClosed)$('stepClosed').className='step active'; return; }
+  viewingSessionId=active.session_id;
+  $('endBtn').style.display='inline-block';
+  const phase=active.phase||'start', content=phaseContent(phase);
+  $('phaseTitle').textContent=content.title;$('phaseHelp').textContent=content.help;$('phaseFootnote').textContent=content.foot;
+  $('qrToken').textContent=active.token;$('qrImage').src='/qr-sessions/active/qr.png?v='+Date.now();
+  if(phase==='start'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('spotBtn').style.display='inline-block';}
+  else if(phase==='spot'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('resumeBtn').style.display='inline-block';}
+  else{$('stepStart').className='step done';$('stepEnd').className='step active';$('endBtn').style.display='inline-block';}
+}
+async function pollActive(){try{const data=await api('/qr-sessions/active');if(!viewingClosed)renderActive(data);if(!viewingClosed)viewingSessionId=data.active?data.session_id:viewingSessionId;if(!projector)await refreshRoster();}catch(e){if(!projector)toast(e.message);}}
+async function changePhase(phase,confirmText){if(confirmText&&!confirm(confirmText))return;try{await api('/qr-sessions/phase',{method:'POST',body:JSON.stringify({phase})});viewingClosed=false;await pollActive();toast(phase==='end'?'FINAL phase opened. Students scan the new QR.':'Session phase updated');}catch(e){toast(e.message);}}
+$('finalBtn').onclick=()=>changePhase('end','Start Final Attendance now?\nStart check-ins will close and a NEW final QR will appear.');
+$('spotBtn').onclick=()=>changePhase('spot','Open an optional mid-class spot check?\nStudents with a start check-in will scan a new QR.');
+$('resumeBtn').onclick=()=>changePhase('start',null);
+$('endBtn').onclick=async()=>{if(!confirm('End this class session?\nNo more check-ins will be accepted. The final roster stays available.'))return;try{await api('/qr-sessions/end',{method:'POST',body:JSON.stringify({session_id:viewingSessionId})});viewingClosed=true;renderActive({active:false});await Promise.all([refreshRoster(),loadHistory()]);toast('Session closed. Review the final roster.');}catch(e){toast(e.message);}};
+$('projectorBtn').onclick=()=>{window.open('/dashboard?projector=1','_blank','noopener');};
+
+async function refreshRoster(){
+  if(!viewingSessionId)return;
+  try{
+    const rows=await api('/attendance/roster?qr_session_id='+viewingSessionId);
+    const body=$('rosterBody');
+    body.innerHTML=rows.length?rows.map(r=>{
+      const confidence=r.end_confidence??r.start_confidence;
+      const canManual=viewingClosed&&r.status!=='verified';
+      return `<tr><td>${esc(r.student_nim)}</td><td>${esc(r.student_name)}</td><td><span class="badge ${r.status}">${r.status.toUpperCase()}</span>${r.manual?'<span class="manual-note">MANUAL</span>':''}</td><td>${esc((r.start_time||'-').split(' ')[1]||r.start_time||'-')}</td><td>${esc((r.end_time||'-').split(' ')[1]||r.end_time||'-')}</td><td>${confidence==null?'-':(confidence*100).toFixed(1)+'%'}</td><td>${canManual?`<button class="success small" onclick="markManual(${r.student_id})">Ô£ô Mark present</button>`:''}</td></tr>`;
+    }).join(''):'<tr><td colspan="7" class="empty">No enrolled students in this class.</td></tr>';
+    $('verifiedCount').textContent=rows.filter(r=>r.status==='verified').length;
+    $('partialCount').textContent=rows.filter(r=>r.status==='partial').length;
+    $('pendingCount').textContent=rows.filter(r=>r.status==='pending'||r.status==='absent').length;
+    $('totalCount').textContent=rows.length;
+  }catch(e){if(!projector)toast(e.message);}
+}
+window.markManual=async(studentId)=>{if(!confirm('Mark this student as Verified (manual)?\nUse this only after the student spoke to you about why they could not check in.'))return;try{await api('/attendance/manual',{method:'POST',body:JSON.stringify({student_id:studentId,qr_session_id:viewingSessionId})});await refreshRoster();toast('Student marked Verified (manual)');}catch(e){toast(e.message);}};
+$('refreshRosterBtn').onclick=refreshRoster;
+$('exportBtn').onclick=()=>{if(!viewingSessionId)return toast('Choose a session first');window.open('/attendance/export/csv?qr_session_id='+viewingSessionId,'_blank');};
+async function loadHistory(){
+  const sessions=await api('/qr-sessions/history?limit=15');const select=$('historySelect');const previous=viewingSessionId;
+  select.innerHTML='<option value="">Choose a sessionÔÇª</option>'+sessions.map(s=>`<option value="${s.id}">#${s.id} ┬À ${esc(s.class_name)} ┬À ${s.phase==='closed'?'Closed':esc(s.phase)} ┬À ${esc((s.started_at||'').slice(0,16))}</option>`).join('');
+  if(previous&&sessions.some(s=>s.id===previous))select.value=previous;
+}
+$('historySelect').onchange=async()=>{const value=$('historySelect').value;if(!value)return;viewingSessionId=Number(value);const text=$('historySelect').selectedOptions[0].textContent;viewingClosed=text.includes('Closed');renderActive(viewingClosed?{active:false}:active);await refreshRoster();};
+
+async function initializeDashboard(){
+  $('teacherName').textContent=teacher;
+  await Promise.all([loadClasses(),loadStudents(),loadHistory()]);
+  await pollActive();
+}
+(async function init(){
+  if(projector){viewingClosed=false;setInterval(async()=>{try{const data=await api('/qr-sessions/active');renderActive(data);}catch(e){}},3000);await pollActive();return;}
+  if(!token){showLogin();return;}
+  try{const valid=await api('/teachers/verify',{method:'POST',body:JSON.stringify({token})});if(!valid.valid){showLogin();return;}hideLogin();await initializeDashboard();setInterval(()=>{if(!viewingClosed)pollActive();},5000);}catch(e){showLogin();}
+})();
+</script>
+</body>
+</html>
