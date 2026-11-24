@@ -60,11 +60,31 @@ binary; put a short note file beside any image that is committed.
   number is quoted in a design note, cite `../evidence/2026-11-13-windows/` and label it
   historical; do not present those figures as current system behaviour.
 
+## Three-view split (2026-11-24)
+
+The single FORM-style mockup was split into three standalone files so each audience has its own
+design. All three share the same `:root` palette and text hierarchy, documented once in
+`feedback/2026-11-24_design-system_notes.md`:
+
+| View | File | Audience |
+|---|---|---|
+| Project overview website | `mockups/2026-11-24_landing_mockup-v1.html` | public / presentation opening |
+| Student dashboard | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | student checking in |
+| Teacher dashboard | `mockups/2026-11-24_teacher-dashboard_mockup-v1.html` | teacher running a session |
+
+None of them is an implemented route: the real teacher dashboard is C's
+`backend/static/dashboard.html`, and the real student flow is the Flutter app.
+
 ## Index
 
 | Date | Item | File | Status |
 |---|---|---|---|
-| 2026-11-24 | **Student dashboard mockup v1 — QR system, same palette and type scale as v2** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
-| 2026-11-24 | Review notes: palette/typography parity and QR copy accuracy | `feedback/2026-11-24_student-dashboard_mockup-v1_notes.md` | awaiting C's decision |
+| 2026-11-24 | **Project overview website v1 — public intro, links to both views** | `mockups/2026-11-24_landing_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | Review notes for the project overview | `feedback/2026-11-24_landing_mockup-v1_notes.md` | awaiting C/D decision |
+| 2026-11-24 | **Student dashboard v1 — active session, QR, own rows** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | Review notes for the student dashboard | `feedback/2026-11-24_student-dashboard_mockup-v1_notes.md` | awaiting C's decision |
+| 2026-11-24 | **Teacher dashboard v1 — session control, live roster, CSV** | `mockups/2026-11-24_teacher-dashboard_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | Review notes for the teacher dashboard | `feedback/2026-11-24_teacher-dashboard_mockup-v1_notes.md` | awaiting C's decision |
+| 2026-11-24 | Shared design system — palette and text hierarchy used by all three | `feedback/2026-11-24_design-system_notes.md` | authoritative reference |
 | 2026-11-18 | FORM-style landing mockup, v2 palette (#FFE14F / #192853 / #ECF4F7) — Wi-Fi era | `mockups/2026-11-18_student-attendance_mockup-v1.html` | historical — superseded by the 2026-11-24 mockup |
 | 2026-11-18 | Review notes for that mockup — Wi-Fi era | `feedback/2026-11-18_student-attendance_mockup-v1_notes.md` | historical |
