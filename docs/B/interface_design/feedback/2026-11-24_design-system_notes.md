@@ -57,6 +57,29 @@ stat label; 1 px `--line` dividers; pill buttons (40 px radius); `IntersectionOb
 on the landing page; navy sidebar with a yellow active rail on the teacher view; mobile
 navigation collapse; and a `prefers-reduced-motion` fallback.
 
+## Navigation state (teacher view, revision 2)
+
+A hover effect is temporary by design, so the teacher view now has two permanent states that
+use only existing tokens:
+
+| State | Visual | Persistence |
+|---|---|---|
+| Current page | yellow left rail + lime text + `●`, `aria-current="page"` | stays until another page is opened; deep links via `#session`, `#attendance`, … |
+| Visited page | softer `✓` in lime at 55 % opacity | stored in `sessionStorage`, survives reloads |
+| Hover | 3 px slide + 10 % lime wash | pointer only |
+
+Both markers are explained by a legend in the sidebar footer (`● CURRENT · ✓ VISITED`).
+Page content fades/slides in over 0.28 s; the animation is skipped under
+`prefers-reduced-motion`.
+
+## Phone layout check (390 px viewport, 2026-11-25)
+
+All three files were measured at a 390 px viewport: no horizontal overflow; the landing and
+student navigation drawers collapse; the landing hero drops to 64 px; student stats and cards
+become one column; teacher stats become two columns (one below 420 px); the teacher table
+becomes labelled cards; the teacher sidebar becomes an overlay drawer with a fixed top bar.
+No colour, font or size token was changed for this revision.
+
 ## What is deliberately NOT in these mockups
 
 - No Wi-Fi/AP/BSSID/ARP language, no `wifi_scanner`, no `REQUIRE_CLASSROOM_WIFI`, no

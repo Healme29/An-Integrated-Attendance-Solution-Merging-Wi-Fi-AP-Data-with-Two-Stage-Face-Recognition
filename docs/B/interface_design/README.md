@@ -75,6 +75,12 @@ design. All three share the same `:root` palette and text hierarchy, documented 
 None of them is an implemented route: the real teacher dashboard is C's
 `backend/static/dashboard.html`, and the real student flow is the Flutter app.
 
+**Revision 2 (2026-11-25):** the teacher mockup was made phone-responsive (hamburger drawer,
+two-column stats, table-to-card rows) and its navigation now keeps a `●` marker on the current
+page and a `✓` marker on visited pages. "Roster" was renamed to "Attendance" in the UI because
+it is jargon for the class list; the API endpoint keeps its name. Details are in the review
+notes and in `feedback/2026-11-24_design-system_notes.md` §"Navigation state".
+
 ## Index
 
 | Date | Item | File | Status |
@@ -83,7 +89,7 @@ None of them is an implemented route: the real teacher dashboard is C's
 | 2026-11-24 | Review notes for the project overview | `feedback/2026-11-24_landing_mockup-v1_notes.md` | awaiting C/D decision |
 | 2026-11-24 | **Student dashboard v1 — active session, QR, own rows** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
 | 2026-11-24 | Review notes for the student dashboard | `feedback/2026-11-24_student-dashboard_mockup-v1_notes.md` | awaiting C's decision |
-| 2026-11-24 | **Teacher dashboard v1 — session control, live roster, CSV** | `mockups/2026-11-24_teacher-dashboard_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | **Teacher dashboard v1 — five pages, session control, attendance, CSV (rev 2: phone + nav markers)** | `mockups/2026-11-24_teacher-dashboard_mockup-v1.html` | proposal — not implemented |
 | 2026-11-24 | Review notes for the teacher dashboard | `feedback/2026-11-24_teacher-dashboard_mockup-v1_notes.md` | awaiting C's decision |
 | 2026-11-24 | Shared design system — palette and text hierarchy used by all three | `feedback/2026-11-24_design-system_notes.md` | authoritative reference |
 | 2026-11-18 | FORM-style landing mockup, v2 palette (#FFE14F / #192853 / #ECF4F7) — Wi-Fi era | `mockups/2026-11-18_student-attendance_mockup-v1.html` | historical — superseded by the 2026-11-24 mockup |
