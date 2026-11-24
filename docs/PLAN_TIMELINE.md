@@ -4,8 +4,15 @@
 > a unit of work. Project-wide status lives here — nowhere else.
 >
 > Planning session: 2026-10-18. Minutes: `docs/meetings/2026-10-18_team_planning.md`.
-> M2 replanning: 2026-11-01 — gates + four large work packages (see Phase 2 below).
+> M2 replanning: 2026-11-01 - gates + four large work packages (see Phase 2 below).
 > Full technical context: `docs/PROJECT_CONTEXT.md`.
+>
+> **Direction update (2026-11-24):** `origin/main` was pulled to `011840a`. The running
+> system is rotating-QR attendance with `SCHOOL_SUBNET`, classes, teacher login and liveness.
+> Milestones, phase plans, risks and every progress-log entry dated **before 2026-11-24**
+> describe the archived Wi-Fi/ARP design on branch `wifi-backup-prepull` (`a9ca24d`) and are
+> kept as dated history. For current backend facts use `docs/B/current_system_qr.md`; the
+> decision is recorded in `docs/B/DECISIONS.md` D-015.
 
 ---
 
@@ -299,7 +306,35 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
- (Docs: record room-level presence options and demo network status)
+### 2026-11-24 — B: followed `origin/main`, QR direction adopted, B docs aligned
+- **Pull:** `git fetch` + `git pull origin main` fast-forwarded local `task-b` from `a9ca24d`
+  to **`011840a`** (59 files, +4,900 / -6,904). `origin/main` now tracks the QR attendance
+  design: rotating QR sessions, classes, teacher login, passive liveness, roster CSV and a
+  **38-test** suite. The Wi-Fi scanner, `/wifi/*`, `/schedules/*`, `/prompt/*`, `scapy` and the
+  old 209-test suite are gone from the working tree.
+- **Archive:** created local branch **`wifi-backup-prepull` at `a9ca24d`** so the old
+  Wi-Fi implementation and its evidence are preserved without blocking `main`. Decision
+  recorded as **D-015** in `docs/B/DECISIONS.md`; user direction: "ikut arah main" (follow
+  `main`). No A/C source file was changed to resurrect Wi-Fi.
+- **Environment:** first post-pull test run failed with `ModuleNotFoundError: No module named
+  'qrcode'`; installed `qrcode[pil]==8.0.0` and added its wheel to `wheelhouse\`. PyTest then
+  reported **38 passed in 7.3 s** (`.venv/pytest_after_pull.log`). The offline wheelhouse was
+  re-validated with `--no-index --find-links wheelhouse -r backend\requirements.txt` → **79
+  packages resolved**. Model backups (`backups\models\yolov8m-face.pt` and the five
+  `buffalo_l` ONNX files) were hash-verified earlier and remain in place.
+- **Docs:** added `docs/B/current_system_qr.md` as the single current source of truth
+  (configuration, 32 endpoints, check-in flow, six-table DB, deployment, fallback, gaps).
+  Added superseded banners to the Wi-Fi-era B docs and the 2026-11-13 evidence pack; rewrote
+  `docs/B/report_chapter_outline.md` for the QR architecture and added a direction banner to
+  this timeline.
+- **Config:** fixed B-owned `docker-compose.yml` — replaced dead `WI_FI_SUBNET` with
+  `SCHOOL_SUBNET` (default `192.168.0.0/16`), removed dead
+  `ATTENDANCE_CHECK_WINDOW_MINUTES`, corrected the "schedule windows" comment and added
+  `QR_ROTATION_SECONDS` / `QR_GRACE_SECONDS`.
+- **Still open:** `dill==0.3.8` is absent from A's `requirements.txt` and Dockerfile; two-phone
+  hotspot run and accepted real-face check-in latency are still **not measured**;
+  `AGENTS.md:104`, its endpoint/DB tables and `CLAUDE_CONTEXT_UPDATE.txt` remain stale
+  (A/D-owned). Docker stays optional and off the demo path.
 
 ### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
 - **Replanning (drives this entry):** the team will be assessed at a presentation in about

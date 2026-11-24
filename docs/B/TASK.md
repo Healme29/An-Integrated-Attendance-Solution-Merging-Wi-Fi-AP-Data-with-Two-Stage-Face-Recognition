@@ -1,5 +1,11 @@
 # TUGAS B — Backend, Validasi Wi-Fi Nyata & Deployment
 
+> **DO NOT FOLLOW — SUPERSEDED WORKING INSTRUCTIONS (2026-11-24).** Every Wi-Fi/ARP,
+> `REQUIRE_CLASSROOM_WIFI`, `/wifi/*`, `/schedules/*`, `ap_bssid`, `face_only` and 209-test
+> step below describes the archived `wifi-backup-prepull` branch (`a9ca24d`), not the code
+> at `011840a`. For deployment, demo steps, endpoints, configuration and fallback, use
+> `docs/B/current_system_qr.md` instead. Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 · archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Baca dulu:** `docs/PROJECT_CONTEXT.md` dan `docs/PLAN_TIMELINE.md`.
 > Estimasi total beban kerja: **18–22 jam** (seimbang dengan C dan D; A tetap terberat).
 

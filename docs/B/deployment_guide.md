@@ -1,5 +1,11 @@
 # Deployment Guide — Running the Backend with Docker
 
+> **DO NOT FOLLOW — SUPERSEDED WORKING INSTRUCTIONS (2026-11-24).** Every Wi-Fi/ARP,
+> `REQUIRE_CLASSROOM_WIFI`, `/wifi/*`, `/schedules/*`, `ap_bssid`, `face_only` and 209-test
+> step below describes the archived `wifi-backup-prepull` branch (`a9ca24d`), not the code
+> at `011840a`. For deployment, demo steps, endpoints, configuration and fallback, use
+> `docs/B/current_system_qr.md` instead. Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 · archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Audience:** anyone on the team, including non-technical members (D, teachers).
 > **Time needed:** 20–30 minutes the first time (most of it is image download/build).
 > **Output:** backend reachable at `http://<machine-ip>:8000`, teacher dashboard at

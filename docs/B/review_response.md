@@ -1,5 +1,14 @@
 # Review Response — Task B (`task-b`), review of 2026-11-02
 
+> **HISTORICAL RECORD — SUPERSEDED (2026-11-24).** This page documents the Wi-Fi/ARP
+> presence design that existed before `origin/main` was pulled. The running system at
+> `011840a` uses rotating QR sessions, `SCHOOL_SUBNET`, classes, teacher login and liveness;
+> `wifi_scanner.py`, `/wifi/*`, `/schedules/*`, `/me/prompt`, `ap_bssid`, `face_only` and the
+> 209-test suite no longer exist. Keep this file only as dated evidence of the validation
+> method and of decisions D-001–D-014.
+> Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 ·
+> archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Review under response:** "Review of Task B — Backend, Real Wi-Fi Validation &
 > Deployment", 8.5/10, accepted to merge after findings 1 and 2.
 > **Response date:** 2026-11-03 · **Last updated:** 2026-11-13 (Windows G1 + hardening
