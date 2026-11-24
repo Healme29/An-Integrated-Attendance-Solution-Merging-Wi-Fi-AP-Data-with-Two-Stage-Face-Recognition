@@ -7,10 +7,31 @@
 > Palette and text hierarchy: `2026-11-24_design-system_notes.md` (identical in all three).
 > Current backend facts: `docs/B/current_system_qr.md` · decision `docs/B/DECISIONS.md` D-015.
 
+## Revision 2 (2026-11-25) — phone layout and persistent navigation markers
+
+The same revision applied to the teacher dashboard is applied here, using the student's
+horizontal top nav instead of a sidebar:
+
+- **Phone layout:** below 900 px a fixed navy top bar carries the logo, overview link and a
+  hamburger button; the nav becomes a right-side drawer with overlay, `Escape` to close and
+  `aria-expanded`. Stats become two columns (one below 420 px), QR artwork shrinks to 140 px,
+  buttons go full width, and each "Today's rows" entry becomes a labelled two-line card
+  (phase / time / status) below 600 px. Verified at a 390 px viewport: no horizontal overflow.
+- **Persistent state:** the active section keeps an ink pill with lime text and a `●` marker;
+  visited sections keep a soft `✓`. Both are stored in `sessionStorage`, so they survive a
+  reload. Hover still lifts the item 2 px with a light ink wash. The legend
+  `● CURRENT · ✓ VISITED` sits at the bottom of the drawer.
+- **Scroll sync:** scrolling updates the active item automatically; clicking an item suppresses
+  that sync briefly so the marker does not jump during the smooth scroll. Deep links
+  `#top`, `#checkin`, `#rows`, `#record` work on load.
+- **Terminology:** the stat "Roster status" became **Attendance status** and the caption
+  "ROSTER VALUES" became **STATUS VALUES**, for consistency with the teacher view. The API
+  endpoint `GET /attendance/roster` is unchanged.
+
 ## What this view shows
 
 1. **Header** — signed-in demo student and demo NIM, plus the network verdict (`IN SUBNET`).
-2. **Three stats** — active session, rows today, roster status (`Partial`).
+2. **Three stats** — active session, rows today, attendance status (`Partial`).
 3. **Projected QR card** — class/phase/token context, CSS QR placeholder, and the
    `SCAN & CHECK IN` action. The real image is `GET /qr-sessions/active/qr.png`.
 4. **Three-signal card** — school network, current QR token, face + liveness, identity binding

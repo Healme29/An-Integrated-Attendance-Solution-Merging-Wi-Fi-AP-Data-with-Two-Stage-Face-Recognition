@@ -75,11 +75,12 @@ design. All three share the same `:root` palette and text hierarchy, documented 
 None of them is an implemented route: the real teacher dashboard is C's
 `backend/static/dashboard.html`, and the real student flow is the Flutter app.
 
-**Revision 2 (2026-11-25):** the teacher mockup was made phone-responsive (hamburger drawer,
-two-column stats, table-to-card rows) and its navigation now keeps a `●` marker on the current
-page and a `✓` marker on visited pages. "Roster" was renamed to "Attendance" in the UI because
-it is jargon for the class list; the API endpoint keeps its name. Details are in the review
-notes and in `feedback/2026-11-24_design-system_notes.md` §"Navigation state".
+**Revision 2 (2026-11-25):** both dashboards were made phone-responsive (fixed top bar,
+hamburger drawer, two-column stats, table/rows as labelled cards) and both navigations now keep
+a `●` marker on the current page and a `✓` marker on visited pages (`sessionStorage`). "Roster"
+was renamed to "Attendance" in the UI because it is jargon for the class list; the API endpoint
+keeps its name. Details are in the review notes and in
+`feedback/2026-11-24_design-system_notes.md` §"Navigation state".
 
 ## Index
 
@@ -87,7 +88,7 @@ notes and in `feedback/2026-11-24_design-system_notes.md` §"Navigation state".
 |---|---|---|---|
 | 2026-11-24 | **Project overview website v1 — public intro, links to both views** | `mockups/2026-11-24_landing_mockup-v1.html` | proposal — not implemented |
 | 2026-11-24 | Review notes for the project overview | `feedback/2026-11-24_landing_mockup-v1_notes.md` | awaiting C/D decision |
-| 2026-11-24 | **Student dashboard v1 — active session, QR, own rows** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | **Student dashboard v1 — active session, QR, own rows (rev 2: phone + nav markers)** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
 | 2026-11-24 | Review notes for the student dashboard | `feedback/2026-11-24_student-dashboard_mockup-v1_notes.md` | awaiting C's decision |
 | 2026-11-24 | **Teacher dashboard v1 — five pages, session control, attendance, CSV (rev 2: phone + nav markers)** | `mockups/2026-11-24_teacher-dashboard_mockup-v1.html` | proposal — not implemented |
 | 2026-11-24 | Review notes for the teacher dashboard | `feedback/2026-11-24_teacher-dashboard_mockup-v1_notes.md` | awaiting C's decision |
