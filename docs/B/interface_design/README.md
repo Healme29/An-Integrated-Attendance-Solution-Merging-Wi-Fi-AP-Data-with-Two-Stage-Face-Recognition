@@ -37,29 +37,34 @@ binary; put a short note file beside any image that is committed.
 
 ## Current behaviour a designer must design around
 
-- The dashboard currently has these sections: Overview, Architecture, Attendance Sheet,
-  Schedules, Face Enrollment, Attendance, Wi-Fi Scanner, Recognition Demo. It reads
-  `/students/`, `/schedules/`, `/schedules/active`, `/attendance/today`,
-  `/attendance/export/csv`, `/attendance/preflight`, `/wifi/scan` and `/health`.
-- **Strict classroom mode** (`REQUIRE_CLASSROOM_WIFI=true`, D-006) is the demo setting:
-  a check-in from a device not visible on the classroom network returns `403` and writes **no
-  row**. It does not silently become `face_only`. Any UI copy about "not connected" has to
-  say this plainly. With the flag off, `face_only` remains a normal documented status.
-- The mobile app lists only `/schedules/active` and calls `/attendance/preflight` before the
-  camera opens, so "no active class" and "not on the classroom network" are **blocked before
-  a selfie is taken**. The website should not design a flow that contradicts that ordering.
-- `day_of_week` is Python numbering (Monday = 0 … Sunday = 6). The current dashboard still
-  filters with the browser's `Date.getDay()` (Sunday = 0), so "Today's Schedule" is empty on
-  weekdays — an open C-owned defect, not a layout constraint to copy.
-- Wi-Fi evidence is L2/AP-coverage level, not proof of room presence. Use the wording in
-  `../network_validation.md` and `../DECISIONS.md`; do not promise stronger presence in UI
-  copy.
-- Measured timings and Windows evidence belong in `../evidence/2026-11-13-windows/`; quote
-  those numbers in a design note rather than inventing placeholders.
+> Updated 2026-11-24 after `git pull origin main` (`011840a`). The 2026-11-18 note below was
+> replaced; the Wi-Fi/ARP design it described is archived on `wifi-backup-prepull` (`a9ca24d`).
+> Source of truth: `../current_system_qr.md` · decision: `../DECISIONS.md` D-015.
+
+- The teacher dashboard at `/dashboard` is C's file. The current backend has no `/wifi/*`,
+  `/schedules/*` or `/prompt/*` routes. The live endpoints are `/teachers/*`, `/classes/*`,
+  `/qr-sessions/*`, `/students/*`, `/faces/*` and `/attendance/*`.
+- Presence proof is the **client IP inside `SCHOOL_SUBNET`** (default `192.168.0.0/16`,
+  loopback allowed). An address outside it gets `403` and **no row** — never a `face_only`
+  row, a status that no longer exists. Do not claim room-level verification: this is a subnet
+  gate, not an AP/BSSID check.
+- Student flow: log in by NIM → scan the projected QR → selfie →
+  `POST /attendance/check-qr?student_id=&token=`. The token rotates every 5 s with a 10 s
+  grace on the previous one; a phase change issues a new token and invalidates the old one.
+- Session phases are `start → spot (optional) → end → closed`. Rows are `partial` for
+  start/spot and `verified` for end; the roster collapses them into
+  `verified / partial / pending / absent`. Manual attendance is teacher-only and after close.
+- Teacher actions require a Bearer token from `POST /teachers/login`. Status chips and copy
+  must use the API's own values; do not invent statuses.
+- The previous FORM-style mockup and all Wi-Fi measurements are dated evidence only. If a
+  number is quoted in a design note, cite `../evidence/2026-11-13-windows/` and label it
+  historical; do not present those figures as current system behaviour.
 
 ## Index
 
 | Date | Item | File | Status |
 |---|---|---|---|
-| 2026-11-18 | FORM-style landing mockup, v2 palette (#FFE14F / #192853 / #ECF4F7) | `mockups/2026-11-18_student-attendance_mockup-v1.html` | proposal — not implemented |
-| 2026-11-18 | Review notes for that mockup | `feedback/2026-11-18_student-attendance_mockup-v1_notes.md` | awaiting C's decision |
+| 2026-11-24 | **Student dashboard mockup v1 — QR system, same palette and type scale as v2** | `mockups/2026-11-24_student-dashboard_mockup-v1.html` | proposal — not implemented |
+| 2026-11-24 | Review notes: palette/typography parity and QR copy accuracy | `feedback/2026-11-24_student-dashboard_mockup-v1_notes.md` | awaiting C's decision |
+| 2026-11-18 | FORM-style landing mockup, v2 palette (#FFE14F / #192853 / #ECF4F7) — Wi-Fi era | `mockups/2026-11-18_student-attendance_mockup-v1.html` | historical — superseded by the 2026-11-24 mockup |
+| 2026-11-18 | Review notes for that mockup — Wi-Fi era | `feedback/2026-11-18_student-attendance_mockup-v1_notes.md` | historical |

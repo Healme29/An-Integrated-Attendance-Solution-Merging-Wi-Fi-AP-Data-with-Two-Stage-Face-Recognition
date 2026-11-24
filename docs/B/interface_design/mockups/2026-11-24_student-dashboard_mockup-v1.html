@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTEND — Student Dashboard</title>
+
+<!-- Fonts are optional: the fallbacks below keep the layout intact offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #ECF4F7;          /* pale blue — canvas */
+  --ink: #192853;         /* deep navy — type, structure, contrast */
+  --lime: #FFE14F;        /* gargoyle gas — signal, action, highlight */
+  --muted: #5A6B82;       /* slate — supporting copy */
+  --line: rgba(25,40,83,.16);
+  --font: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container {
+  width: min(1400px, 90%);
+  margin: auto;
+}
+
+/* NAVIGATION */
+
+nav {
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.logo {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+.logo span { color: #A88600; }
+
+.nav-links {
+  display: flex;
+  gap: 38px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: opacity .25s;
+}
+
+.nav-links a:hover { opacity: .45; }
+
+.nav-cta {
+  background: var(--ink);
+  color: white;
+  padding: 13px 20px;
+  border-radius: 30px;
+  font-size: 12px;
+  transition: .3s;
+}
+
+.nav-cta:hover {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.menu-toggle {
+  display: none;
+  border: 0;
+  background: none;
+  font-size: 25px;
+  cursor: pointer;
+}
+
+/* HERO */
+
+.hero {
+  padding: 110px 0 80px;
+  min-height: 690px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px rgba(255,225,79,.55);
+}
+
+.hero h1 {
+  font-size: clamp(70px, 11.5vw, 166px);
+  line-height: .86;
+  letter-spacing: -.095em;
+  font-weight: 700;
+  margin-top: 45px;
+}
+
+.hero h1 .outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--ink);
+}
+
+.hero-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-top: 55px;
+}
+
+.hero-desc {
+  max-width: 420px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.hero-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--lime);
+  padding: 17px 24px;
+  border-radius: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: .3s;
+}
+
+.hero-button:hover {
+  transform: translateY(-5px);
+  background: var(--ink);
+  color: white;
+}
+
+/* MARQUEE */
+
+.marquee {
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 20px 0;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: move 25s linear infinite;
+}
+
+.marquee span {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -.5px;
+  padding-right: 35px;
+}
+
+.marquee span b {
+  color: var(--lime);
+  margin-right: 35px;
+}
+
+@keyframes move {
+  to { transform: translateX(-50%); }
+}
+
+/* SECTIONS */
+
+.section {
+  padding: 115px 0;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 45px;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
+
+.section-heading h2 {
+  font-size: clamp(42px, 6vw, 76px);
+  letter-spacing: -.07em;
+  line-height: .95;
+}
+
+.section-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 230px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+/* EVIDENCE PANELS */
+
+.projects {
+  display: grid;
+  grid-template-columns: 1.25fr .75fr;
+  gap: 24px;
+}
+
+.project:nth-child(2) {
+  margin-top: 110px;
+}
+
+.project-image {
+  overflow: hidden;
+  background: #DCE8EE;
+  aspect-ratio: 1.2 / 1;
+}
+
+.project:nth-child(2) .project-image {
+  aspect-ratio: .9 / 1;
+}
+
+.signal-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  padding: clamp(22px, 4vw, 46px);
+  transition: transform .7s cubic-bezier(.2,.7,.2,1);
+}
+
+.project:hover .signal-panel {
+  transform: scale(1.015);
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px;
+}
+
+.signal-row .key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.signal-row .value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  border-radius: 30px;
+  white-space: nowrap;
+}
+
+.tag-pass { background: var(--lime); color: var(--ink); font-weight: 500; }
+.tag-block { background: var(--ink); color: white; }
+
+.mini-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+  font-size: 13px;
+}
+
+.mini-row:last-child { border-bottom: 0; }
+
+.mini-row .who { font-weight: 600; }
+.mini-row .stage { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; }
+.mini-row .state { font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.mini-row .state.ok { color: #12624F; }
+.mini-row .state.warn { color: #8A5200; }
+
+.panel-caption {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.project-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.project-info h3 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.project-info p {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+.project-number {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* PROJECTED QR PANEL — illustrative CSS placeholder, no external image */
+
+.qr-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: clamp(22px, 4vw, 40px);
+}
+
+.qr-illustration {
+  position: relative;
+  width: min(80%, 230px);
+  aspect-ratio: 1;
+  background: #DCE8EE;
+}
+
+.qr-noise {
+  position: absolute;
+  inset: 0;
+  background-image: conic-gradient(var(--ink) 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0);
+  background-size: 16px 16px;
+  opacity: .62;
+}
+
+.finder {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 8px solid var(--ink);
+  background: var(--bg);
+  z-index: 1;
+}
+
+.finder::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  background: var(--ink);
+}
+
+.finder.tl { top: 0; left: 0; }
+.finder.tr { top: 0; right: 0; }
+.finder.bl { bottom: 0; left: 0; }
+
+/* TODAY PANEL */
+
+.today-panel {
+  margin-top: 55px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.today-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+.today-head h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* FLOW — lime band */
+
+.about {
+  background: var(--lime);
+  padding: 100px 0;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: .7fr 1.3fr;
+  gap: 80px;
+}
+
+.about h2 {
+  font-size: 15px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.about-copy {
+  font-size: clamp(30px, 4.5vw, 59px);
+  letter-spacing: -.06em;
+  line-height: 1.12;
+}
+
+.about-copy span {
+  color: rgba(25,40,83,.48);
+}
+
+.flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 45px;
+}
+
+.flow-strip span {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  border-radius: 30px;
+  padding: 10px 16px;
+}
+
+.flow-strip span.on {
+  background: var(--ink);
+  color: var(--lime);
+}
+
+.fine-print {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 30px;
+  max-width: 720px;
+}
+
+/* MY RECORD */
+
+.contact {
+  padding: 125px 0 70px;
+}
+
+.contact h2 {
+  font-size: clamp(55px, 10vw, 130px);
+  line-height: .9;
+  letter-spacing: -.09em;
+  margin: 35px 0;
+}
+
+.contact h2 span { color: #9AAEC2; }
+
+.contact-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 35px;
+  border-top: 1px solid var(--line);
+}
+
+.contact-bottom p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.contact-bottom a {
+  font-family: var(--mono);
+  font-size: 12px;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 5px;
+  white-space: nowrap;
+}
+
+footer {
+  padding: 25px 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* REVEAL ANIMATION */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(35px);
+  transition: opacity .8s ease, transform .8s ease;
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* MOBILE */
+
+@media(max-width: 768px) {
+  .container { width: 88%; }
+
+  nav { height: 72px; }
+
+  .menu-toggle { display: block; }
+
+  .nav-cta { display: none; }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    width: 100%;
+    background: var(--bg);
+    padding: 30px 6%;
+    flex-direction: column;
+    gap: 25px;
+    border-bottom: 1px solid var(--line);
+    z-index: 10;
+  }
+
+  .nav-links.open { display: flex; }
+
+  .hero {
+    padding: 100px 0 65px;
+    min-height: 590px;
+  }
+
+  .hero h1 {
+    font-size: clamp(64px, 15vw, 105px);
+    margin-top: 55px;
+  }
+
+  .hero-bottom {
+    align-items: start;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .section { padding: 85px 0; }
+
+  .section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-note { text-align: left; }
+
+  .projects {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+
+  .project:nth-child(2) { margin-top: 0; }
+
+  .project:nth-child(2) .project-image {
+    aspect-ratio: 1.2 / 1;
+  }
+
+  .about { padding: 75px 0; }
+
+  .about-grid {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+
+  .contact { padding: 90px 0 55px; }
+
+  .contact-bottom {
+    align-items: start;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  footer {
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+}
+
+@media(prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <nav>
+    <a href="#today" class="logo">A<span>.</span>TTEND</a>
+
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#today">Today</a></li>
+      <li><a href="#checkin">Check-in</a></li>
+      <li><a href="#record">My Record</a></li>
+      <li><a href="#flow">The Flow</a></li>
+    </ul>
+
+    <a href="http://127.0.0.1:8000/dashboard" class="nav-cta">Teacher Dashboard ↗</a>
+    <button class="menu-toggle" id="menuToggle"
+      aria-label="Toggle navigation"
+      aria-expanded="false">☰</button>
+  </nav>
+
+  <header class="hero" id="today">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      INTEGRATED ATTENDANCE — ROTATING QR + FACE RECOGNITION
+    </div>
+
+    <h1>
+      THREE SIGNALS.<br>
+      <span class="outline">ONE</span><br>
+      ATTENDANCE<span style="color:#A88600">.</span>
+    </h1>
+
+    <div class="hero-bottom">
+      <p class="hero-desc">
+        Attendance is granted only when the device is on the school network, the scanned
+        token is current for the session phase, and the selfie matches the enrolled student.
+        Miss one condition and no row is written.
+      </p>
+
+      <a href="#checkin" class="hero-button">
+        START CHECK-IN <span>↗</span>
+      </a>
+    </div>
+  </header>
+
+</div>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>SCHOOL NETWORK <b>✳</b></span>
+    <span>CURRENT QR TOKEN <b>✳</b></span>
+    <span>MATCHING FACE <b>✳</b></span>
+    <span>SCHOOL NETWORK <b>✳</b></span>
+    <span>CURRENT QR TOKEN <b>✳</b></span>
+    <span>MATCHING FACE <b>✳</b></span>
+  </div>
+</div>
+
+<main class="container">
+
+  <section class="section" id="checkin">
+
+    <div class="section-heading reveal">
+      <div>
+        <p class="section-label">01 / MY CHECK-IN</p>
+        <h2>Scan, match,<br>done.</h2>
+      </div>
+      <p class="section-note">ILLUSTRATIVE — SEEDED DEMO DATA, NOT REAL STUDENTS</p>
+    </div>
+
+    <div class="projects">
+
+      <article class="project reveal">
+        <div class="project-image signal-panel">
+          <div class="signal-row">
+            <span class="key">School network</span>
+            <span class="tag tag-pass">In subnet</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">QR token</span>
+            <span class="value">A7K2Q9 · 4s left</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Session phase</span>
+            <span class="tag tag-pass">Start</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Face + liveness</span>
+            <span class="value">Matched ✓</span>
+          </div>
+          <div class="signal-row">
+            <span class="key">Result</span>
+            <span class="tag tag-pass">Partial</span>
+          </div>
+          <p class="panel-caption">Decision: GET /qr-sessions/active → POST /attendance/check-qr</p>
+        </div>
+        <div class="project-info">
+          <div>
+            <h3>The decision</h3>
+            <p>Three conditions / all required</p>
+          </div>
+          <span class="project-number">01 ↗</span>
+        </div>
+      </article>
+
+      <article class="project reveal">
+        <div class="project-image qr-frame">
+          <div class="qr-illustration" aria-hidden="true">
+            <div class="qr-noise"></div>
+            <div class="finder tl"></div>
+            <div class="finder tr"></div>
+            <div class="finder bl"></div>
+          </div>
+          <p class="panel-caption">Projected on LCD · rotates every 5 s</p>
+        </div>
+        <div class="project-info">
+          <div>
+            <h3>Projected QR</h3>
+            <p>Rendered by GET /qr-sessions/active/qr.png</p>
+          </div>
+          <span class="project-number">02 ↗</span>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="today-panel reveal">
+      <div class="today-head">
+        <h3>Today's rows</h3>
+        <p class="panel-caption">START → PARTIAL · END → VERIFIED</p>
+      </div>
+      <div class="mini-row">
+        <span class="who">Demo Student 2</span>
+        <span class="stage">start</span>
+        <span class="state warn">partial</span>
+      </div>
+      <div class="mini-row">
+        <span class="who">Demo Student 2</span>
+        <span class="stage">end</span>
+        <span class="state ok">verified</span>
+      </div>
+      <div class="mini-row">
+        <span class="who">Demo Student 3</span>
+        <span class="stage">spot</span>
+        <span class="state warn">partial</span>
+      </div>
+      <div class="mini-row">
+        <span class="who">Demo Student 4</span>
+        <span class="stage">—</span>
+        <span class="state warn">absent</span>
+      </div>
+      <p class="panel-caption" style="margin-top:14px">Roster values: verified / partial / pending / absent · no face_only in the current system</p>
+    </div>
+
+  </section>
+
+</main>
+
+<section class="about" id="flow">
+  <div class="container about-grid reveal">
+    <h2>02 / HOW IT DECIDES</h2>
+
+    <div>
+      <p class="about-copy">
+        A selfie alone is not enough. The device must be on the school network, the scanned
+        token must belong to the current phase, and the face must match the logged-in student.
+        <span>A phase change issues a new token, so an old QR stops working immediately.</span>
+      </p>
+
+      <div class="flow-strip">
+        <span class="on">01 · Network</span>
+        <span class="on">02 · QR token</span>
+        <span class="on">03 · Face + liveness</span>
+        <span>04 · Identity bound</span>
+      </div>
+
+      <p class="fine-print">
+        The token rotates every 5 s and the previous one stays valid for 10 s. A 403 means the
+        client IP is outside SCHOOL_SUBNET and no row is written. A face that matches another
+        student is also a 403 with no row. The roster collapses the rows into verified,
+        partial, pending or absent.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="contact container" id="record">
+  <p class="section-label">03 / MY RECORD</p>
+
+  <h2 class="reveal">
+    OPEN THE<br>
+    <span>RECORD.</span>
+  </h2>
+
+  <div class="contact-bottom">
+    <p>Live server: 127.0.0.1:8000<br>Token rotation 5 s · grace 10 s</p>
+    <a href="http://127.0.0.1:8000/docs">API DOCS ↗</a>
+  </div>
+</section>
+
+<div class="container">
+  <footer>
+    <span>© 2026 STUDENT ATTENDANCE SYSTEM</span>
+    <span>BUILT FOR THE STITP DEMO</span>
+    <span>BACK TO TOP ↑</span>
+  </footer>
+</div>
+
+<script>
+// MOBILE NAVIGATION
+
+const menuToggle = document.getElementById("menuToggle");
+const navLinks = document.getElementById("navLinks");
+
+menuToggle.addEventListener("click", () => {
+  const isOpen = navLinks.classList.toggle("open");
+
+  menuToggle.textContent = isOpen ? "✕" : "☰";
+  menuToggle.setAttribute("aria-expanded", isOpen);
+});
+
+navLinks.querySelectorAll("a").forEach(link => {
+  link.addEventListener("click", () => {
+    navLinks.classList.remove("open");
+    menuToggle.textContent = "☰";
+    menuToggle.setAttribute("aria-expanded", "false");
+  });
+});
+
+// SCROLL REVEAL
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add("active");
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
