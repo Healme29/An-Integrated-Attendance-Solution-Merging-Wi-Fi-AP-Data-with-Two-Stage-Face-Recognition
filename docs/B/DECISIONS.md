@@ -1,5 +1,11 @@
 # DECISIONS — Member B (backend / deployment)
 
+> **Reading guide (2026-11-24):** decisions D-001–D-014 below were made for the
+> archived Wi-Fi/ARP design (`wifi-backup-prepull`, `a9ca24d`). They remain valid
+> as dated evidence of that work. **D-015** is the current direction: the tree at
+> `011840a` follows `origin/main`'s rotating-QR design. Current deployment and
+> fallback facts live in `current_system_qr.md`.
+
 > Setiap keputusan teknis yang tidak sepele **wajib** ditulis di sini. File ini bagian
 > dari penilaian M2: bukti bahwa kamu mengukur dulu, baru memutuskan.
 >
@@ -381,3 +387,43 @@
   troubleshooting table now maps to "download the model / install dill".
 - **Revisit by:** M3 — a deep health probe or an env-flag eager load, once A agrees to touch
   the startup path.
+
+### D-015 — Follow `main`'s QR direction; archive the Wi-Fi path instead of merging it back
+- **Date:** 2026-11-24 · **Stage:** M2/M3 (direction change after `git pull origin main`)
+- **Problem:** `origin/main` moved from `a317994` (2026-11-12) to `011840a` (2026-11-22) with
+  17 commits that **delete** `backend/services/wifi_scanner.py`, `routers/wifi.py`,
+  `routers/schedules.py`, `routers/prompt.py`, `scapy`, and the entire Wi-Fi test suite, and
+  replace them with rotating QR sessions, classes, teacher login, liveness and roster CSV.
+  Local `task-b` still contained B's Wi-Fi implementation and 209-test suite. What should
+  happen to B's branch and B's documentation?
+- **Options:** (1) keep `task-b`'s Wi-Fi path and merge/cherry-pick `main` around it — the two
+  designs touch the same attendance, DB, router and test files, so every Wi-Fi feature would
+  have to be re-added against A's rewritten code; (2) fast-forward `task-b` to `main`, keep
+  the old Wi-Fi work on a separate local branch, and rewrite B's docs for the QR system;
+  (3) run both attendance modes side by side behind a feature flag — needs changes in A/C
+  files and doubles the demo's failure modes.
+- **Evidence:** `git pull origin main` fast-forwarded `a9ca24d..011840a` — **59 files,
+  +4,900 / −6,904 lines**; removals include `wifi_scanner.py` (647 lines), `schedules.py`
+  (270), `wifi.py` (36), `test_wifi_subnet.py` (375), `test_hardening.py` (488); additions
+  include `qr_service.py` (262), `qr_sessions.py` (130), `classes.py` (154), `teachers.py`
+  (68), `liveness.py` (108). `backend/requirements.txt` replaced `scapy==2.5.0` and
+  `openpyxl==3.1.5` with `qrcode[pil]==8.0.0`. The first test run after the pull failed with
+  `ModuleNotFoundError: No module named 'qrcode'`; after installing that pin (wheel added to
+  `wheelhouse\`), the new suite is **38 passed** in 7.3 s.
+- **Decision:** option 2. `task-b` now points at `011840a` and follows `main`; the old state
+  is preserved locally as **`wifi-backup-prepull` at `a9ca24d`**, so nothing is lost. B's docs
+  are being marked historical or rewritten for QR attendance; no A/C file is modified to
+  resurrect Wi-Fi.
+- **Consequences:** the Wi-Fi scanner, AP/BSSID checks, `/wifi/*` and `/schedules/*` endpoints,
+  and the 209-test suite are **no longer in the working tree** — any B doc that presents them
+  as current is wrong and must carry a superseded banner. The offline kit (`backups\models`,
+  `wheelhouse\`) still exists on disk, but its wheel set was built for the pre-pull
+  requirements and now contains both generations; it must be re-validated against the new
+  `requirements.txt`. Strict-mode demo steps, hotspot setup and AP pinning are no longer part
+  of the demo path.
+- **Revisit by:** if A reintroduces AP-based presence checking, or the teacher pilot requires
+  room-level verification, restore from `wifi-backup-prepull` and re-evaluate with A before
+  adding any Wi-Fi file back. Until then, treat Wi-Fi results as **historical evidence only**.
+- **Evidence files:** `git` refs `011840a` / `a9ca24d` / `wifi-backup-prepull`;
+  `backend/requirements.txt` (qrcode vs scapy); `backend/routers/*`, `backend/services/*`;
+  `.venv/pytest_after_pull.log`; `docs/B/evidence/2026-11-13-windows/` (historical Wi-Fi run).

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTEND — Project Overview</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #ECF4F7; --ink: #192853; --lime: #FFE14F; --muted: #5A6B82;
+  --line: rgba(25,40,83,.16); --surface: #DCE8EE;
+  --font: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+  --success: #12624F; --warning: #B45309; --danger: #C4323C;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { width: min(1400px, 90%); margin: auto; }
+
+nav { height: 88px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.logo { font-size: 27px; font-weight: 700; letter-spacing: -2px; }
+.logo span { color: #A88600; }
+.nav-links { display: flex; gap: 38px; list-style: none; }
+.nav-links a { font-family: var(--mono); font-size: 11px; text-transform: uppercase; transition: opacity .25s; }
+.nav-links a:hover { opacity: .45; }
+.nav-cta { background: var(--ink); color: white; padding: 13px 20px; border-radius: 30px; font-size: 12px; transition: .3s; }
+.nav-cta:hover { background: var(--lime); color: var(--ink); }
+.menu-toggle { display: none; border: 0; background: none; font-size: 25px; cursor: pointer; }
+
+.hero { padding: 110px 0 80px; min-height: 690px; display: flex; flex-direction: column; justify-content: space-between; }
+.eyebrow { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px rgba(255,225,79,.55); }
+.hero h1 { font-size: clamp(70px, 11.5vw, 166px); line-height: .86; letter-spacing: -.095em; font-weight: 700; margin-top: 45px; }
+.hero h1 .outline { color: transparent; -webkit-text-stroke: 1.5px var(--ink); }
+.hero-bottom { display: flex; justify-content: space-between; align-items: end; margin-top: 55px; gap: 30px; }
+.hero-desc { max-width: 420px; font-size: 16px; line-height: 1.7; color: var(--muted); }
+.hero-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hero-button { display: inline-flex; align-items: center; gap: 20px; background: var(--lime); padding: 17px 24px; border-radius: 40px; font-size: 13px; font-weight: 600; transition: .3s; }
+.hero-button:hover { transform: translateY(-5px); background: var(--ink); color: white; }
+.hero-button.secondary { background: transparent; border: 1px solid var(--ink); }
+.hero-button.secondary:hover { background: var(--ink); color: white; transform: none; }
+
+.marquee { overflow: hidden; background: var(--ink); color: var(--bg); padding: 20px 0; }
+.marquee-track { display: flex; width: max-content; animation: move 25s linear infinite; }
+.marquee span { font-size: 19px; font-weight: 500; letter-spacing: -.5px; padding-right: 35px; }
+.marquee span b { color: var(--lime); margin-right: 35px; }
+@keyframes move { to { transform: translateX(-50%); } }
+
+.section { padding: 115px 0; }
+.section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 45px; gap: 20px; }
+.section-label { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 15px; }
+.section-heading h2 { font-size: clamp(42px, 6vw, 76px); letter-spacing: -.07em; line-height: .95; }
+.section-note { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 230px; line-height: 1.6; text-align: right; }
+
+.projects { display: grid; grid-template-columns: 1.25fr .75fr; gap: 24px; }
+.project:nth-child(2) { margin-top: 110px; }
+.project-image { overflow: hidden; background: var(--surface); aspect-ratio: 1.2 / 1; }
+.project:nth-child(2) .project-image { aspect-ratio: .9 / 1; }
+.signal-panel { display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: clamp(22px, 4vw, 46px); transition: transform .7s cubic-bezier(.2,.7,.2,1); }
+.project:hover .signal-panel { transform: scale(1.015); }
+.signal-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 13px; }
+.signal-row .key { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.signal-row .value { font-size: 15px; font-weight: 600; }
+.tag { font-family: var(--mono); font-size: 10px; text-transform: uppercase; padding: 6px 11px; border-radius: 30px; white-space: nowrap; }
+.tag-pass { background: var(--lime); color: var(--ink); font-weight: 500; }
+.tag-block { background: var(--ink); color: white; }
+.panel-caption { font-family: var(--mono); font-size: 10px; line-height: 1.6; color: var(--muted); text-transform: uppercase; }
+.project-info { display: flex; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.project-info h3 { font-size: 19px; font-weight: 600; }
+.project-info p { font-family: var(--mono); color: var(--muted); font-size: 10px; margin-top: 7px; text-transform: uppercase; }
+.project-number { font-family: var(--mono); font-size: 12px; }
+
+.about { background: var(--lime); padding: 100px 0; }
+.about-grid { display: grid; grid-template-columns: .7fr 1.3fr; gap: 80px; }
+.about h2 { font-size: 15px; font-family: var(--mono); text-transform: uppercase; }
+.about-copy { font-size: clamp(30px, 4.5vw, 59px); letter-spacing: -.06em; line-height: 1.12; }
+.about-copy span { color: rgba(25,40,83,.48); }
+.flow-strip { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 45px; }
+.flow-strip span { font-family: var(--mono); font-size: 11px; text-transform: uppercase; border: 1px solid var(--ink); border-radius: 30px; padding: 10px 16px; }
+.fine-print { font-family: var(--mono); font-size: 11px; line-height: 1.7; margin-top: 30px; max-width: 720px; }
+
+.routes { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.route { display: block; padding: clamp(22px, 4vw, 40px); background: var(--surface); border-bottom: 4px solid var(--ink); transition: transform .25s, border-color .25s; }
+.route:hover { transform: translateY(-6px); border-color: var(--lime); }
+.route .path { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); }
+.route h3 { font-size: 30px; letter-spacing: -.05em; margin: 18px 0 10px; }
+.route p { font-size: 13px; line-height: 1.6; color: var(--muted); }
+.route .arrow { font-family: var(--mono); font-size: 12px; display: inline-block; margin-top: 22px; }
+
+footer { padding: 25px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); color: var(--muted); font-size: 10px; }
+
+.reveal { opacity: 0; transform: translateY(35px); transition: opacity .8s ease, transform .8s ease; }
+.reveal.active { opacity: 1; transform: translateY(0); }
+
+@media(max-width: 768px) {
+  .container { width: 88%; }
+  nav { height: 72px; }
+  .menu-toggle { display: block; }
+  .nav-cta { display: none; }
+  .nav-links { display: none; position: absolute; top: 72px; left: 0; width: 100%; background: var(--bg); padding: 30px 6%; flex-direction: column; gap: 25px; border-bottom: 1px solid var(--line); z-index: 10; }
+  .nav-links.open { display: flex; }
+  .hero { padding: 100px 0 65px; min-height: 590px; }
+  .hero h1 { font-size: clamp(64px, 15vw, 105px); margin-top: 55px; }
+  .hero-bottom { align-items: start; flex-direction: column; }
+  .section { padding: 85px 0; }
+  .section-heading { align-items: start; flex-direction: column; }
+  .section-note { text-align: left; }
+  .projects, .routes { grid-template-columns: 1fr; gap: 35px; }
+  .project:nth-child(2) { margin-top: 0; }
+  .project:nth-child(2) .project-image { aspect-ratio: 1.2 / 1; }
+  .about { padding: 75px 0; }
+  .about-grid { grid-template-columns: 1fr; gap: 35px; }
+  footer { gap: 15px; flex-wrap: wrap; }
+}
+@media(prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <nav>
+    <a href="#top" class="logo">A<span>.</span>TTEND</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#top">Overview</a></li>
+      <li><a href="#conditions">The Conditions</a></li>
+      <li><a href="#flow">The Flow</a></li>
+      <li><a href="#dashboards">Dashboards</a></li>
+    </ul>
+    <a href="2026-11-24_teacher-dashboard_mockup-v1.html" class="nav-cta">Teacher Dashboard ↗</a>
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="eyebrow"><span class="dot"></span>INTEGRATED ATTENDANCE — ROTATING QR + FACE RECOGNITION</div>
+    <h1>THREE SIGNALS.<br><span class="outline">ONE</span><br>ATTENDANCE<span style="color:#A88600">.</span></h1>
+    <div class="hero-bottom">
+      <p class="hero-desc">
+        A class session, a rotating QR code, and a face check. The backend grants attendance
+        only when all three agree — and records which ones actually held.
+      </p>
+      <div class="hero-actions">
+        <a href="#dashboards" class="hero-button">EXPLORE THE VIEWS <span>↗</span></a>
+        <a href="#flow" class="hero-button secondary">HOW IT WORKS</a>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>SCHOOL NETWORK <b>✳</b></span><span>CURRENT QR TOKEN <b>✳</b></span><span>MATCHING FACE <b>✳</b></span>
+    <span>SCHOOL NETWORK <b>✳</b></span><span>CURRENT QR TOKEN <b>✳</b></span><span>MATCHING FACE <b>✳</b></span>
+  </div>
+</div>
+
+<main class="container">
+  <section class="section" id="conditions">
+    <div class="section-heading reveal">
+      <div><p class="section-label">01 / THE CONDITIONS</p><h2>Nothing is<br>assumed.</h2></div>
+      <p class="section-note">ILLUSTRATIVE — SEEDED DEMO DATA, NOT REAL STUDENTS</p>
+    </div>
+    <div class="projects">
+      <article class="project reveal">
+        <div class="project-image signal-panel">
+          <div class="signal-row"><span class="key">School network</span><span class="tag tag-pass">In subnet</span></div>
+          <div class="signal-row"><span class="key">QR token</span><span class="value">A7K2Q9 · 4s left</span></div>
+          <div class="signal-row"><span class="key">Session phase</span><span class="tag tag-pass">Start</span></div>
+          <div class="signal-row"><span class="key">Face + liveness</span><span class="value">Matched ✓</span></div>
+          <div class="signal-row"><span class="key">Result</span><span class="tag tag-pass">Partial</span></div>
+          <p class="panel-caption">GET /qr-sessions/active → POST /attendance/check-qr</p>
+        </div>
+        <div class="project-info"><div><h3>The decision</h3><p>Three conditions / all required</p></div><span class="project-number">01 ↗</span></div>
+      </article>
+      <article class="project reveal">
+        <div class="project-image signal-panel">
+          <div class="signal-row"><span class="key">Outside subnet</span><span class="tag tag-block">403 · no row</span></div>
+          <div class="signal-row"><span class="key">Expired token</span><span class="tag tag-block">400 · no row</span></div>
+          <div class="signal-row"><span class="key">Wrong face</span><span class="tag tag-block">403 · no row</span></div>
+          <div class="signal-row"><span class="key">Duplicate</span><span class="tag tag-block">409 · no row</span></div>
+          <p class="panel-caption">A failed condition never becomes a weaker attendance row</p>
+        </div>
+        <div class="project-info"><div><h3>The refusal</h3><p>Four ways to be rejected</p></div><span class="project-number">02 ↗</span></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<section class="about" id="flow">
+  <div class="container about-grid reveal">
+    <h2>02 / HOW IT DECIDES</h2>
+    <div>
+      <p class="about-copy">
+        A selfie alone is not enough. The device must be on the school network, the scanned
+        token must belong to the current phase, and the face must match the logged-in student.
+        <span>A phase change issues a new token, so an old QR stops working immediately.</span>
+      </p>
+      <div class="flow-strip"><span>01 · Network</span><span>02 · QR token</span><span>03 · Face + liveness</span><span>04 · Identity bound</span></div>
+      <p class="fine-print">
+        The token rotates every 5 s and the previous one stays valid for 10 s. The roster
+        collapses check-ins into verified, partial, pending or absent. This is a subnet gate,
+        not room-level proof; the demo runs on a hotspot the team controls.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section container" id="dashboards">
+  <div class="section-heading reveal">
+    <div><p class="section-label">03 / TWO VIEWS</p><h2>One system,<br>two roles.</h2></div>
+    <p class="section-note">BOTH USE THE SAME PALETTE AND TYPE SCALE</p>
+  </div>
+  <div class="routes">
+    <a class="route reveal" href="2026-11-24_teacher-dashboard_mockup-v1.html">
+      <span class="path">TEACHER · /dashboard</span>
+      <h3>Teacher dashboard</h3>
+      <p>Start a class, project the rotating QR, move through phases, watch the roster fill in and export the sheet.</p>
+      <span class="arrow">OPEN MOCKUP ↗</span>
+    </a>
+    <a class="route reveal" href="2026-11-24_student-dashboard_mockup-v1.html">
+      <span class="path">STUDENT · COMPANION VIEW</span>
+      <h3>Student dashboard</h3>
+      <p>See the active session, scan and check in, then follow the row from partial to verified.</p>
+      <span class="arrow">OPEN MOCKUP ↗</span>
+    </a>
+  </div>
+</section>
+
+<div class="container">
+  <footer>
+    <span>© 2026 STUDENT ATTENDANCE SYSTEM</span><span>BUILT FOR THE STITP DEMO</span><span>BACK TO TOP ↑</span>
+  </footer>
+</div>
+
+<script>
+const menuToggle = document.getElementById("menuToggle");
+const navLinks = document.getElementById("navLinks");
+menuToggle.addEventListener("click", () => {
+  const isOpen = navLinks.classList.toggle("open");
+  menuToggle.textContent = isOpen ? "✕" : "☰";
+  menuToggle.setAttribute("aria-expanded", isOpen);
+});
+navLinks.querySelectorAll("a").forEach(link => link.addEventListener("click", () => {
+  navLinks.classList.remove("open");
+  menuToggle.textContent = "☰";
+  menuToggle.setAttribute("aria-expanded", "false");
+}));
+const observer = new IntersectionObserver(entries => entries.forEach(entry => {
+  if (entry.isIntersecting) { entry.target.classList.add("active"); observer.unobserve(entry.target); }
+}), { threshold: 0.1 });
+document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

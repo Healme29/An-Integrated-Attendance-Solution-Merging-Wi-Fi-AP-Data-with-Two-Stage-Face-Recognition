@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTEND — Teacher Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #ECF4F7; --ink: #192853; --lime: #FFE14F; --muted: #5A6B82;
+  --line: rgba(25,40,83,.16); --surface: #DCE8EE;
+  --font: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --mono: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+  --success: #12624F; --warning: #B45309; --danger: #C4323C;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+
+/* SIDEBAR — active page keeps a rail + ●, visited pages keep a ✓ */
+
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 250px; background: var(--ink); color: var(--bg); padding: 28px 0; z-index: 30; transition: transform .25s ease; }
+body:not(.ready) .sidebar, body:not(.ready) .sidebar li a { transition: none; }
+.sidebar .logo { display: block; font-size: 27px; font-weight: 700; letter-spacing: -2px; padding: 0 28px 34px; }
+.sidebar .logo span { color: var(--lime); }
+.sidebar ul { list-style: none; }
+.sidebar li a {
+  display: flex; align-items: center; gap: 14px; padding: 14px 28px;
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  border-left: 4px solid transparent; opacity: .72;
+  transition: background .2s ease, opacity .2s ease, color .2s ease, transform .2s ease, border-color .2s ease;
+}
+.sidebar li a:hover { background: rgba(255,225,79,.10); opacity: 1; transform: translateX(3px); }
+.sidebar li a.visited { opacity: .88; }
+.sidebar li a.visited::after { content: "\2713"; margin-left: auto; font-size: 10px; color: rgba(255,225,79,.55); }
+.sidebar li a.active { background: rgba(255,225,79,.14); border-left-color: var(--lime); color: var(--lime); opacity: 1; transform: none; }
+.sidebar li a.active::after { content: "\25CF"; margin-left: auto; font-size: 9px; color: var(--lime); }
+.sidebar .foot { position: absolute; bottom: 28px; left: 28px; font-family: var(--mono); font-size: 10px; opacity: .55; line-height: 1.7; }
+.overlay { display: none; position: fixed; inset: 0; background: rgba(25,40,83,.45); z-index: 25; }
+
+/* MOBILE BAR */
+
+.mobile-bar { display: none; position: fixed; top: 0; left: 0; right: 0; height: 62px; z-index: 20; background: var(--ink); color: var(--bg); align-items: center; justify-content: space-between; padding: 0 18px; }
+.mobile-bar .logo { font-size: 24px; font-weight: 700; letter-spacing: -2px; }
+.mobile-bar .logo span { color: var(--lime); }
+.mobile-bar .right { display: flex; align-items: center; gap: 12px; }
+.menu-button { border: 1px solid var(--lime); background: transparent; color: var(--lime); border-radius: 8px; width: 38px; height: 38px; font-size: 18px; cursor: pointer; }
+
+.main { margin-left: 250px; min-width: 0; }
+.topbar { height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 clamp(22px, 4vw, 48px); border-bottom: 1px solid var(--line); }
+.topbar .crumb { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.live { display: inline-flex; align-items: center; gap: 9px; background: var(--lime); color: var(--ink); padding: 7px 13px; border-radius: 30px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; font-weight: 500; }
+.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.teacher { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.content { padding: clamp(22px, 4vw, 48px); max-width: 1500px; }
+.page[hidden] { display: none; }
+.page:not([hidden]) { animation: pageIn .28s ease both; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.page-title { font-size: 30px; letter-spacing: -.05em; font-weight: 700; }
+.eyebrow { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px rgba(255,225,79,.55); flex-shrink: 0; }
+.page-head { margin-bottom: 28px; }
+.page-head p.eyebrow { margin-bottom: 10px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+.stat { background: var(--surface); padding: 22px 24px; }
+.stat .label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 9px; }
+.stat .label::before { content: ""; width: 9px; height: 9px; background: var(--lime); display: inline-block; flex-shrink: 0; }
+.stat .value { font-size: 36px; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.05em; margin-top: 8px; }
+.stat .foot { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; }
+
+.cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; }
+.card { background: var(--surface); transition: box-shadow .2s ease, transform .2s ease; }
+.card:hover { box-shadow: 0 8px 22px rgba(25,40,83,.10); }
+.card-head { display: flex; justify-content: space-between; align-items: start; gap: 15px; border-bottom: 1px solid var(--line); padding: 20px 24px; }
+.card h3 { font-size: 19px; font-weight: 600; }
+.card .meta { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+.card-head .num { font-family: var(--mono); font-size: 12px; }
+.card-pad { padding: 24px; }
+
+.field { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding: 13px 0; }
+.field:last-child { border-bottom: 0; }
+.field .key { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .08em; }
+.field .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.tag { font-family: var(--mono); font-size: 10px; text-transform: uppercase; padding: 6px 11px; border-radius: 30px; white-space: nowrap; }
+.tag-live { background: var(--lime); color: var(--ink); font-weight: 500; }
+.tag-idle { background: var(--ink); color: white; }
+
+.phase-strip { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 6px; }
+.phase-strip span { font-family: var(--mono); font-size: 11px; text-transform: uppercase; border: 1px solid var(--ink); border-radius: 30px; padding: 9px 14px; }
+.phase-strip span.on { background: var(--ink); color: var(--lime); }
+.buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 14px; padding: 14px 20px; border-radius: 40px; font-size: 13px; font-weight: 600; transition: .25s; }
+.button.primary { background: var(--lime); color: var(--ink); }
+.button.primary:hover { background: var(--ink); color: white; transform: translateY(-3px); }
+.button.ghost { background: transparent; border: 1px solid var(--ink); }
+.button.ghost:hover { background: var(--ink); color: white; }
+.panel-caption { font-family: var(--mono); font-size: 10px; line-height: 1.6; color: var(--muted); text-transform: uppercase; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; text-align: left; color: var(--muted); border-bottom: 1px solid var(--line); padding: 12px 24px; }
+td { padding: 13px 24px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+td.name { font-weight: 600; }
+td.mono { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); }
+.chip { font-family: var(--mono); font-size: 10px; text-transform: uppercase; padding: 5px 10px; border-radius: 30px; display: inline-block; }
+.chip.verified { color: var(--success); border: 1px solid var(--success); }
+.chip.partial { color: var(--warning); border: 1px solid var(--warning); }
+.chip.pending, .chip.absent { color: var(--danger); border: 1px solid var(--danger); }
+.actions { margin-top: 24px; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.actions a { font-family: var(--mono); font-size: 12px; border-bottom: 1px solid var(--ink); padding-bottom: 5px; white-space: nowrap; }
+.actions p { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+.list-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.list-item:last-child { border-bottom: 0; }
+.list-item strong { font-size: 15px; font-weight: 600; }
+.list-item small { display: block; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); margin-top: 5px; }
+
+footer { padding: 24px clamp(22px, 4vw, 48px); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--mono); color: var(--muted); font-size: 10px; }
+
+@media(max-width: 1100px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .cols { grid-template-columns: 1fr; }
+}
+
+@media(max-width: 768px) {
+  .sidebar { width: 270px; transform: translateX(-100%); box-shadow: none; }
+  body.drawer-open .sidebar { transform: translateX(0); box-shadow: 12px 0 30px rgba(25,40,83,.25); }
+  body.drawer-open .overlay { display: block; }
+  .sidebar .foot { position: static; margin: 34px 28px 0; }
+  .mobile-bar { display: flex; }
+  .main { margin-left: 0; padding-top: 62px; }
+  .topbar { height: 58px; padding: 0 18px; }
+  .topbar .teacher { display: none; }
+  .teacher-line { display: none; }
+  .content { padding: 22px 16px 40px; }
+  .page-title { font-size: 26px; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { padding: 18px; }
+  .stat .value { font-size: 30px; }
+  .card-head { padding: 18px; }
+  .card-pad { padding: 18px; }
+  .field { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .field .val { text-align: left; }
+  .button { width: 100%; }
+  .actions { flex-direction: column; align-items: flex-start; }
+  .phase-strip span { font-size: 10px; padding: 8px 11px; }
+
+  table, thead, tbody, tr, th, td { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 1px solid var(--line); padding: 14px 18px; }
+  tr:last-child { border-bottom: 0; }
+  td { border: 0; padding: 5px 0; display: flex; justify-content: space-between; gap: 14px; font-size: 13px; }
+  td::before { content: attr(data-label); font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+}
+
+@media(max-width: 420px) {
+  .stats { grid-template-columns: 1fr; }
+  .topbar .crumb { font-size: 10px; }
+}
+
+@media(prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+
+<body>
+<div class="mobile-bar">
+  <a href="#overview" class="logo" data-mobile-logo>A<span>.</span>TTEND</a>
+  <div class="right"><span class="live">Live</span><button class="menu-button" id="menuButton" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">☰</button></div>
+</div>
+<div class="overlay" id="overlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <a href="#overview" class="logo" data-page="overview">A<span>.</span>TTEND</a>
+  <ul>
+    <li><a href="#overview" data-page="overview" class="active" aria-current="page">Overview</a></li>
+    <li><a href="#session" data-page="session">Session</a></li>
+    <li><a href="#attendance" data-page="attendance">Attendance</a></li>
+    <li><a href="#classes" data-page="classes">Classes</a></li>
+    <li><a href="#students" data-page="students">Students</a></li>
+  </ul>
+  <div class="foot">TEACHER CONSOLE<br>STITP DEMO BUILD<br>● CURRENT · ✓ VISITED</div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumb" id="crumb">TEACHER / OVERVIEW</div>
+    <span class="live teacher-line">Live</span>
+    <div class="teacher">TEACHER · DEMO ACCOUNT</div>
+  </div>
+
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <section class="page" id="page-overview">
+      <div class="page-head">
+        <p class="eyebrow"><span class="dot"></span>TEACHER VIEW — ROTATING QR ATTENDANCE</p>
+        <h1 class="page-title" id="title-overview">Overview.</h1>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="label">In class</div><div class="value">24</div><div class="foot">DEMO CLASS ROSTER</div></div>
+        <div class="stat"><div class="label">Verified</div><div class="value">18</div><div class="foot">FINAL CHECK COMPLETE</div></div>
+        <div class="stat"><div class="label">Partial</div><div class="value">04</div><div class="foot">START / SPOT ONLY</div></div>
+        <div class="stat"><div class="label">Absent</div><div class="value">02</div><div class="foot">NO ROW THIS SESSION</div></div>
+      </div>
+      <div class="cols">
+        <article class="card">
+          <div class="card-head"><div><h3>How the gate behaves</h3><p class="meta">SCHOOL_SUBNET = 192.168.0.0/16</p></div><span class="num">01 ↗</span></div>
+          <div class="card-pad">
+            <div class="field"><span class="key">Client in subnet</span><span class="tag tag-live">Allowed</span></div>
+            <div class="field"><span class="key">Client outside</span><span class="tag tag-idle">403 · no row</span></div>
+            <div class="field"><span class="key">Expired token</span><span class="tag tag-idle">400 · no row</span></div>
+            <div class="field"><span class="key">Wrong face</span><span class="tag tag-idle">403 · no row</span></div>
+            <div class="field"><span class="key">Teacher actions</span><span class="val">Bearer token required</span></div>
+            <p class="panel-caption" style="margin-top:20px">TOKEN ISSUED BY POST /teachers/login</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><h3>Jump to</h3><p class="meta">ONE PAGE PER TASK</p></div><span class="num">02 ↗</span></div>
+          <div class="card-pad">
+            <div class="list-item"><div><strong>Run the session</strong><small>START / SPOT / END / CLOSED</small></div><a href="#session" data-page="session" class="button ghost" style="margin:0;width:auto;padding:10px 16px;font-size:11px">OPEN ↗</a></div>
+            <div class="list-item"><div><strong>Check attendance</strong><small>VERIFY / PARTIAL / PENDING / ABSENT</small></div><a href="#attendance" data-page="attendance" class="button ghost" style="margin:0;width:auto;padding:10px 16px;font-size:11px">OPEN ↗</a></div>
+            <div class="list-item"><div><strong>Manage classes</strong><small>DEMO CLASS · DEMO ROOM A</small></div><a href="#classes" data-page="classes" class="button ghost" style="margin:0;width:auto;padding:10px 16px;font-size:11px">OPEN ↗</a></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- SESSION -->
+    <section class="page" id="page-session" hidden>
+      <div class="page-head">
+        <p class="eyebrow"><span class="dot"></span>TEACHER VIEW — ROTATING QR ATTENDANCE</p>
+        <h1 class="page-title" id="title-session">Session control.</h1>
+      </div>
+      <article class="card">
+        <div class="card-head"><div><h3>Active session</h3><p class="meta">POST /qr-sessions/start · PHASE CONTROL</p></div><span class="num">01 ↗</span></div>
+        <div class="card-pad">
+          <div class="field"><span class="key">Class</span><span class="val">Demo Class</span></div>
+          <div class="field"><span class="key">Room</span><span class="val">Demo Room A</span></div>
+          <div class="field"><span class="key">Current token</span><span class="val">A7K2Q9</span></div>
+          <div class="field"><span class="key">Rotation</span><span class="val">5 s · grace 10 s</span></div>
+          <div class="field"><span class="key">State</span><span class="tag tag-live">Active · Start</span></div>
+          <div class="phase-strip"><span class="on">Start</span><span>Spot (optional)</span><span>End</span><span>Closed</span></div>
+          <div class="buttons">
+            <a href="#attendance" data-page="attendance" class="button primary">START FINAL ATTENDANCE ↗</a>
+            <a href="#attendance" data-page="attendance" class="button ghost">END SESSION</a>
+          </div>
+          <p class="panel-caption" style="margin-top:20px">A PHASE CHANGE ISSUES A NEW TOKEN — THE OLD QR STOPS WORKING IMMEDIATELY</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ATTENDANCE (was "Roster") -->
+    <section class="page" id="page-attendance" hidden>
+      <div class="page-head">
+        <p class="eyebrow"><span class="dot"></span>TEACHER VIEW — ROTATING QR ATTENDANCE</p>
+        <h1 class="page-title" id="title-attendance">Attendance.</h1>
+      </div>
+      <article class="card">
+        <div class="card-head"><div><h3>Live attendance</h3><p class="meta">GET /attendance/roster?qr_session_id=1 · ONE ROW PER STUDENT</p></div><span class="num">01 ↗</span></div>
+        <table>
+          <thead><tr><th>Student</th><th>Check</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="name" data-label="Student">Demo Student 1</td><td class="mono" data-label="Check">end</td><td data-label="Start">08:01</td><td data-label="End">09:58</td><td data-label="Status"><span class="chip verified">verified</span></td></tr>
+            <tr><td class="name" data-label="Student">Demo Student 2</td><td class="mono" data-label="Check">spot</td><td data-label="Start">08:02</td><td data-label="End">—</td><td data-label="Status"><span class="chip partial">partial</span></td></tr>
+            <tr><td class="name" data-label="Student">Demo Student 3</td><td class="mono" data-label="Check">start</td><td data-label="Start">08:04</td><td data-label="End">—</td><td data-label="Status"><span class="chip partial">partial</span></td></tr>
+            <tr><td class="name" data-label="Student">Demo Student 4</td><td class="mono" data-label="Check">—</td><td data-label="Start">—</td><td data-label="End">—</td><td data-label="Status"><span class="chip absent">absent</span></td></tr>
+            <tr><td class="name" data-label="Student">Demo Student 5</td><td class="mono" data-label="Check">—</td><td data-label="Start">—</td><td data-label="End">—</td><td data-label="Status"><span class="chip pending">pending</span></td></tr>
+          </tbody>
+        </table>
+        <div class="actions">
+          <p>MANUAL ROWS REQUIRE A REASON AND ARE WRITTEN ONLY AFTER THE SESSION CLOSES</p>
+          <a href="http://127.0.0.1:8000/docs">EXPORT CSV ↗</a>
+        </div>
+      </article>
+    </section>
+
+    <!-- CLASSES -->
+    <section class="page" id="page-classes" hidden>
+      <div class="page-head">
+        <p class="eyebrow"><span class="dot"></span>TEACHER VIEW — ROTATING QR ATTENDANCE</p>
+        <h1 class="page-title" id="title-classes">Classes.</h1>
+      </div>
+      <article class="card">
+        <div class="card-head"><div><h3>Class roster</h3><p class="meta">GET /classes/ · ONE CLASS PER STUDENT</p></div><span class="num">01 ↗</span></div>
+        <div class="card-pad">
+          <div class="list-item"><div><strong>Demo Class</strong><small>DEMO ROOM A · 24 STUDENTS · ACTIVE SESSION</small></div><span class="tag tag-live">Active</span></div>
+          <div class="list-item"><div><strong>Algorithms 2026</strong><small>ROOM B12 · 18 STUDENTS</small></div><span class="tag tag-idle">Idle</span></div>
+          <div class="list-item"><div><strong>Data Structures</strong><small>ROOM C04 · 22 STUDENTS</small></div><span class="tag tag-idle">Idle</span></div>
+          <div class="buttons"><a href="#session" data-page="session" class="button primary">START A SESSION ↗</a></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- STUDENTS -->
+    <section class="page" id="page-students" hidden>
+      <div class="page-head">
+        <p class="eyebrow"><span class="dot"></span>TEACHER VIEW — ROTATING QR ATTENDANCE</p>
+        <h1 class="page-title" id="title-students">Students.</h1>
+      </div>
+      <article class="card">
+        <div class="card-head"><div><h3>Enrolled students</h3><p class="meta">GET /students/?nim= · ENROLLMENT VIA /faces/enroll</p></div><span class="num">01 ↗</span></div>
+        <div class="card-pad">
+          <div class="list-item"><div><strong>Demo Student 1</strong><small>F25040101 · 5 EMBEDDINGS</small></div><span class="chip verified">enrolled</span></div>
+          <div class="list-item"><div><strong>Demo Student 2</strong><small>F25040126 · 5 EMBEDDINGS</small></div><span class="chip verified">enrolled</span></div>
+          <div class="list-item"><div><strong>Demo Student 3</strong><small>F25040128 · 3 EMBEDDINGS</small></div><span class="chip verified">enrolled</span></div>
+          <div class="list-item"><div><strong>Demo Student 4</strong><small>F25040130 · 0 EMBEDDINGS</small></div><span class="chip pending">not enrolled</span></div>
+        </div>
+      </article>
+    </section>
+
+  </div>
+</div>
+
+<footer><span>© 2026 STUDENT ATTENDANCE SYSTEM</span><span>BUILT FOR THE STITP DEMO</span><span>ONE PALETTE · THREE VIEWS</span></footer>
+
+<script>
+(function () {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuButton = document.getElementById('menuButton');
+  const crumb = document.getElementById('crumb');
+  const links = Array.from(document.querySelectorAll('[data-page]'));
+  const pages = Array.from(document.querySelectorAll('.page'));
+  const labels = {
+    overview: 'Overview', session: 'Session', attendance: 'Attendance',
+    classes: 'Classes', students: 'Students'
+  };
+  const visited = new Set();
+  try { JSON.parse(sessionStorage.getItem('attend-visited') || '[]').forEach(p => visited.add(p)); } catch (e) { /* private mode */ }
+
+  function closeDrawer() {
+    document.body.classList.remove('drawer-open');
+    menuButton.setAttribute('aria-expanded', 'false');
+    menuButton.setAttribute('aria-label', 'Open navigation');
+    menuButton.textContent = '☰';
+  }
+
+  function showPage(name) {
+    if (!labels[name]) name = 'overview';
+    visited.add(name);
+    try { sessionStorage.setItem('attend-visited', JSON.stringify(Array.from(visited))); } catch (e) { /* private mode */ }
+    links.forEach(link => {
+      const on = link.dataset.page === name && !!link.closest('ul');
+      link.classList.toggle('active', on);
+      link.classList.toggle('visited', !!link.closest('ul') && visited.has(link.dataset.page));
+      if (on) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    pages.forEach(page => { page.hidden = page.id !== 'page-' + name; });
+    crumb.textContent = 'TEACHER / ' + labels[name].toUpperCase();
+    if (history.replaceState) history.replaceState(null, '', '#' + name);
+    closeDrawer();
+    window.scrollTo(0, 0);
+  }
+
+  links.forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    showPage(link.dataset.page);
+  }));
+
+  menuButton.addEventListener('click', () => {
+    const open = document.body.classList.toggle('drawer-open');
+    menuButton.setAttribute('aria-expanded', String(open));
+    menuButton.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    menuButton.textContent = open ? '✕' : '☰';
+  });
+  overlay.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeDrawer(); });
+  window.addEventListener('hashchange', () => showPage((location.hash || '').replace('#', '')));
+  showPage((location.hash || '').replace('#', '') || 'overview');
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('ready')));
+})();
+</script>
+</body>
+</html>

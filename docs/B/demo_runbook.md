@@ -1,5 +1,11 @@
 # Demo Runbook — printed copy (draft for G12–G16)
 
+> **DO NOT FOLLOW — SUPERSEDED WORKING INSTRUCTIONS (2026-11-24).** Every Wi-Fi/ARP,
+> `REQUIRE_CLASSROOM_WIFI`, `/wifi/*`, `/schedules/*`, `ap_bssid`, `face_only` and 209-test
+> step below describes the archived `wifi-backup-prepull` branch (`a9ca24d`), not the code
+> at `011840a`. For deployment, demo steps, endpoints, configuration and fallback, use
+> `docs/B/current_system_qr.md` instead. Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 · archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Status:** draft. Numbers marked *(measured)* were measured; everything else is a
 > procedure to be executed and timed at dry run #1 (2027-01-09/10).
 > **Owner:** B · **Used by:** A (backend), C (phone), D (narration), B (fallback).

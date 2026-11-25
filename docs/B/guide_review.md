@@ -1,5 +1,14 @@
 # Deployment Guide — Followed From Scratch (M2 stage 3)
 
+> **HISTORICAL RECORD — SUPERSEDED (2026-11-24).** This page documents the Wi-Fi/ARP
+> presence design that existed before `origin/main` was pulled. The running system at
+> `011840a` uses rotating QR sessions, `SCHOOL_SUBNET`, classes, teacher login and liveness;
+> `wifi_scanner.py`, `/wifi/*`, `/schedules/*`, `/me/prompt`, `ap_bssid`, `face_only` and the
+> 209-test suite no longer exist. Keep this file only as dated evidence of the validation
+> method and of decisions D-001–D-014.
+> Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 ·
+> archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Why:** the guide must work for someone who has never deployed anything. I followed it
 > myself, in a clean copy of the repository, and wrote down every step that failed or was
 > ambiguous. Gate: none (feeds G12–G16).

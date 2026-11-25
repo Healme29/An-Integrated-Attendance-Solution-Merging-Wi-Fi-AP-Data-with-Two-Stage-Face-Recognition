@@ -1,5 +1,11 @@
 # Offline Fallback — One Page (G5)
 
+> **DO NOT FOLLOW — SUPERSEDED WORKING INSTRUCTIONS (2026-11-24).** Every Wi-Fi/ARP,
+> `REQUIRE_CLASSROOM_WIFI`, `/wifi/*`, `/schedules/*`, `ap_bssid`, `face_only` and 209-test
+> step below describes the archived `wifi-backup-prepull` branch (`a9ca24d`), not the code
+> at `011840a`. For deployment, demo steps, endpoints, configuration and fallback, use
+> `docs/B/current_system_qr.md` instead. Current system: `docs/B/current_system_qr.md` · direction decision: `docs/B/DECISIONS.md` D-015 · archived Wi-Fi code: branch `wifi-backup-prepull` (`a9ca24d`).
+
 > **Purpose:** the demo must run with **no internet at all**: no Docker Hub, no model
 > downloads, no campus DHCP surprises. This page is the fallback ladder. Read it on paper
 > at the demo; it is also reproduced in `docs/B/demo_runbook.md`.
