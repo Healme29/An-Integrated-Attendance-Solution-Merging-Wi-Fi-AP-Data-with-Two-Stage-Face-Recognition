@@ -24,6 +24,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   bool _isProcessing = false;
   bool _scannerDisposed = false;
 
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('MOBILE_SCANNER_ERROR screen_opened');
+  }
+
   /// Release the scanner camera *before* the selfie screen opens its own
   /// controller. Both plugins share the process-wide CameraX provider, so
   /// closing the scanner late (from [dispose]) unbinds the selfie camera's
@@ -56,6 +62,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     try {
       await _controller.start();
     } catch (e) {
+      debugPrint('MOBILE_SCANNER_ERROR restart_failed $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Still cannot open the camera: $e"), backgroundColor: Colors.red),
@@ -70,6 +77,11 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     MobileScannerException error,
     Widget? child,
   ) {
+    // Temporary diagnostics: surface the plugin's exact error in logcat
+    // (filter with: adb logcat | findstr MOBILE_SCANNER_ERROR).
+    debugPrint(
+      'MOBILE_SCANNER_ERROR code=${error.errorCode} details=${error.errorDetails}',
+    );
     final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
     final unsupported = error.errorCode == MobileScannerErrorCode.unsupported;
     final message = denied

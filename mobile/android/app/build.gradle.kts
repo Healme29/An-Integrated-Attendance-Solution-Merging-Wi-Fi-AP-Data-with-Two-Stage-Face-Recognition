@@ -34,6 +34,13 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Keep MLKit's reflection-loaded classes alive through R8, otherwise
+            // mobile_scanner cannot initialise its barcode scanner and the QR
+            // screen fails with MobileScannerErrorCode.genericError.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

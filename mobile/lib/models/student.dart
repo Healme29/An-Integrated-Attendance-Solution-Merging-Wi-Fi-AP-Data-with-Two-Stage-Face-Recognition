@@ -59,6 +59,68 @@ class QRSessionInfo {
   }
 }
 
+/// A student's own check-in status for one class session.
+///
+/// Built from `GET /attendance/student/{id}` (rows carry `qr_session_id`,
+/// `check_type`, `spot_round`, `timestamp`). The home screen uses it to show a
+/// permanent success card and to disable the scan button once the student has
+/// already checked in for the current phase.
+class SessionCheckInState {
+  final bool startDone;
+  final bool endDone;
+  final Set<int> spotRounds;
+  final String? startTime;
+  final String? endTime;
+
+  const SessionCheckInState({
+    this.startDone = false,
+    this.endDone = false,
+    this.spotRounds = const <int>{},
+    this.startTime,
+    this.endTime,
+  });
+
+  bool spotDone(int round) => spotRounds.contains(round);
+
+  /// Keep only the rows belonging to [sessionId] and summarise them.
+  factory SessionCheckInState.fromHistory(
+    List<Map<String, dynamic>> rows,
+    int sessionId,
+  ) {
+    var start = false;
+    var end = false;
+    String? startTime;
+    String? endTime;
+    final spots = <int>{};
+
+    for (final row in rows) {
+      final rowSession = row['qr_session_id'];
+      if (rowSession is! num || rowSession.toInt() != sessionId) continue;
+
+      final type = (row['check_type'] ?? 'start').toString();
+      final timestamp = row['timestamp']?.toString();
+      if (type == 'end') {
+        end = true;
+        endTime ??= timestamp;
+      } else if (type == 'spot') {
+        final round = row['spot_round'];
+        spots.add(round is num ? round.toInt() : 0);
+      } else {
+        start = true;
+        startTime ??= timestamp;
+      }
+    }
+
+    return SessionCheckInState(
+      startDone: start,
+      endDone: end,
+      spotRounds: spots,
+      startTime: startTime,
+      endTime: endTime,
+    );
+  }
+}
+
 class QRValidateResult {
   final bool valid;
   final int? sessionId;
