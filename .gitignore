@@ -9,6 +9,8 @@ build/
 # Database
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Model weights (large files)
 *.pt
