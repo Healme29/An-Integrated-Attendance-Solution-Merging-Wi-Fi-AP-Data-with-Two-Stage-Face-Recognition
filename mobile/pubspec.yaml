@@ -1,4 +1,4 @@
-name: face_attendance
+name: zhen_dao
 description: Face recognition attendance system with rotating QR code verification
 publish_to: 'none'
 version: 2.0.0+1

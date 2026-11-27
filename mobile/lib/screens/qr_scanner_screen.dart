@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:face_attendance/services/api_service.dart';
+import 'package:zhen_dao/services/api_service.dart';
 import 'camera_screen.dart';
 
 /// QR scanner screen: the student scans the rotating QR code that the teacher

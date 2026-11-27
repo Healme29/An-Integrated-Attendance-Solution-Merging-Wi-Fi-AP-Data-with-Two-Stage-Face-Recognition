@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:face_attendance/models/student.dart';
-import 'package:face_attendance/services/session_service.dart';
-import 'package:face_attendance/services/api_service.dart';
+import 'package:zhen_dao/models/student.dart';
+import 'package:zhen_dao/services/session_service.dart';
+import 'package:zhen_dao/services/api_service.dart';
 import 'enroll_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final session = _activeSession;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Student Attendance'),
+        title: const Text('真到'),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),

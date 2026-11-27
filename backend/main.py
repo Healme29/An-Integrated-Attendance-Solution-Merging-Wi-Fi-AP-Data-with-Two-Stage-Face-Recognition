@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Face Attendance API",
+    title="真到 API",
     description="Integrated attendance system with face recognition and rotating QR code verification",
     version="2.1.0",
     lifespan=lifespan
@@ -49,7 +49,7 @@ app.include_router(classes.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Face Attendance API is running", "docs": "/docs", "dashboard": "/dashboard"}
+    return {"message": "真到 API is running", "docs": "/docs", "dashboard": "/dashboard"}
 
 
 @app.get("/health")
