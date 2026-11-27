@@ -299,7 +299,66 @@ own weeks; nobody waits for A to hand out steps. Every member maintains
 
 ## 5. Progress Log (append newest entry at the top)
 
- (Docs: record room-level presence options and demo network status)
+### 2026-11-25 — A: database policy = current schema only; dev database rebuilt fresh (measured)
+
+- **Decision:** the project no longer supports the removed schedule-based database. `init_db`
+  used to *rebuild* such a file silently - it dropped `schedules`, `schedule_students`,
+  `ap_logs` and rewrote every attendance row to `qr_session_id=0`. That rebuild is gone;
+  a legacy file is now **refused at startup** with a `RuntimeError` that names the offending
+  tables and tells the operator to archive the file, start fresh, run
+  `seed_demo.py --reset` and re-enroll faces. Additive `ALTER TABLE ... ADD COLUMN` migrations
+  stay (a previous QR database upgrades with zero row changes).
+- **Verified against the real backups, not assumptions:**
+  `backups/attendance-prerun.db` (schedule era) -> refused, `schedules`/`attendance` rows still
+  present after the refusal (nothing deleted). `backups/attendance_before_v2_20261120_221811.db`
+  (QR v2.0) -> upgraded additively, 30 attendance + 4 session rows intact, only new columns.
+  Re-running `init_db` twice is a no-op.
+- **New contract tests:** `backend/tests/test_schema.py` (4 tests) - fresh-schema columns,
+  idempotency, legacy refusal without data loss, additive upgrade of a v2.0 database.
+  Suite **42 passed**.
+- **Dev database rebuilt on the current schema** (backup first:
+  `backups/fresh_20261125_215843/` = DB + `embeddings/` + `faces/`, 19 files):
+  `seed_demo.py --reset --students 5` -> 5 students, 1 class with 5 enrolled, 1 active
+  START-phase session; faces re-enrolled through the API from single-person photos only
+  (`reenroll_clean.py`: orang_1=1, orang_2=2, orang_3=3 -> **5 embeddings each**, 15 total).
+- **Evidence the rebuilt DB works:** smoke test **26/26** (two-stage flow, roster CSV, manual
+  attendance); held-out photos recognised as the correct student at **0.78 / 0.96 / 0.81**
+  cosine similarity (threshold 0.5); `/dashboard` 200; roster shows the enrolled class.
+- **Docs:** `AGENTS.md` now states the schema policy, the real six-table schema (including
+  `classes`, `class_students`, phase/spot/manual columns) and the missing endpoints
+  (`/teachers/*`, `/classes/*`, `/qr-sessions/phase`, `/qr-sessions/history`, `/attendance/roster`,
+  `/attendance/manual`); `docs/PROJECT_CONTEXT.md` §5 updated to match.
+- **Still open (unchanged):** the 2026-11-13 and 2026-11-17 log entries are still missing from
+  this file (lost in `0b5de11`, recoverable from `ab4b47b`); teacher credentials are env-only
+  with the default password; deleted test coverage for hardening/identity/anticheat is not
+  restored yet.
+
+### 2026-11-17 — Lead: room-level presence options recorded; demo network still to be measured
+
+- **Supervisor position restated (2026-11-16):** demo may run on a network we control; the
+  "coverage area of the scheduled AP" claim is accepted when stated honestly. The supervisor
+  later asked us to use the existing NJUPT Wi-Fi instead of a separate AP, so the campus SSID
+  is the current plan A and the portable hotspot stays the fallback.
+- **Wi-Fi scan from the dormitory (measured):** `subnet 10.163.182.0/24`, only the gateway
+  visible (`70:c6:dd:09:b0:02`), `bssid 54:2b:de:fd:90:21`, 1 device. Confirms the campus
+  client-isolation finding in a second location — a student in another room is invisible to
+  the scan there, but that is isolation, not a designed per-room check.
+- **Room-level presence analysis written down** in
+  `docs/meetings/2026-11-17_room_level_presence_notes.md`: what the system proves today
+  (network segment + server BSSID), the adjacent-classroom scenarios it cannot separate, and
+  the three practical differentiators (BLE beacon per room, rotating QR per room, AP
+  management plane). BLE is the recommended December-pilot candidate; the management plane
+  remains blocked by campus access policy (`docs/B/ap_management_plane.md` remains the
+  verdict).
+- **If AP admin access were granted:** a controller/SNMP query would resolve MAC → associated
+  AP → RSSI, turning the check into MAC visible + server BSSID + student's own AP/RSSI. This
+  is recorded as future work, not scope for the end-of-November demo.
+- **Teacher-facing simplification:** teachers must never type BSSID values; the proposed
+  "Detect Classroom AP" dashboard helper reads the server's current AP and fills the schedule
+  automatically. Deferred until after the presentation (D-005 scope freeze).
+- **Next:** re-measure `/wifi/scan` in the actual demo room before the rehearsal, then lock
+  the demo network path (campus AP vs hotspot). The results feed the dry run and the
+  limitations slide.
 
 ### 2026-11-09 — Team: timeline accelerated (presentation ~Nov 23, submission & demo end of November) + package redistribution recorded
 - **Replanning (drives this entry):** the team will be assessed at a presentation in about

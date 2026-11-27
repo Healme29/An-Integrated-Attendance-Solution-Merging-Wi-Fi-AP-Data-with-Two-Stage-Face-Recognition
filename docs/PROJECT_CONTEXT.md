@@ -147,13 +147,23 @@ project-root/
 
 ---
 
-## 5. Database schema (5 tables)
+## 5. Database schema (current QR session model)
 
-- **students**: id, name, nim (UNIQUE), mac_address, created_at
+Source of truth: `backend/models/database.py`; contract tests: `backend/tests/test_schema.py`.
+Sections 5-7 of this file predate the v2.1 QR redesign where not restated below.
+
+- **students**: id, name, nim (UNIQUE), mac_address (unused), created_at
 - **faces**: id, student_id → students.id, embedding (BLOB, pickled), image_path, created_at
-- **schedules**: id, class_name, day_of_week (0=Mon … 6=Sun), start_time "HH:MM", end_time "HH:MM", ap_bssid, room
-- **attendance**: id, student_id, schedule_id, check_type ('start'|'end'), confidence, wifi_verified (0/1), status, timestamp
-- **ap_logs**: id, mac_address, ip_address, bssid, ssid, scan_time (60 s dedupe window)
+- **classes**: id, class_name, room, created_by, created_at
+- **class_students**: id, class_id, student_id, added_at (UNIQUE(class_id, student_id))
+- **qr_sessions**: id, token, prev_token, token_rotated_at, created_by, class_id, class_name, room,
+  started_at, ended_at, is_active, phase ('start'|'end'|'closed'), spot_round, phase_started_at
+- **attendance**: id, student_id, qr_session_id, check_type ('start'|'end'|'spot'), spot_round,
+  confidence, ip_address, status, timestamp, faces_detected, manual_by, manual_at, manual_reason
+
+Removed tables (schedule-based design): `schedules`, `schedule_students`, `ap_logs`. A database
+containing them is **refused at startup** by design; archive it and start fresh. Migrations are
+additive only. There is no `teachers` table (login uses env credentials + in-memory token).
 
 ---
 

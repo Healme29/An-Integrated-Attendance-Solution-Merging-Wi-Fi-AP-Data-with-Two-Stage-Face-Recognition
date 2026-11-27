@@ -102,8 +102,13 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 - Enrollment hardening: JPEG/PNG magic-byte check, `MAX_UPLOAD_BYTES` cap (413), `MIN_FACE_BBOX_PX` filter, max `MAX_EMBEDDINGS_PER_STUDENT` samples per student
 - Removed in v2 (QR redesign): schedules/schedule-based rosters, per-student MAC collection,
   ARP scanning (`wifi_scanner.py`, scapy), two-stage start/end check-ins, auto-prompt polling
-- Database migration: an old schedule-based `attendance` table is rebuilt automatically on
-  startup (student/confidence/status/timestamp survive; `schedule_id` rows get `qr_session_id=0`)
+- **Database policy: current schema only.** Migrations are additive (`ALTER TABLE ... ADD COLUMN`);
+  a database from the removed schedule-based design is **refused at startup** with a clear
+  `RuntimeError` instead of being rebuilt (the old rebuild dropped `schedules`,
+  `schedule_students`, `ap_logs` and rewrote every attendance row to `qr_session_id=0`).
+  Keep such files in `backups/`, delete/rename the live `attendance.db`, restart, then restore
+  demo data with `python backend/scripts/seed_demo.py --reset` and re-enroll faces.
+  Contract tests: `backend/tests/test_schema.py`.
 
 ## API Endpoints
 
@@ -115,8 +120,19 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | DELETE | `/students/{id}` | Delete student |
 | POST | `/faces/enroll?student_id=` | Enroll face (upload image) |
 | POST | `/faces/recognize` | Recognize face (upload image) |
+| POST | `/teachers/login` | Teacher login (`{username, password}` -> bearer token, `TEACHER_TOKEN_HOURS`) |
+| POST | `/teachers/verify` | Check whether the current bearer token is still valid |
+| POST | `/teachers/logout` | Drop the bearer token |
+| POST | `/classes/` | Teacher creates a class (canonical session owner) |
+| GET | `/classes/` | List classes |
+| GET | `/classes/{id}/students` | Class roster (enrolled students) |
+| POST | `/classes/{id}/students` | Enroll students into a class (`{student_ids: [...]}`) |
+| DELETE | `/classes/{id}/students/{student_id}` | Remove one student from a class (profile is kept) |
+| DELETE | `/classes/{id}` | Delete a class (teacher auth) |
 | POST | `/qr-sessions/start` | Teacher starts a class session (auto-closes any active one) |
 | POST | `/qr-sessions/end` | Teacher ends the session (`{session_id?}`, returns total attendance) |
+| POST | `/qr-sessions/phase` | Teacher moves the phase: `start` \| `end` \| `closed` (`FINAL_CHECK_GRACE_MINUTES`) |
+| GET | `/qr-sessions/history` | Teacher's recent sessions (teacher auth) |
 | GET | `/qr-sessions/active` | Active session info (rotates the token when stale) |
 | GET | `/qr-sessions/active/token` | Current rotating token (lightweight dashboard poll) |
 | GET | `/qr-sessions/active/qr.png` | QR code image (PNG) of the current token for the LCD |
@@ -125,15 +141,28 @@ This machine: Flutter SDK at `C:\flutter` (on user PATH), Android SDK at `C:\And
 | GET | `/attendance/today?qr_session_id=` | Today's attendance (joined names, optional filter) |
 | GET | `/attendance/student/{id}` | Get student history (supports `limit`, `offset`, `date_from`, `date_to`; total in `X-Total-Count`) |
 | GET | `/attendance/export/csv?date=&qr_session_id=` | Export attendance as CSV |
+| GET | `/attendance/roster?qr_session_id=` | Class roster + attendance status for one session |
+| GET | `/attendance/export/csv?qr_session_id=` | Same endpoint: roster CSV when a session is given, raw check-in CSV otherwise |
+| POST | `/attendance/manual` | Teacher writes an audited manual attendance row after the session closes |
 | GET | `/dashboard` | Teacher web dashboard (HTML: QR + live attendance + students) |
 | GET | `/health` | Health check with database ping (503 on DB failure) |
 
 ## Database Schema
 
+Current schema is defined in `backend/models/database.py` (that file is the source of truth;
+`backend/tests/test_schema.py` asserts it).
+
 - **students**: id, name, nim, mac_address (unused), created_at
 - **faces**: id, student_id, embedding, image_path, created_at
-- **qr_sessions**: id, token, prev_token, token_rotated_at, created_by, class_name, room, started_at, ended_at, is_active
-- **attendance**: id, student_id, qr_session_id, confidence, ip_address, status, timestamp, faces_detected
+- **classes**: id, class_name, room, created_by, created_at
+- **class_students**: id, class_id, student_id, added_at (`UNIQUE(class_id, student_id)`)
+- **qr_sessions**: id, token, prev_token, token_rotated_at, created_by, class_id, class_name,
+  room, started_at, ended_at, is_active, phase (`start|end|closed`), spot_round, phase_started_at
+- **attendance**: id, student_id, qr_session_id, check_type (`start|end|spot`), spot_round,
+  confidence, ip_address, status, timestamp, faces_detected, manual_by, manual_at, manual_reason
+
+There is no `teachers` table: teacher login uses `TEACHER_USERNAME`/`TEACHER_PASSWORD` env vars
+and an in-memory bearer token, so restarting the server logs every teacher out.
 
 ## Setup Steps
 
