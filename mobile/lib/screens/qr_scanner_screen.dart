@@ -46,6 +46,69 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     super.dispose();
   }
 
+  /// Restart the scanner camera after a failure (permission granted late,
+  /// camera still held by another app, or the preview was unbound).
+  Future<void> _restartScanner() async {
+    if (_scannerDisposed) return;
+    try {
+      await _controller.stop();
+    } catch (_) {/* not running */}
+    try {
+      await _controller.start();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Still cannot open the camera: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  /// Shown instead of the default black screen with an error icon, so a student
+  /// can see *why* the camera did not start and recover without reinstalling.
+  Widget _buildCameraError(
+    BuildContext context,
+    MobileScannerException error,
+    Widget? child,
+  ) {
+    final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
+    final unsupported = error.errorCode == MobileScannerErrorCode.unsupported;
+    final message = denied
+        ? "Camera permission is blocked. Open Settings > Apps > Zhen Dao > "
+            "Permissions, allow Camera, then press Retry."
+        : unsupported
+            ? "This device cannot scan QR codes with its camera."
+            : "The camera could not start. Close other apps that use the "
+                "camera (or lock and unlock the screen), then press Retry.";
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.no_photography, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              "Camera unavailable",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _restartScanner,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Retry"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
     final raw = capture.barcodes.firstOrNull?.rawValue;
@@ -114,42 +177,53 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Scan Class QR Code")),
-      body: Stack(
-        children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-          ),
-          Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 3),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+      // The framing square and the hint would sit on top of the error message,
+      // so they are hidden while the scanner reports a camera problem.
+      body: ValueListenableBuilder<MobileScannerState>(
+        valueListenable: _controller,
+        builder: (context, state, _) {
+          final hasError = state.error != null;
+          return Stack(
+            children: [
+              MobileScanner(
+                controller: _controller,
+                onDetect: _onDetect,
+                errorBuilder: _buildCameraError,
               ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                "Fit the classroom QR inside the square.\nHold still until it is detected.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-          if (_isProcessing)
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
-        ],
+              if (!hasError)
+                Center(
+                  child: Container(
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white, width: 3),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+                    ),
+                  ),
+                ),
+              if (!hasError)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      "Fit the classroom QR inside the square.\nHold still until it is detected.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              if (_isProcessing)
+                const Center(child: CircularProgressIndicator(color: Colors.white)),
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,305 +1,305 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-store">
-<title>真到 ÔÇö Teacher Dashboard</title>
-<style>
-  :root {
-    --bg:#f4f7fb; --card:#fff; --navy:#173b67; --blue:#1f64d6; --blue-dark:#174da7;
-    --green:#087f5b; --amber:#b76000; --red:#c92a2a; --gray:#64748b; --line:#dbe4ee;
-  }
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#172033;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-  header{background:var(--navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}
-  header h1{font-size:21px;margin:0} header p{margin:3px 0 0;opacity:.8;font-size:13px}
-  main{max-width:1180px;margin:22px auto;padding:0 16px;display:grid;gap:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 8px #173b6708}
-  .card h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.wide{grid-column:1/-1}
-  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.grow{flex:1;min-width:190px}
-  label{font-size:12px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px}
-  input,select{width:100%;padding:11px 12px;border:1px solid #bdccdc;border-radius:8px;font:inherit;background:#fff}
-  button{border:0;border-radius:8px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}
-  button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--blue);color:#fff}.primary:hover{background:var(--blue-dark)}
-  .warning{background:#e8930c;color:#201300}.danger{background:var(--red);color:#fff}.secondary{background:#e9eff7;color:var(--navy)}
-  .success{background:var(--green);color:#fff}.small{padding:7px 10px;font-size:12px}
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.step{padding:12px;border-radius:9px;background:#eef2f7;text-align:center;color:var(--gray);font-weight:700}
-  .step.active{background:#dceaff;color:var(--blue-dark);outline:2px solid #8fb5ef}.step.done{background:#dcf4e9;color:var(--green)}
-  .qr-wrap{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:center}.qr-box{text-align:center}
-  .qr-box img{width:310px;max-width:100%;border:10px solid #fff;border-radius:12px;box-shadow:0 4px 20px #0002}
-  .token{font:700 24px ui-monospace,monospace;letter-spacing:5px;margin-top:8px}.hint{color:var(--gray);font-size:13px;margin-top:8px}
-  .phase-title{font-size:24px;color:var(--navy);margin:0 0 8px}.phase-help{font-size:16px;margin-bottom:16px}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
-  .stat b{display:block;font-size:27px}.stat span{font-size:12px;color:var(--gray)}
-  table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 9px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--gray)}
-  .badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;white-space:nowrap}
-  .verified{background:#d3f4e5;color:#066143}.partial{background:#fff0ce;color:#8b4a00}.pending{background:#e8edf3;color:#526174}.absent{background:#ffe0e0;color:#a31515}.manual-note{font-size:10px;margin-left:4px}
-  .scroll{overflow-x:auto}.empty{text-align:center;color:var(--gray);padding:28px}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#10233c;color:#fff;padding:12px 20px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:100;max-width:90vw}
-  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #login{position:fixed;inset:0;background:#10233cdd;display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
-  #login .modal{background:#fff;padding:28px;border-radius:14px;width:100%;max-width:390px;box-shadow:0 20px 60px #0005}
-  #login h2{margin-top:0}.error{color:var(--red);font-size:13px;min-height:20px;margin-top:8px}
-  .top-link{color:#fff;background:#ffffff1c;text-decoration:none;padding:8px 12px;border-radius:8px;border:0}
-  .roster-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-  .student-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;gap:8px}
-  details summary{cursor:pointer;font-weight:700;color:var(--blue);margin:10px 0}.notice{background:#eaf2ff;border-left:4px solid var(--blue);padding:12px;border-radius:7px;color:#294769}
-  body.projector main{margin:0;max-width:none;padding:0}body.projector header,body.projector .no-projector{display:none!important}
-  body.projector #sessionCard{border:0;box-shadow:none;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
-  body.projector .qr-wrap{grid-template-columns:1fr 1fr;max-width:1200px;margin:auto}body.projector .qr-box img{width:min(70vh,90%)}
-  @media(max-width:780px){.grid,.qr-wrap{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.steps{font-size:12px}.card{padding:15px}header{padding:14px 16px}.qr-box img{width:270px}}
-</style>
-</head>
-<body>
-<header class="no-projector">
-  <div><h1>真到</h1><p>Teacher Dashboard ┬À two-stage QR + face verification</p></div>
-  <div class="row"><span id="teacherName"></span><button class="top-link" id="logoutBtn">Log out</button></div>
-</header>
-<main>
-  <section class="card no-projector" id="classCard">
-    <h2>1. Prepare the class</h2>
-    <div class="notice">Choose a class, enroll its students, then start. Only students in this class can check in.</div>
-    <div class="row" style="margin-top:14px">
-      <div class="grow"><label for="classSelect">Class</label><select id="classSelect"></select></div>
-      <div style="align-self:end"><button class="secondary" id="newClassBtn">+ New class</button></div>
-      <div style="align-self:end"><button class="danger small" id="deleteClassBtn">­ƒùæ Delete class</button></div>
-      <div style="align-self:end"><button class="primary" id="startBtn">ÔûÂ Start Class Session</button></div>
-    </div>
-    <div id="classForm" class="row" style="display:none;margin-top:12px">
-      <div class="grow"><label for="className">Class name</label><input id="className" placeholder="e.g. Mathematics A"></div>
-      <div class="grow"><label for="classRoom">Room (optional)</label><input id="classRoom" placeholder="e.g. Lab 101"></div>
-      <div style="align-self:end"><button class="primary" id="createClassBtn">Create class</button></div>
-    </div>
-    <details id="enrollmentDetails">
-      <summary>Manage students in the selected class</summary>
-      <div class="grid">
-        <div>
-          <label for="existingStudent">Enroll an existing student</label>
-          <div class="row"><select id="existingStudent" class="grow"></select><button class="secondary" id="enrollBtn">Enroll</button></div>
-          <label style="margin-top:14px">Or add a new student</label>
-          <div class="row"><input id="newName" class="grow" placeholder="Full name"><input id="newNim" class="grow" placeholder="NIM"><button class="secondary" id="addStudentBtn">Add &amp; enroll</button></div>
-        </div>
-        <div><label>Enrolled students (<span id="enrolledCount">0</span>)</label><div id="enrolledList" class="empty">Select a class first.</div></div>
-      </div>
-    </details>
-  </section>
-
-  <section class="card wide" id="sessionCard">
-    <div class="roster-toolbar"><h2>Class Session &amp; QR Code</h2><button class="secondary small no-projector" id="projectorBtn">ÔøÂ Projector mode</button></div>
-    <div class="steps no-projector">
-      <div class="step" id="stepStart">1 ┬À Start check-in</div><div class="step" id="stepEnd">2 ┬À Final check-in</div><div class="step" id="stepClosed">3 ┬À Session closed</div>
-    </div>
-    <div id="noSession" class="empty no-projector">No active session. Prepare a class above and press <b>Start Class Session</b>.</div>
-    <div id="sessionActive" style="display:none">
-      <div class="qr-wrap">
-        <div class="qr-box"><img id="qrImage" alt="Rotating class QR code"><div class="token" id="qrToken">------</div><div class="hint">QR rotates every 5 seconds. Students scan this screen, then take a selfie.</div></div>
-        <div class="no-projector">
-          <h3 class="phase-title" id="phaseTitle">Start check-in</h3>
-          <p class="phase-help" id="phaseHelp"></p>
-          <div class="row">
-            <button class="warning" id="finalBtn">ÔÅ¡ Start Final Attendance</button>
-            <button class="secondary" id="spotBtn">´╝ï Optional Spot Check</button>
-            <button class="secondary" id="resumeBtn" style="display:none">ÔåÉ Resume Class</button>
-            <button class="danger" id="endBtn">ÔÅ╣ End Session</button>
-          </div>
-          <p class="hint" id="phaseFootnote"></p>
-        </div>
-      </div>
-    </div>
-    <div id="sessionClosed" class="empty no-projector" style="display:none"><b>Session closed.</b> Review the final roster below. You can mark a student present manually if they spoke to you after class.</div>
-  </section>
-
-  <section class="card wide no-projector">
-    <div class="roster-toolbar">
-      <h2 style="margin:0">Class Roster <span id="rosterSubtitle" class="hint"></span></h2>
-      <div class="row">
-        <select id="historySelect" style="width:auto;min-width:210px"></select>
-        <button class="secondary small" id="refreshRosterBtn">Ôå╗ Refresh</button>
-        <button class="success small" id="exportBtn">­ƒôÑ Download CSV</button>
-      </div>
-    </div>
-    <div class="stats" style="margin-bottom:14px">
-      <div class="stat"><b id="verifiedCount">0</b><span>Verified</span></div>
-      <div class="stat"><b id="partialCount">0</b><span>Partial</span></div>
-      <div class="stat"><b id="pendingCount">0</b><span>Pending / Absent</span></div>
-      <div class="stat"><b id="totalCount">0</b><span>Students</span></div>
-    </div>
-    <div class="scroll"><table>
-      <thead><tr><th>NIM</th><th>Name</th><th>Status</th><th>Start time</th><th>End time</th><th>Confidence</th><th>Action</th></tr></thead>
-      <tbody id="rosterBody"><tr><td colspan="7" class="empty">Start a session or choose a previous one.</td></tr></tbody>
-    </table></div>
-  </section>
-</main>
-<div id="toast"></div>
-<div id="login">
-  <form class="modal" id="loginForm">
-    <h2>Teacher Login</h2>
-    <p class="hint">Sign in to manage classes and attendance.</p>
-    <label for="username">Username</label><input id="username" autocomplete="username" value="teacher" required>
-    <label for="password" style="margin-top:10px">Password</label><input id="password" type="password" autocomplete="current-password" required>
-    <div class="error" id="loginError"></div>
-    <button class="primary" type="submit" style="width:100%">Log in</button>
-    <p class="hint">Demo account: teacher / attendance2026</p>
-  </form>
-</div>
-<script>
-let token = localStorage.getItem('teacherToken') || '';
-let teacher = localStorage.getItem('teacherName') || '';
-let active = null;
-let viewingSessionId = null;
-let viewingClosed = false;
-let classes = [];
-let students = [];
-let projector = new URLSearchParams(location.search).get('projector') === '1';
-if (projector) document.body.classList.add('projector');
-
-const $ = id => document.getElementById(id);
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el.t); el.t=setTimeout(()=>el.classList.remove('show'),3200); }
-function headers(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
-async function api(path, options={}){
-  options.headers = {...headers(), ...(options.headers||{})};
-  const response = await fetch(path, options);
-  if(response.status===401 && !path.includes('/teachers/login')){ showLogin(); throw new Error('Teacher login required'); }
-  if(!response.ok){ let message=response.statusText; try{message=(await response.json()).detail||message;}catch(e){} throw new Error(message); }
-  return response.json();
-}
-function showLogin(){ if(projector) return; $('login').style.display='flex'; }
-function hideLogin(){ $('login').style.display='none'; }
-$('loginForm').onsubmit = async event => {
-  event.preventDefault();
-  try{
-    const result=await api('/teachers/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});
-    token=result.token; teacher=result.teacher;
-    localStorage.setItem('teacherToken',token); localStorage.setItem('teacherName',teacher);
-    $('teacherName').textContent=teacher; hideLogin(); await initializeDashboard(); toast('Welcome, '+teacher);
-  }catch(e){ $('loginError').textContent=e.message; }
-};
-$('logoutBtn').onclick=()=>{ localStorage.removeItem('teacherToken');localStorage.removeItem('teacherName');token='';teacher='';showLogin(); };
-
-async function loadClasses(){
-  classes=await api('/classes/');
-  const select=$('classSelect');
-  const previous=select.value;
-  select.innerHTML=classes.length?classes.map(c=>`<option value="${c.id}">${esc(c.class_name)}${c.room?' ┬À '+esc(c.room):''}</option>`).join(''):'<option value="">Create a class first</option>';
-  if(previous && classes.some(c=>String(c.id)===previous)) select.value=previous;
-  await refreshEnrolled();
-}
-async function loadStudents(){
-  students=await api('/students/');
-  $('existingStudent').innerHTML=students.length?students.map(s=>`<option value="${s.id}">${esc(s.nim)} ┬À ${esc(s.name)}</option>`).join(''):'<option value="">No students yet</option>';
-}
-async function refreshEnrolled(){
-  const cid=$('classSelect').value;
-  if(!cid){ $('enrolledList').textContent='Create a class first.'; $('enrolledCount').textContent='0'; return; }
-  const rows=await api('/classes/'+cid+'/students');
-  $('enrolledCount').textContent=rows.length;
-  $('enrolledList').className=rows.length?'':'empty';
-  $('enrolledList').innerHTML=rows.length?rows.map(s=>`<div class="student-row"><span><b>${esc(s.student_nim)}</b> ┬À ${esc(s.student_name)}</span><button class="secondary small" onclick="removeStudent(${cid},${s.student_id})">Remove</button></div>`).join(''):'No students enrolled yet.';
-}
-$('classSelect').onchange=refreshEnrolled;
-$('deleteClassBtn').onclick=async()=>{
-  const cid=Number($('classSelect').value);
-  if(!cid) return toast('Choose a class first');
-  const name=$('classSelect').selectedOptions[0]?.text||'this class';
-  if(!confirm(`Delete class "${esc(name)}"?\nThis removes all student enrollments for this class.`)) return;
-  try{
-    await api('/classes/'+cid,{method:'DELETE'});
-    toast('Class deleted');
-    await loadClasses();
-  }catch(e){ toast(e.message); }
-};
-$('newClassBtn').onclick=()=>{ $('classForm').style.display=$('classForm').style.display==='none'?'flex':'none'; };
-$('createClassBtn').onclick=async()=>{
-  const name=$('className').value.trim(); if(!name)return toast('Enter a class name');
-  try{ const created=await api('/classes/',{method:'POST',body:JSON.stringify({class_name:name,room:$('classRoom').value.trim()||null})});
-    $('className').value='';$('classRoom').value='';$('classForm').style.display='none';await loadClasses();$('classSelect').value=created.id;await refreshEnrolled();$('enrollmentDetails').open=true;toast('Class created. Add students next.');
-  }catch(e){toast(e.message);}
-};
-$('enrollBtn').onclick=async()=>{
-  const cid=$('classSelect').value,sid=$('existingStudent').value;if(!cid||!sid)return toast('Choose a class and student');
-  try{await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:Number(sid)})});await refreshEnrolled();toast('Student enrolled');}catch(e){toast(e.message);}
-};
-$('addStudentBtn').onclick=async()=>{
-  const cid=$('classSelect').value,name=$('newName').value.trim(),nim=$('newNim').value.trim();
-  if(!cid||!name||!nim)return toast('Class, name, and NIM are required');
-  try{const s=await api('/students/',{method:'POST',body:JSON.stringify({name,nim})});await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:s.id})});$('newName').value='';$('newNim').value='';await Promise.all([loadStudents(),refreshEnrolled()]);toast('Student added and enrolled');}catch(e){toast(e.message);}
-};
-window.removeStudent=async(cid,sid)=>{if(!confirm('Remove this student from the class?'))return;try{await api('/classes/'+cid+'/students/'+sid,{method:'DELETE'});await refreshEnrolled();}catch(e){toast(e.message);}};
-$('startBtn').onclick=async()=>{
-  const cid=Number($('classSelect').value);if(!cid)return toast('Create and select a class first');
-  if(Number($('enrolledCount').textContent)===0){$('enrollmentDetails').open=true;return toast('Add at least one student before starting');}
-  if(!confirm('Start the class session now?\nThe start QR will appear for students to scan and take their first selfie.'))return;
-  try{await api('/qr-sessions/start',{method:'POST',body:JSON.stringify({class_id:cid})});viewingClosed=false;await pollActive();toast('START phase opened. Students can scan the QR.');}catch(e){toast(e.message);}
-};
-
-function phaseContent(phase){
-  if(phase==='start')return {title:'STEP 1 ┬À Start check-in',help:'Students scan this QR and take their FIRST selfie. Successful students appear as Partial (yellow) in the roster.',foot:'When the class is almost finished, press Start Final Attendance.'};
-  if(phase==='spot')return {title:'OPTIONAL ┬À Spot check',help:'Students with a start check-in scan this QR and take another selfie. This helps confirm they are still present.',foot:'Resume the class or continue to Final Attendance.'};
-  return {title:'STEP 2 ┬À Final check-in',help:'Students scan this NEW QR and take their FINAL selfie. Students with both selfies become Verified (green).',foot:'The final phase closes automatically after the configured grace period, or press End Session.'};
-}
-function renderActive(data){
-  active=data && data.active?data:null;
-  const has=!!active;
-  $('noSession').style.display=has?'none':'block';
-  $('sessionActive').style.display=has?'block':'none';
-  $('sessionClosed').style.display=(!has&&viewingClosed)?'block':'none';
-  ['stepStart','stepEnd','stepClosed'].forEach(id=>$(id).className='step');
-  $('finalBtn').style.display='none';$('spotBtn').style.display='none';$('resumeBtn').style.display='none';$('endBtn').style.display='none';
-  if(!has){ if(viewingClosed)$('stepClosed').className='step active'; return; }
-  viewingSessionId=active.session_id;
-  $('endBtn').style.display='inline-block';
-  const phase=active.phase||'start', content=phaseContent(phase);
-  $('phaseTitle').textContent=content.title;$('phaseHelp').textContent=content.help;$('phaseFootnote').textContent=content.foot;
-  $('qrToken').textContent=active.token;$('qrImage').src='/qr-sessions/active/qr.png?v='+Date.now();
-  if(phase==='start'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('spotBtn').style.display='inline-block';}
-  else if(phase==='spot'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('resumeBtn').style.display='inline-block';}
-  else{$('stepStart').className='step done';$('stepEnd').className='step active';$('endBtn').style.display='inline-block';}
-}
-async function pollActive(){try{const data=await api('/qr-sessions/active');if(!viewingClosed)renderActive(data);if(!viewingClosed)viewingSessionId=data.active?data.session_id:viewingSessionId;if(!projector)await refreshRoster();}catch(e){if(!projector)toast(e.message);}}
-async function changePhase(phase,confirmText){if(confirmText&&!confirm(confirmText))return;try{await api('/qr-sessions/phase',{method:'POST',body:JSON.stringify({phase})});viewingClosed=false;await pollActive();toast(phase==='end'?'FINAL phase opened. Students scan the new QR.':'Session phase updated');}catch(e){toast(e.message);}}
-$('finalBtn').onclick=()=>changePhase('end','Start Final Attendance now?\nStart check-ins will close and a NEW final QR will appear.');
-$('spotBtn').onclick=()=>changePhase('spot','Open an optional mid-class spot check?\nStudents with a start check-in will scan a new QR.');
-$('resumeBtn').onclick=()=>changePhase('start',null);
-$('endBtn').onclick=async()=>{if(!confirm('End this class session?\nNo more check-ins will be accepted. The final roster stays available.'))return;try{await api('/qr-sessions/end',{method:'POST',body:JSON.stringify({session_id:viewingSessionId})});viewingClosed=true;renderActive({active:false});await Promise.all([refreshRoster(),loadHistory()]);toast('Session closed. Review the final roster.');}catch(e){toast(e.message);}};
-$('projectorBtn').onclick=()=>{window.open('/dashboard?projector=1','_blank','noopener');};
-
-async function refreshRoster(){
-  if(!viewingSessionId)return;
-  try{
-    const rows=await api('/attendance/roster?qr_session_id='+viewingSessionId);
-    const body=$('rosterBody');
-    body.innerHTML=rows.length?rows.map(r=>{
-      const confidence=r.end_confidence??r.start_confidence;
-      const canManual=viewingClosed&&r.status!=='verified';
-      return `<tr><td>${esc(r.student_nim)}</td><td>${esc(r.student_name)}</td><td><span class="badge ${r.status}">${r.status.toUpperCase()}</span>${r.manual?'<span class="manual-note">MANUAL</span>':''}</td><td>${esc((r.start_time||'-').split(' ')[1]||r.start_time||'-')}</td><td>${esc((r.end_time||'-').split(' ')[1]||r.end_time||'-')}</td><td>${confidence==null?'-':(confidence*100).toFixed(1)+'%'}</td><td>${canManual?`<button class="success small" onclick="markManual(${r.student_id})">Ô£ô Mark present</button>`:''}</td></tr>`;
-    }).join(''):'<tr><td colspan="7" class="empty">No enrolled students in this class.</td></tr>';
-    $('verifiedCount').textContent=rows.filter(r=>r.status==='verified').length;
-    $('partialCount').textContent=rows.filter(r=>r.status==='partial').length;
-    $('pendingCount').textContent=rows.filter(r=>r.status==='pending'||r.status==='absent').length;
-    $('totalCount').textContent=rows.length;
-  }catch(e){if(!projector)toast(e.message);}
-}
-window.markManual=async(studentId)=>{if(!confirm('Mark this student as Verified (manual)?\nUse this only after the student spoke to you about why they could not check in.'))return;try{await api('/attendance/manual',{method:'POST',body:JSON.stringify({student_id:studentId,qr_session_id:viewingSessionId})});await refreshRoster();toast('Student marked Verified (manual)');}catch(e){toast(e.message);}};
-$('refreshRosterBtn').onclick=refreshRoster;
-$('exportBtn').onclick=()=>{if(!viewingSessionId)return toast('Choose a session first');window.open('/attendance/export/csv?qr_session_id='+viewingSessionId,'_blank');};
-async function loadHistory(){
-  const sessions=await api('/qr-sessions/history?limit=15');const select=$('historySelect');const previous=viewingSessionId;
-  select.innerHTML='<option value="">Choose a sessionÔÇª</option>'+sessions.map(s=>`<option value="${s.id}">#${s.id} ┬À ${esc(s.class_name)} ┬À ${s.phase==='closed'?'Closed':esc(s.phase)} ┬À ${esc((s.started_at||'').slice(0,16))}</option>`).join('');
-  if(previous&&sessions.some(s=>s.id===previous))select.value=previous;
-}
-$('historySelect').onchange=async()=>{const value=$('historySelect').value;if(!value)return;viewingSessionId=Number(value);const text=$('historySelect').selectedOptions[0].textContent;viewingClosed=text.includes('Closed');renderActive(viewingClosed?{active:false}:active);await refreshRoster();};
-
-async function initializeDashboard(){
-  $('teacherName').textContent=teacher;
-  await Promise.all([loadClasses(),loadStudents(),loadHistory()]);
-  await pollActive();
-}
-(async function init(){
-  if(projector){viewingClosed=false;setInterval(async()=>{try{const data=await api('/qr-sessions/active');renderActive(data);}catch(e){}},3000);await pollActive();return;}
-  if(!token){showLogin();return;}
-  try{const valid=await api('/teachers/verify',{method:'POST',body:JSON.stringify({token})});if(!valid.valid){showLogin();return;}hideLogin();await initializeDashboard();setInterval(()=>{if(!viewingClosed)pollActive();},5000);}catch(e){showLogin();}
-})();
-</script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>真到 — Teacher Dashboard</title>
+<style>
+  :root {
+    --bg:#f4f7fb; --card:#fff; --navy:#173b67; --blue:#1f64d6; --blue-dark:#174da7;
+    --green:#087f5b; --amber:#b76000; --red:#c92a2a; --gray:#64748b; --line:#dbe4ee;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#172033;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{background:var(--navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  header h1{font-size:21px;margin:0} header p{margin:3px 0 0;opacity:.8;font-size:13px}
+  main{max-width:1180px;margin:22px auto;padding:0 16px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 8px #173b6708}
+  .card h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.wide{grid-column:1/-1}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.grow{flex:1;min-width:190px}
+  label{font-size:12px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px}
+  input,select{width:100%;padding:11px 12px;border:1px solid #bdccdc;border-radius:8px;font:inherit;background:#fff}
+  button{border:0;border-radius:8px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--blue);color:#fff}.primary:hover{background:var(--blue-dark)}
+  .warning{background:#e8930c;color:#201300}.danger{background:var(--red);color:#fff}.secondary{background:#e9eff7;color:var(--navy)}
+  .success{background:var(--green);color:#fff}.small{padding:7px 10px;font-size:12px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.step{padding:12px;border-radius:9px;background:#eef2f7;text-align:center;color:var(--gray);font-weight:700}
+  .step.active{background:#dceaff;color:var(--blue-dark);outline:2px solid #8fb5ef}.step.done{background:#dcf4e9;color:var(--green)}
+  .qr-wrap{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:center}.qr-box{text-align:center}
+  .qr-box img{width:310px;max-width:100%;border:10px solid #fff;border-radius:12px;box-shadow:0 4px 20px #0002}
+  .token{font:700 24px ui-monospace,monospace;letter-spacing:5px;margin-top:8px}.hint{color:var(--gray);font-size:13px;margin-top:8px}
+  .phase-title{font-size:24px;color:var(--navy);margin:0 0 8px}.phase-help{font-size:16px;margin-bottom:16px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .stat b{display:block;font-size:27px}.stat span{font-size:12px;color:var(--gray)}
+  table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 9px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--gray)}
+  .badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+  .verified{background:#d3f4e5;color:#066143}.partial{background:#fff0ce;color:#8b4a00}.pending{background:#e8edf3;color:#526174}.absent{background:#ffe0e0;color:#a31515}.manual-note{font-size:10px;margin-left:4px}
+  .scroll{overflow-x:auto}.empty{text-align:center;color:var(--gray);padding:28px}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#10233c;color:#fff;padding:12px 20px;border-radius:9px;opacity:0;transition:.2s;pointer-events:none;z-index:100;max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #login{position:fixed;inset:0;background:#10233cdd;display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
+  #login .modal{background:#fff;padding:28px;border-radius:14px;width:100%;max-width:390px;box-shadow:0 20px 60px #0005}
+  #login h2{margin-top:0}.error{color:var(--red);font-size:13px;min-height:20px;margin-top:8px}
+  .top-link{color:#fff;background:#ffffff1c;text-decoration:none;padding:8px 12px;border-radius:8px;border:0}
+  .roster-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .student-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;gap:8px}
+  details summary{cursor:pointer;font-weight:700;color:var(--blue);margin:10px 0}.notice{background:#eaf2ff;border-left:4px solid var(--blue);padding:12px;border-radius:7px;color:#294769}
+  body.projector main{margin:0;max-width:none;padding:0}body.projector header,body.projector .no-projector{display:none!important}
+  body.projector #sessionCard{border:0;box-shadow:none;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+  body.projector .qr-wrap{grid-template-columns:1fr 1fr;max-width:1200px;margin:auto}body.projector .qr-box img{width:min(70vh,90%)}
+  @media(max-width:780px){.grid,.qr-wrap{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.steps{font-size:12px}.card{padding:15px}header{padding:14px 16px}.qr-box img{width:270px}}
+</style>
+</head>
+<body>
+<header class="no-projector">
+  <div><h1>真到</h1><p>Teacher Dashboard · two-stage QR + face verification</p></div>
+  <div class="row"><span id="teacherName"></span><button class="top-link" id="logoutBtn">Log out</button></div>
+</header>
+<main>
+  <section class="card no-projector" id="classCard">
+    <h2>1. Prepare the class</h2>
+    <div class="notice">Choose a class, enroll its students, then start. Only students in this class can check in.</div>
+    <div class="row" style="margin-top:14px">
+      <div class="grow"><label for="classSelect">Class</label><select id="classSelect"></select></div>
+      <div style="align-self:end"><button class="secondary" id="newClassBtn">+ New class</button></div>
+      <div style="align-self:end"><button class="danger small" id="deleteClassBtn">🗑 Delete class</button></div>
+      <div style="align-self:end"><button class="primary" id="startBtn">▶ Start Class Session</button></div>
+    </div>
+    <div id="classForm" class="row" style="display:none;margin-top:12px">
+      <div class="grow"><label for="className">Class name</label><input id="className" placeholder="e.g. Mathematics A"></div>
+      <div class="grow"><label for="classRoom">Room (optional)</label><input id="classRoom" placeholder="e.g. Lab 101"></div>
+      <div style="align-self:end"><button class="primary" id="createClassBtn">Create class</button></div>
+    </div>
+    <details id="enrollmentDetails">
+      <summary>Manage students in the selected class</summary>
+      <div class="grid">
+        <div>
+          <label for="existingStudent">Enroll an existing student</label>
+          <div class="row"><select id="existingStudent" class="grow"></select><button class="secondary" id="enrollBtn">Enroll</button></div>
+          <label style="margin-top:14px">Or add a new student</label>
+          <div class="row"><input id="newName" class="grow" placeholder="Full name"><input id="newNim" class="grow" placeholder="NIM"><button class="secondary" id="addStudentBtn">Add &amp; enroll</button></div>
+        </div>
+        <div><label>Enrolled students (<span id="enrolledCount">0</span>)</label><div id="enrolledList" class="empty">Select a class first.</div></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card wide" id="sessionCard">
+    <div class="roster-toolbar"><h2>Class Session &amp; QR Code</h2><button class="secondary small no-projector" id="projectorBtn">⛶ Projector mode</button></div>
+    <div class="steps no-projector">
+      <div class="step" id="stepStart">1 · Start check-in</div><div class="step" id="stepEnd">2 · Final check-in</div><div class="step" id="stepClosed">3 · Session closed</div>
+    </div>
+    <div id="noSession" class="empty no-projector">No active session. Prepare a class above and press <b>Start Class Session</b>.</div>
+    <div id="sessionActive" style="display:none">
+      <div class="qr-wrap">
+        <div class="qr-box"><img id="qrImage" alt="Rotating class QR code"><div class="token" id="qrToken">------</div><div class="hint">QR rotates every 5 seconds. Students scan this screen, then take a selfie.</div></div>
+        <div class="no-projector">
+          <h3 class="phase-title" id="phaseTitle">Start check-in</h3>
+          <p class="phase-help" id="phaseHelp"></p>
+          <div class="row">
+            <button class="warning" id="finalBtn">⏭ Start Final Attendance</button>
+            <button class="secondary" id="spotBtn">＋ Optional Spot Check</button>
+            <button class="secondary" id="resumeBtn" style="display:none">← Resume Class</button>
+            <button class="danger" id="endBtn">⏹ End Session</button>
+          </div>
+          <p class="hint" id="phaseFootnote"></p>
+        </div>
+      </div>
+    </div>
+    <div id="sessionClosed" class="empty no-projector" style="display:none"><b>Session closed.</b> Review the final roster below. You can mark a student present manually if they spoke to you after class.</div>
+  </section>
+
+  <section class="card wide no-projector">
+    <div class="roster-toolbar">
+      <h2 style="margin:0">Class Roster <span id="rosterSubtitle" class="hint"></span></h2>
+      <div class="row">
+        <select id="historySelect" style="width:auto;min-width:210px"></select>
+        <button class="secondary small" id="refreshRosterBtn">↻ Refresh</button>
+        <button class="success small" id="exportBtn">📥 Download CSV</button>
+      </div>
+    </div>
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><b id="verifiedCount">0</b><span>Verified</span></div>
+      <div class="stat"><b id="partialCount">0</b><span>Partial</span></div>
+      <div class="stat"><b id="pendingCount">0</b><span>Pending / Absent</span></div>
+      <div class="stat"><b id="totalCount">0</b><span>Students</span></div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>NIM</th><th>Name</th><th>Status</th><th>Start time</th><th>End time</th><th>Confidence</th><th>Action</th></tr></thead>
+      <tbody id="rosterBody"><tr><td colspan="7" class="empty">Start a session or choose a previous one.</td></tr></tbody>
+    </table></div>
+  </section>
+</main>
+<div id="toast"></div>
+<div id="login">
+  <form class="modal" id="loginForm">
+    <h2>Teacher Login</h2>
+    <p class="hint">Sign in to manage classes and attendance.</p>
+    <label for="username">Username</label><input id="username" autocomplete="username" value="teacher" required>
+    <label for="password" style="margin-top:10px">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <div class="error" id="loginError"></div>
+    <button class="primary" type="submit" style="width:100%">Log in</button>
+    <p class="hint">Demo account: teacher / attendance2026</p>
+  </form>
+</div>
+<script>
+let token = localStorage.getItem('teacherToken') || '';
+let teacher = localStorage.getItem('teacherName') || '';
+let active = null;
+let viewingSessionId = null;
+let viewingClosed = false;
+let classes = [];
+let students = [];
+let projector = new URLSearchParams(location.search).get('projector') === '1';
+if (projector) document.body.classList.add('projector');
+
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el.t); el.t=setTimeout(()=>el.classList.remove('show'),3200); }
+function headers(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
+async function api(path, options={}){
+  options.headers = {...headers(), ...(options.headers||{})};
+  const response = await fetch(path, options);
+  if(response.status===401 && !path.includes('/teachers/login')){ showLogin(); throw new Error('Teacher login required'); }
+  if(!response.ok){ let message=response.statusText; try{message=(await response.json()).detail||message;}catch(e){} throw new Error(message); }
+  return response.json();
+}
+function showLogin(){ if(projector) return; $('login').style.display='flex'; }
+function hideLogin(){ $('login').style.display='none'; }
+$('loginForm').onsubmit = async event => {
+  event.preventDefault();
+  try{
+    const result=await api('/teachers/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});
+    token=result.token; teacher=result.teacher;
+    localStorage.setItem('teacherToken',token); localStorage.setItem('teacherName',teacher);
+    $('teacherName').textContent=teacher; hideLogin(); await initializeDashboard(); toast('Welcome, '+teacher);
+  }catch(e){ $('loginError').textContent=e.message; }
+};
+$('logoutBtn').onclick=()=>{ localStorage.removeItem('teacherToken');localStorage.removeItem('teacherName');token='';teacher='';showLogin(); };
+
+async function loadClasses(){
+  classes=await api('/classes/');
+  const select=$('classSelect');
+  const previous=select.value;
+  select.innerHTML=classes.length?classes.map(c=>`<option value="${c.id}">${esc(c.class_name)}${c.room?' · '+esc(c.room):''}</option>`).join(''):'<option value="">Create a class first</option>';
+  if(previous && classes.some(c=>String(c.id)===previous)) select.value=previous;
+  await refreshEnrolled();
+}
+async function loadStudents(){
+  students=await api('/students/');
+  $('existingStudent').innerHTML=students.length?students.map(s=>`<option value="${s.id}">${esc(s.nim)} · ${esc(s.name)}</option>`).join(''):'<option value="">No students yet</option>';
+}
+async function refreshEnrolled(){
+  const cid=$('classSelect').value;
+  if(!cid){ $('enrolledList').textContent='Create a class first.'; $('enrolledCount').textContent='0'; return; }
+  const rows=await api('/classes/'+cid+'/students');
+  $('enrolledCount').textContent=rows.length;
+  $('enrolledList').className=rows.length?'':'empty';
+  $('enrolledList').innerHTML=rows.length?rows.map(s=>`<div class="student-row"><span><b>${esc(s.student_nim)}</b> · ${esc(s.student_name)}</span><button class="secondary small" onclick="removeStudent(${cid},${s.student_id})">Remove</button></div>`).join(''):'No students enrolled yet.';
+}
+$('classSelect').onchange=refreshEnrolled;
+$('deleteClassBtn').onclick=async()=>{
+  const cid=Number($('classSelect').value);
+  if(!cid) return toast('Choose a class first');
+  const name=$('classSelect').selectedOptions[0]?.text||'this class';
+  if(!confirm(`Delete class "${esc(name)}"?\nThis removes all student enrollments for this class.`)) return;
+  try{
+    await api('/classes/'+cid,{method:'DELETE'});
+    toast('Class deleted');
+    await loadClasses();
+  }catch(e){ toast(e.message); }
+};
+$('newClassBtn').onclick=()=>{ $('classForm').style.display=$('classForm').style.display==='none'?'flex':'none'; };
+$('createClassBtn').onclick=async()=>{
+  const name=$('className').value.trim(); if(!name)return toast('Enter a class name');
+  try{ const created=await api('/classes/',{method:'POST',body:JSON.stringify({class_name:name,room:$('classRoom').value.trim()||null})});
+    $('className').value='';$('classRoom').value='';$('classForm').style.display='none';await loadClasses();$('classSelect').value=created.id;await refreshEnrolled();$('enrollmentDetails').open=true;toast('Class created. Add students next.');
+  }catch(e){toast(e.message);}
+};
+$('enrollBtn').onclick=async()=>{
+  const cid=$('classSelect').value,sid=$('existingStudent').value;if(!cid||!sid)return toast('Choose a class and student');
+  try{await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:Number(sid)})});await refreshEnrolled();toast('Student enrolled');}catch(e){toast(e.message);}
+};
+$('addStudentBtn').onclick=async()=>{
+  const cid=$('classSelect').value,name=$('newName').value.trim(),nim=$('newNim').value.trim();
+  if(!cid||!name||!nim)return toast('Class, name, and NIM are required');
+  try{const s=await api('/students/',{method:'POST',body:JSON.stringify({name,nim})});await api('/classes/'+cid+'/students',{method:'POST',body:JSON.stringify({student_id:s.id})});$('newName').value='';$('newNim').value='';await Promise.all([loadStudents(),refreshEnrolled()]);toast('Student added and enrolled');}catch(e){toast(e.message);}
+};
+window.removeStudent=async(cid,sid)=>{if(!confirm('Remove this student from the class?'))return;try{await api('/classes/'+cid+'/students/'+sid,{method:'DELETE'});await refreshEnrolled();}catch(e){toast(e.message);}};
+$('startBtn').onclick=async()=>{
+  const cid=Number($('classSelect').value);if(!cid)return toast('Create and select a class first');
+  if(Number($('enrolledCount').textContent)===0){$('enrollmentDetails').open=true;return toast('Add at least one student before starting');}
+  if(!confirm('Start the class session now?\nThe start QR will appear for students to scan and take their first selfie.'))return;
+  try{await api('/qr-sessions/start',{method:'POST',body:JSON.stringify({class_id:cid})});viewingClosed=false;await pollActive();toast('START phase opened. Students can scan the QR.');}catch(e){toast(e.message);}
+};
+
+function phaseContent(phase){
+  if(phase==='start')return {title:'STEP 1 · Start check-in',help:'Students scan this QR and take their FIRST selfie. Successful students appear as Partial (yellow) in the roster.',foot:'When the class is almost finished, press Start Final Attendance.'};
+  if(phase==='spot')return {title:'OPTIONAL · Spot check',help:'Students with a start check-in scan this QR and take another selfie. This helps confirm they are still present.',foot:'Resume the class or continue to Final Attendance.'};
+  return {title:'STEP 2 · Final check-in',help:'Students scan this NEW QR and take their FINAL selfie. Students with both selfies become Verified (green).',foot:'The final phase closes automatically after the configured grace period, or press End Session.'};
+}
+function renderActive(data){
+  active=data && data.active?data:null;
+  const has=!!active;
+  $('noSession').style.display=has?'none':'block';
+  $('sessionActive').style.display=has?'block':'none';
+  $('sessionClosed').style.display=(!has&&viewingClosed)?'block':'none';
+  ['stepStart','stepEnd','stepClosed'].forEach(id=>$(id).className='step');
+  $('finalBtn').style.display='none';$('spotBtn').style.display='none';$('resumeBtn').style.display='none';$('endBtn').style.display='none';
+  if(!has){ if(viewingClosed)$('stepClosed').className='step active'; return; }
+  viewingSessionId=active.session_id;
+  $('endBtn').style.display='inline-block';
+  const phase=active.phase||'start', content=phaseContent(phase);
+  $('phaseTitle').textContent=content.title;$('phaseHelp').textContent=content.help;$('phaseFootnote').textContent=content.foot;
+  $('qrToken').textContent=active.token;$('qrImage').src='/qr-sessions/active/qr.png?v='+Date.now();
+  if(phase==='start'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('spotBtn').style.display='inline-block';}
+  else if(phase==='spot'){$('stepStart').className='step active';$('finalBtn').style.display='inline-block';$('resumeBtn').style.display='inline-block';}
+  else{$('stepStart').className='step done';$('stepEnd').className='step active';$('endBtn').style.display='inline-block';}
+}
+async function pollActive(){try{const data=await api('/qr-sessions/active');if(!viewingClosed)renderActive(data);if(!viewingClosed)viewingSessionId=data.active?data.session_id:viewingSessionId;if(!projector)await refreshRoster();}catch(e){if(!projector)toast(e.message);}}
+async function changePhase(phase,confirmText){if(confirmText&&!confirm(confirmText))return;try{await api('/qr-sessions/phase',{method:'POST',body:JSON.stringify({phase})});viewingClosed=false;await pollActive();toast(phase==='end'?'FINAL phase opened. Students scan the new QR.':'Session phase updated');}catch(e){toast(e.message);}}
+$('finalBtn').onclick=()=>changePhase('end','Start Final Attendance now?\nStart check-ins will close and a NEW final QR will appear.');
+$('spotBtn').onclick=()=>changePhase('spot','Open an optional mid-class spot check?\nStudents with a start check-in will scan a new QR.');
+$('resumeBtn').onclick=()=>changePhase('start',null);
+$('endBtn').onclick=async()=>{if(!confirm('End this class session?\nNo more check-ins will be accepted. The final roster stays available.'))return;try{await api('/qr-sessions/end',{method:'POST',body:JSON.stringify({session_id:viewingSessionId})});viewingClosed=true;renderActive({active:false});await Promise.all([refreshRoster(),loadHistory()]);toast('Session closed. Review the final roster.');}catch(e){toast(e.message);}};
+$('projectorBtn').onclick=()=>{window.open('/dashboard?projector=1','_blank','noopener');};
+
+async function refreshRoster(){
+  if(!viewingSessionId)return;
+  try{
+    const rows=await api('/attendance/roster?qr_session_id='+viewingSessionId);
+    const body=$('rosterBody');
+    body.innerHTML=rows.length?rows.map(r=>{
+      const confidence=r.end_confidence??r.start_confidence;
+      const canManual=viewingClosed&&r.status!=='verified';
+      return `<tr><td>${esc(r.student_nim)}</td><td>${esc(r.student_name)}</td><td><span class="badge ${r.status}">${r.status.toUpperCase()}</span>${r.manual?'<span class="manual-note">MANUAL</span>':''}</td><td>${esc((r.start_time||'-').split(' ')[1]||r.start_time||'-')}</td><td>${esc((r.end_time||'-').split(' ')[1]||r.end_time||'-')}</td><td>${confidence==null?'-':(confidence*100).toFixed(1)+'%'}</td><td>${canManual?`<button class="success small" onclick="markManual(${r.student_id})">✓ Mark present</button>`:''}</td></tr>`;
+    }).join(''):'<tr><td colspan="7" class="empty">No enrolled students in this class.</td></tr>';
+    $('verifiedCount').textContent=rows.filter(r=>r.status==='verified').length;
+    $('partialCount').textContent=rows.filter(r=>r.status==='partial').length;
+    $('pendingCount').textContent=rows.filter(r=>r.status==='pending'||r.status==='absent').length;
+    $('totalCount').textContent=rows.length;
+  }catch(e){if(!projector)toast(e.message);}
+}
+window.markManual=async(studentId)=>{if(!confirm('Mark this student as Verified (manual)?\nUse this only after the student spoke to you about why they could not check in.'))return;try{await api('/attendance/manual',{method:'POST',body:JSON.stringify({student_id:studentId,qr_session_id:viewingSessionId})});await refreshRoster();toast('Student marked Verified (manual)');}catch(e){toast(e.message);}};
+$('refreshRosterBtn').onclick=refreshRoster;
+$('exportBtn').onclick=()=>{if(!viewingSessionId)return toast('Choose a session first');window.open('/attendance/export/csv?qr_session_id='+viewingSessionId,'_blank');};
+async function loadHistory(){
+  const sessions=await api('/qr-sessions/history?limit=15');const select=$('historySelect');const previous=viewingSessionId;
+  select.innerHTML='<option value="">Choose a session…</option>'+sessions.map(s=>`<option value="${s.id}">#${s.id} · ${esc(s.class_name)} · ${s.phase==='closed'?'Closed':esc(s.phase)} · ${esc((s.started_at||'').slice(0,16))}</option>`).join('');
+  if(previous&&sessions.some(s=>s.id===previous))select.value=previous;
+}
+$('historySelect').onchange=async()=>{const value=$('historySelect').value;if(!value)return;viewingSessionId=Number(value);const text=$('historySelect').selectedOptions[0].textContent;viewingClosed=text.includes('Closed');renderActive(viewingClosed?{active:false}:active);await refreshRoster();};
+
+async function initializeDashboard(){
+  $('teacherName').textContent=teacher;
+  await Promise.all([loadClasses(),loadStudents(),loadHistory()]);
+  await pollActive();
+}
+(async function init(){
+  if(projector){viewingClosed=false;setInterval(async()=>{try{const data=await api('/qr-sessions/active');renderActive(data);}catch(e){}},3000);await pollActive();return;}
+  if(!token){showLogin();return;}
+  try{const valid=await api('/teachers/verify',{method:'POST',body:JSON.stringify({token})});if(!valid.valid){showLogin();return;}hideLogin();await initializeDashboard();setInterval(()=>{if(!viewingClosed)pollActive();},5000);}catch(e){showLogin();}
+})();
+</script>
+</body>
+</html>
